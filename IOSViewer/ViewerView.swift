@@ -33,12 +33,16 @@ struct ViewerView: View {
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .textFieldStyle(.roundedBorder)
-                        Button("Connect") {
-                            viewer.connect(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
-                                           code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+                        Button(viewer.isConnecting ? "Cancel connection" : "Connect") {
+                            if viewer.isConnecting {
+                                viewer.disconnect()
+                            } else {
+                                viewer.connect(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
+                                               code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+                            }
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(macAddress.isEmpty || code.isEmpty)
+                        .disabled(!viewer.isConnecting && (macAddress.isEmpty || code.isEmpty))
                     } else {
                         HStack {
                             Button(viewer.isMicrophoneOn ? "Stop microphone" : "Start microphone") {

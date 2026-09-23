@@ -16,11 +16,13 @@ Run `xcodegen generate` in this folder, then open `TailView.xcodeproj` in Xcode.
 4. To make the device microphone available to Mac apps, install [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) (`brew install --cask blackhole-2ch`), reboot the Mac, and select **BlackHole 2ch** as the input in the Mac app that needs your voice.
 5. Press **Stop sharing** on the Mac to end capture and close the connection.
 
+The iOS viewer offers **Cancel connection** while connecting and times out after 10 seconds. A new Mac sharing session generates a new code; reconnect with the newly displayed code.
+
 If the iOS app cannot connect, check that macOS Firewall allows incoming connections for TailView Mac. The host still binds only to its Tailscale IPv4 address. Keep the Mac awake and signed in while sharing.
 
 BlackHole installation requires the Mac administrator password. TailView does not install or change the audio driver itself. Video can be tested before BlackHole is installed; the Mac app reports microphone routing as unavailable in that case.
 
-Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display the viewer, but macOS does not expose the mirrored iPhone's microphone to it. The Mac app reports when it receives an audio packet, even if BlackHole is unavailable.
+Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display the viewer, but macOS does not expose the mirrored iPhone's microphone to it. The Mac app reports the received audio level in dBFS, even if BlackHole is unavailable.
 
 ## Transport and scope
 

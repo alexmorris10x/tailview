@@ -7,11 +7,15 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var status = "Start sharing on the Mac, then connect here."
     @Published private(set) var microphoneStatus = "Microphone is off"
     @Published private(set) var isConnected = false
+    @Published private(set) var isConnecting = false
     @Published private(set) var isMicrophoneOn = false
 
     private let networkQueue = DispatchQueue(label: "TailView.viewerNetwork")
     private let packetLock = NSLock()
     private var pendingPackets = 0
+    private var didReportCapture = false
+    private var didReportConversionFailure = false
+    private var didReportSend = false
     private var connection: NWConnection?
     private var engine: AVAudioEngine?
 
@@ -23,6 +27,7 @@ final class ViewerModel: ObservableObject {
             return
         }
         status = "Connecting…"
+        isConnecting = true
         let connection = NWConnection(host: NWEndpoint.Host(host), port: port, using: .tcp)
         self.connection = connection
         connection.stateUpdateHandler = { [weak self, weak connection] state in
@@ -44,6 +49,13 @@ final class ViewerModel: ObservableObject {
             }
         }
         connection.start(queue: networkQueue)
+        networkQueue.asyncAfter(deadline: .now() + 10) { [weak self, weak connection] in
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection, self.isConnecting else { return }
+                self.disconnect()
+                self.status = "Connection timed out"
+            }
+        }
     }
 
     func disconnect() {
@@ -52,6 +64,7 @@ final class ViewerModel: ObservableObject {
         connection = nil
         image = nil
         isConnected = false
+        isConnecting = false
         status = "Disconnected"
     }
 
@@ -76,6 +89,7 @@ final class ViewerModel: ObservableObject {
                 DispatchQueue.main.async {
                     guard self.connection === connection else { return }
                     self.isConnected = true
+                    self.isConnecting = false
                     self.status = "Viewing Mac screen"
                 }
                 self.receiveFrames(connection, parser: PacketParser())
@@ -122,7 +136,12 @@ final class ViewerModel: ObservableObject {
         engine?.stop()
         engine = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        packetLock.lock(); pendingPackets = 0; packetLock.unlock()
+        packetLock.lock()
+        pendingPackets = 0
+        didReportCapture = false
+        didReportConversionFailure = false
+        didReportSend = false
+        packetLock.unlock()
         isMicrophoneOn = false
         microphoneStatus = "Microphone is off"
     }
@@ -147,7 +166,7 @@ final class ViewerModel: ObservableObject {
             try engine.start()
             self.engine = engine
             isMicrophoneOn = true
-            microphoneStatus = "Sending microphone to Mac"
+            microphoneStatus = "Waiting for microphone samples…"
         } catch {
             stopMicrophone()
             microphoneStatus = "Microphone failed: \(error.localizedDescription)"
@@ -157,9 +176,16 @@ final class ViewerModel: ObservableObject {
     private func sendMicrophone(_ input: AVAudioPCMBuffer, converter: AVAudioConverter,
                                 format: AVAudioFormat, connection: NWConnection) {
         packetLock.lock()
+        let firstCapture = !didReportCapture
+        didReportCapture = true
         if pendingPackets >= 8 { packetLock.unlock(); return }
         pendingPackets += 1
         packetLock.unlock()
+        if firstCapture {
+            DispatchQueue.main.async { [weak self] in
+                if self?.isMicrophoneOn == true { self?.microphoneStatus = "Captured microphone samples; converting…" }
+            }
+        }
         let capacity = AVAudioFrameCount(ceil(Double(input.frameLength) * 48_000 / input.format.sampleRate)) + 32
         guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { packetDone(); return }
         var provided = false
@@ -170,7 +196,19 @@ final class ViewerModel: ObservableObject {
             status.pointee = .haveData
             return input
         }
-        guard error == nil, output.frameLength > 0, let channel = output.int16ChannelData?[0] else { packetDone(); return }
+        guard error == nil, output.frameLength > 0, let channel = output.int16ChannelData?[0] else {
+            packetLock.lock()
+            let firstFailure = !didReportConversionFailure && !didReportSend
+            didReportConversionFailure = true
+            packetLock.unlock()
+            if firstFailure {
+                DispatchQueue.main.async { [weak self] in
+                    if self?.isMicrophoneOn == true { self?.microphoneStatus = "Microphone conversion produced no audio" }
+                }
+            }
+            packetDone()
+            return
+        }
         let byteCount = Int(output.frameLength) * 2
         let payload = Data(bytes: channel, count: byteCount)
         connection.send(content: Packet.encode(.microphone, payload), completion: .contentProcessed { [weak self] error in
@@ -180,6 +218,16 @@ final class ViewerModel: ObservableObject {
                     guard self?.connection === connection else { return }
                     self?.disconnect()
                     self?.status = "Mac connection lost"
+                }
+            } else if let self {
+                self.packetLock.lock()
+                let firstSend = !self.didReportSend
+                self.didReportSend = true
+                self.packetLock.unlock()
+                if firstSend {
+                    DispatchQueue.main.async {
+                        if self.isMicrophoneOn { self.microphoneStatus = "Audio packets sent to Mac" }
+                    }
                 }
             }
         })

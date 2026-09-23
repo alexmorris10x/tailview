@@ -40,6 +40,13 @@ final class HostModel: ObservableObject {
                         self?.microphoneStatus = sink == nil ? "Receiving voice; install BlackHole 2ch to route it" : "Receiving voice through BlackHole 2ch"
                     }
                 }
+                server.onMicrophoneLevel = { [weak self] level in
+                    Task { @MainActor in
+                        let decibels = level > 0 ? max(-90, Int((20 * log10(level)).rounded())) : -90
+                        let routing = sink == nil ? " · BlackHole 2ch needed for Mac input" : " · BlackHole 2ch"
+                        self?.microphoneStatus = "Receiving voice · \(decibels) dBFS\(routing)"
+                    }
+                }
                 server.onError = { [weak self] message in
                     Task { @MainActor in self?.stop(); self?.status = message }
                 }

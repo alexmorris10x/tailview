@@ -4,6 +4,7 @@ import Foundation
 final class VideoServer {
     var onViewerStatus: ((String) -> Void)?
     var onMicrophonePacket: (() -> Void)?
+    var onMicrophoneLevel: ((Double) -> Void)?
     var onError: ((String) -> Void)?
 
     private let lock = NSLock()
@@ -16,6 +17,7 @@ final class VideoServer {
     private var sendPending = false
     private var latestFrame: Data?
     private var didReportMicrophone = false
+    private var lastLevelReport = 0.0
 
     init(address: String, code: String, audioSink: AudioSink?) throws {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
@@ -119,6 +121,7 @@ final class VideoServer {
             let frame = latestFrame
             lock.unlock()
             didReportMicrophone = false
+            lastLevelReport = 0
             onViewerStatus?("Connected")
             if let frame { publish(frame) }
             receiveMicrophone(client)
@@ -136,7 +139,26 @@ final class VideoServer {
                 didReportMicrophone = true
                 onMicrophonePacket?()
             }
+            let now = ProcessInfo.processInfo.systemUptime
+            if now - lastLevelReport >= 0.2 {
+                lastLevelReport = now
+                onMicrophoneLevel?(Self.microphoneLevel(payload))
+            }
             audioSink?.append(payload)
+        }
+    }
+
+    private static func microphoneLevel(_ payload: Data) -> Double {
+        payload.withUnsafeBytes { rawBytes in
+            let bytes = rawBytes.bindMemory(to: UInt8.self)
+            guard bytes.count >= 2 else { return 0 }
+            var sum = 0.0
+            for index in stride(from: 0, to: bytes.count - 1, by: 2) {
+                let bits = UInt16(bytes[index]) | (UInt16(bytes[index + 1]) << 8)
+                let sample = Double(Int16(bitPattern: bits)) / 32768.0
+                sum += sample * sample
+            }
+            return sqrt(sum / Double(bytes.count / 2))
         }
     }
 
