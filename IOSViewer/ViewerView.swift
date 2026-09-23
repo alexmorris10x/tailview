@@ -79,14 +79,18 @@ struct ViewerView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         Form {
-                            Section("Acoustic microphone test") {
-                                Text("Plays a two-second tone through this device's speaker. Its microphone must capture that sound and send it to the Mac; the tone is never sent directly.")
-                                Button("Play test tone") { viewer.runAcousticTest() }
-                                    .disabled(!viewer.isMicrophoneOn)
-                                Button("Compare with system recorder") { viewer.runRecorderTest() }
+                            Section("Microphone input") {
+                                Text("Stops streaming and records four seconds with the same record-only audio session used for live microphone capture. The temporary audio is deleted after measuring it.")
+                                Button("Record-only microphone check") { viewer.runRecorderTest(isolated: true) }
                                 Text(viewer.debugStatus)
                                 Text(viewer.inputLevelStatus)
                                 Text(viewer.microphoneStatus)
+                            }
+                            Section("Speaker output") {
+                                Text("Plays a tone through this device's speaker. This does not test microphone capture.")
+                                Button("Play speaker test tone") { viewer.runSpeakerTest() }
+                                    .disabled(viewer.isMicrophoneOn)
+                                Text(viewer.speakerTestStatus)
                             }
                             Section("Transport test") {
                                 Text("Sends generated PCM to the Mac without using the microphone. This verifies the connection and receiver only.")
@@ -116,7 +120,6 @@ struct ViewerView: View {
                 macAddress = arguments[index + 1]
                 code = arguments[index + 2]
                 viewer.connect(host: macAddress, code: code, startMicrophoneOnConnect: true,
-                               runAcousticTestOnConnect: arguments.contains("--tailview-test-tone"),
                                runRecorderTestOnConnect: arguments.contains("--tailview-test-recorder"),
                                runSyntheticTestOnConnect: arguments.contains("--tailview-test-synthetic"))
             }

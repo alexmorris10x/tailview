@@ -9,6 +9,7 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var inputLevelStatus = ""
     #if DEBUG
     @Published private(set) var debugStatus = "No diagnostic run yet"
+    @Published private(set) var speakerTestStatus = "No speaker test run yet"
     #endif
     @Published private(set) var isConnected = false
     @Published private(set) var isConnecting = false
@@ -26,7 +27,6 @@ final class ViewerModel: ObservableObject {
     private var engine: AVAudioEngine?
     #if DEBUG
     private var acousticTestPlayer: AVAudioPlayer?
-    private var runAcousticTestAfterCapture = false
     private var runRecorderTestAfterConnect = false
     private var runSyntheticTestAfterConnect = false
     private var diagnosticRecorder: AVAudioRecorder?
@@ -37,7 +37,7 @@ final class ViewerModel: ObservableObject {
     private var inputRouteName = "iPhone microphone"
 
     func connect(host: String, code: String, startMicrophoneOnConnect: Bool = false,
-                 runAcousticTestOnConnect: Bool = false, runRecorderTestOnConnect: Bool = false,
+                 runRecorderTestOnConnect: Bool = false,
                  runSyntheticTestOnConnect: Bool = false) {
         guard connection == nil else { return }
         guard host.hasPrefix("100."), code.count == 36,
@@ -49,7 +49,6 @@ final class ViewerModel: ObservableObject {
         isConnecting = true
         startMicrophoneAfterConnect = startMicrophoneOnConnect
         #if DEBUG
-        runAcousticTestAfterCapture = runAcousticTestOnConnect
         runRecorderTestAfterConnect = runRecorderTestOnConnect
         runSyntheticTestAfterConnect = runSyntheticTestOnConnect
         #endif
@@ -180,7 +179,6 @@ final class ViewerModel: ObservableObject {
         #if DEBUG
         acousticTestPlayer?.stop()
         acousticTestPlayer = nil
-        runAcousticTestAfterCapture = false
         #endif
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
@@ -203,9 +201,8 @@ final class ViewerModel: ObservableObject {
         guard let connection, isConnected else { return }
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            try session.setCategory(.record, mode: .default)
             try session.setActive(true)
-            try session.overrideOutputAudioPort(.speaker)
             if let builtInMicrophone = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
                 try session.setPreferredInput(builtInMicrophone)
             }
@@ -228,12 +225,6 @@ final class ViewerModel: ObservableObject {
             isMicrophoneOn = true
             microphoneStatus = "Waiting for samples from \(inputRouteName)…"
             inputLevelStatus = "Input peak: waiting for samples"
-            #if DEBUG
-            if runAcousticTestAfterCapture {
-                runAcousticTestAfterCapture = false
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.runAcousticTest() }
-            }
-            #endif
         } catch {
             stopMicrophone()
             microphoneStatus = "Microphone failed: \(error.localizedDescription)"
@@ -330,21 +321,32 @@ final class ViewerModel: ObservableObject {
     }
 
     #if DEBUG
-    func runAcousticTest() {
-        guard isMicrophoneOn else {
-            microphoneStatus = "Start microphone before the acoustic test"
+    func runSpeakerTest() {
+        guard !isMicrophoneOn, diagnosticRecorder == nil else {
+            speakerTestStatus = "Stop microphone or recording before the speaker test"
             return
         }
+        let session = AVAudioSession.sharedInstance()
         do {
+            try session.setCategory(.playback, mode: .default)
+            try session.setActive(true)
             try playTestTone()
-            microphoneStatus = "Playing tone through iPhone speaker; measuring microphone…"
+            speakerTestStatus = "Playing speaker tone; microphone is not involved"
+            guard let player = acousticTestPlayer else { return }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [weak self] in
+                guard let self, self.acousticTestPlayer === player, !self.isMicrophoneOn else { return }
+                self.acousticTestPlayer = nil
+                try? session.setActive(false, options: .notifyOthersOnDeactivation)
+                self.speakerTestStatus = "Speaker test finished; microphone was not tested"
+            }
         } catch {
-            microphoneStatus = "Acoustic test failed: \(error.localizedDescription)"
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            speakerTestStatus = "Speaker test failed: \(error.localizedDescription)"
         }
     }
 
     private func playTestTone() throws {
-            // A real speaker-to-microphone test: the generated tone never enters the network path directly.
+            // This tone only checks speaker playback and is never sent to the Mac.
             let sampleRate = 48_000
             let sampleCount = sampleRate * 2
             var pcm = Data(capacity: sampleCount * 2)
@@ -436,12 +438,12 @@ final class ViewerModel: ObservableObject {
                 guard let self, self.diagnosticRecorder === recorder else { return }
                 self.diagnosticTimer?.invalidate()
                 self.diagnosticTimer = nil
-                let recordedSeconds = recorder.currentTime
                 recorder.stop()
                 self.diagnosticRecorder = nil
                 self.acousticTestPlayer?.stop()
                 self.acousticTestPlayer = nil
                 let fileFrames = (try? AVAudioFile(forReading: url).length) ?? 0
+                let recordedSeconds = Double(fileFrames) / 48_000
                 let filePeak = self.recordedFilePeak(url)
                 let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
                 try? FileManager.default.removeItem(at: url)
