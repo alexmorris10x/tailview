@@ -6,6 +6,10 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var image: UIImage?
     @Published private(set) var status = "Start sharing on the Mac, then connect here."
     @Published private(set) var microphoneStatus = "Microphone is off"
+    @Published private(set) var inputLevelStatus = ""
+    #if DEBUG
+    @Published private(set) var debugStatus = "No diagnostic run yet"
+    #endif
     @Published private(set) var isConnected = false
     @Published private(set) var isConnecting = false
     @Published private(set) var isMicrophoneOn = false
@@ -16,10 +20,25 @@ final class ViewerModel: ObservableObject {
     private var didReportCapture = false
     private var didReportConversionFailure = false
     private var didReportSend = false
+    private var inputPeak = 0.0
+    private var lastInputLevelReport = 0.0
     private var connection: NWConnection?
     private var engine: AVAudioEngine?
+    #if DEBUG
+    private var acousticTestPlayer: AVAudioPlayer?
+    private var runAcousticTestAfterCapture = false
+    private var runRecorderTestAfterConnect = false
+    private var runSyntheticTestAfterConnect = false
+    private var diagnosticRecorder: AVAudioRecorder?
+    private var diagnosticTimer: Timer?
+    private var diagnosticPeak = -90.0
+    #endif
+    private var startMicrophoneAfterConnect = false
+    private var inputRouteName = "iPhone microphone"
 
-    func connect(host: String, code: String) {
+    func connect(host: String, code: String, startMicrophoneOnConnect: Bool = false,
+                 runAcousticTestOnConnect: Bool = false, runRecorderTestOnConnect: Bool = false,
+                 runSyntheticTestOnConnect: Bool = false) {
         guard connection == nil else { return }
         guard host.hasPrefix("100."), code.count == 36,
               let port = NWEndpoint.Port(rawValue: 47_820) else {
@@ -28,6 +47,12 @@ final class ViewerModel: ObservableObject {
         }
         status = "Connecting…"
         isConnecting = true
+        startMicrophoneAfterConnect = startMicrophoneOnConnect
+        #if DEBUG
+        runAcousticTestAfterCapture = runAcousticTestOnConnect
+        runRecorderTestAfterConnect = runRecorderTestOnConnect
+        runSyntheticTestAfterConnect = runSyntheticTestOnConnect
+        #endif
         let connection = NWConnection(host: NWEndpoint.Host(host), port: port, using: .tcp)
         self.connection = connection
         connection.stateUpdateHandler = { [weak self, weak connection] state in
@@ -59,12 +84,16 @@ final class ViewerModel: ObservableObject {
     }
 
     func disconnect() {
+        #if DEBUG
+        stopDiagnostic()
+        #endif
         stopMicrophone()
         connection?.cancel()
         connection = nil
         image = nil
         isConnected = false
         isConnecting = false
+        startMicrophoneAfterConnect = false
         status = "Disconnected"
     }
 
@@ -91,6 +120,22 @@ final class ViewerModel: ObservableObject {
                     self.isConnected = true
                     self.isConnecting = false
                     self.status = "Viewing Mac screen"
+                    if self.startMicrophoneAfterConnect {
+                        self.startMicrophoneAfterConnect = false
+                        #if DEBUG
+                        if self.runRecorderTestAfterConnect {
+                            self.runRecorderTestAfterConnect = false
+                            self.runRecorderTest()
+                        } else if self.runSyntheticTestAfterConnect {
+                            self.runSyntheticTestAfterConnect = false
+                            self.sendSyntheticAudioTest()
+                        } else {
+                            self.startMicrophone()
+                        }
+                        #else
+                        self.startMicrophone()
+                        #endif
+                    }
                 }
                 self.receiveFrames(connection, parser: PacketParser())
             } else { self.receiveAuth(connection, partial: partial) }
@@ -132,6 +177,11 @@ final class ViewerModel: ObservableObject {
     }
 
     func stopMicrophone() {
+        #if DEBUG
+        acousticTestPlayer?.stop()
+        acousticTestPlayer = nil
+        runAcousticTestAfterCapture = false
+        #endif
         engine?.inputNode.removeTap(onBus: 0)
         engine?.stop()
         engine = nil
@@ -141,20 +191,30 @@ final class ViewerModel: ObservableObject {
         didReportCapture = false
         didReportConversionFailure = false
         didReportSend = false
+        inputPeak = 0
+        lastInputLevelReport = 0
         packetLock.unlock()
         isMicrophoneOn = false
         microphoneStatus = "Microphone is off"
+        inputLevelStatus = ""
     }
 
     private func beginCapture() {
         guard let connection, isConnected else { return }
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .default, options: [.mixWithOthers, .allowBluetoothHFP])
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setActive(true)
+            try session.overrideOutputAudioPort(.speaker)
+            if let builtInMicrophone = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                try session.setPreferredInput(builtInMicrophone)
+            }
+            let outputRouteName = session.currentRoute.outputs.first?.portName ?? "Unknown output"
+            inputRouteName = (session.currentRoute.inputs.first?.portName ?? "Unknown input") + " → " + outputRouteName
             let engine = AVAudioEngine()
             let input = engine.inputNode
             let sourceFormat = input.outputFormat(forBus: 0)
+            inputRouteName += " · \(sourceFormat.commonFormat) \(Int(sourceFormat.sampleRate)) Hz"
             guard let targetFormat = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 48_000,
                                                    channels: 1, interleaved: false),
                   let converter = AVAudioConverter(from: sourceFormat, to: targetFormat) else {
@@ -166,7 +226,14 @@ final class ViewerModel: ObservableObject {
             try engine.start()
             self.engine = engine
             isMicrophoneOn = true
-            microphoneStatus = "Waiting for microphone samples…"
+            microphoneStatus = "Waiting for samples from \(inputRouteName)…"
+            inputLevelStatus = "Input peak: waiting for samples"
+            #if DEBUG
+            if runAcousticTestAfterCapture {
+                runAcousticTestAfterCapture = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.runAcousticTest() }
+            }
+            #endif
         } catch {
             stopMicrophone()
             microphoneStatus = "Microphone failed: \(error.localizedDescription)"
@@ -175,6 +242,7 @@ final class ViewerModel: ObservableObject {
 
     private func sendMicrophone(_ input: AVAudioPCMBuffer, converter: AVAudioConverter,
                                 format: AVAudioFormat, connection: NWConnection) {
+        reportInputLevel(input)
         packetLock.lock()
         let firstCapture = !didReportCapture
         didReportCapture = true
@@ -226,19 +294,206 @@ final class ViewerModel: ObservableObject {
                 self.packetLock.unlock()
                 if firstSend {
                     DispatchQueue.main.async {
-                        if self.isMicrophoneOn { self.microphoneStatus = "Audio packets sent to Mac" }
+                        if self.isMicrophoneOn { self.microphoneStatus = "Audio packets sent to Mac · \(self.inputRouteName)" }
                     }
                 }
             }
         })
     }
 
+    private func reportInputLevel(_ input: AVAudioPCMBuffer) {
+        var peak = 0.0
+        if let channel = input.floatChannelData?[0] {
+            for index in 0..<Int(input.frameLength) { peak = max(peak, abs(Double(channel[index]))) }
+        } else if let channel = input.int16ChannelData?[0] {
+            for index in 0..<Int(input.frameLength) { peak = max(peak, abs(Double(channel[index]) / 32768.0)) }
+        } else if let channel = input.int32ChannelData?[0] {
+            for index in 0..<Int(input.frameLength) { peak = max(peak, abs(Double(channel[index]) / 2147483648.0)) }
+        }
+        packetLock.lock()
+        inputPeak = max(inputPeak, peak)
+        let now = ProcessInfo.processInfo.systemUptime
+        let shouldReport = now - lastInputLevelReport >= 0.2
+        if shouldReport { lastInputLevelReport = now }
+        let heldPeak = inputPeak
+        packetLock.unlock()
+        if shouldReport {
+            let decibels = heldPeak > 0 ? max(-90, Int((20 * log10(heldPeak)).rounded())) : -90
+            DispatchQueue.main.async { [weak self] in
+                if self?.isMicrophoneOn == true { self?.inputLevelStatus = "Input peak: \(decibels) dBFS" }
+            }
+        }
+    }
+
     private func packetDone() {
         packetLock.lock(); pendingPackets = max(0, pendingPackets - 1); packetLock.unlock()
     }
 
+    #if DEBUG
+    func runAcousticTest() {
+        guard isMicrophoneOn else {
+            microphoneStatus = "Start microphone before the acoustic test"
+            return
+        }
+        do {
+            try playTestTone()
+            microphoneStatus = "Playing tone through iPhone speaker; measuring microphone…"
+        } catch {
+            microphoneStatus = "Acoustic test failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func playTestTone() throws {
+            // A real speaker-to-microphone test: the generated tone never enters the network path directly.
+            let sampleRate = 48_000
+            let sampleCount = sampleRate * 2
+            var pcm = Data(capacity: sampleCount * 2)
+            for sample in 0..<sampleCount {
+                let envelope = min(1.0, Double(sample) / 2_400, Double(sampleCount - sample) / 2_400)
+                let value = Int16((sin(2 * .pi * 750 * Double(sample) / Double(sampleRate)) * envelope * 1_000).rounded())
+                withUnsafeBytes(of: value.littleEndian) { pcm.append(contentsOf: $0) }
+            }
+            var wave = Data()
+            func append32(_ value: UInt32) { withUnsafeBytes(of: value.littleEndian) { wave.append(contentsOf: $0) } }
+            func append16(_ value: UInt16) { withUnsafeBytes(of: value.littleEndian) { wave.append(contentsOf: $0) } }
+            wave.append(contentsOf: "RIFF".utf8)
+            append32(UInt32(36 + pcm.count))
+            wave.append(contentsOf: "WAVEfmt ".utf8)
+            append32(16)
+            append16(1)
+            append16(1)
+            append32(UInt32(sampleRate))
+            append32(UInt32(sampleRate * 2))
+            append16(2)
+            append16(16)
+            wave.append(contentsOf: "data".utf8)
+            append32(UInt32(pcm.count))
+            wave.append(pcm)
+            acousticTestPlayer = try AVAudioPlayer(data: wave)
+            acousticTestPlayer?.prepareToPlay()
+            guard acousticTestPlayer?.play() == true else { throw MicrophoneError.testPlaybackFailed }
+    }
+
+    func runRecorderTest() {
+        guard diagnosticRecorder == nil else { return }
+        stopMicrophone()
+        debugStatus = "Requesting microphone permission…"
+        AVAudioApplication.requestRecordPermission { [weak self] allowed in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard allowed else { self.debugStatus = "Microphone permission denied"; return }
+                self.beginRecorderTest()
+            }
+        }
+    }
+
+    private func stopDiagnostic() {
+        diagnosticTimer?.invalidate()
+        diagnosticTimer = nil
+        diagnosticRecorder?.stop()
+        diagnosticRecorder = nil
+        try? FileManager.default.removeItem(at: FileManager.default.temporaryDirectory
+            .appendingPathComponent("tailview-mic-diagnostic.caf"))
+    }
+
+    private func beginRecorderTest() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            try session.setActive(true)
+            try session.overrideOutputAudioPort(.speaker)
+            if let builtIn = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
+                try session.setPreferredInput(builtIn)
+            }
+            let route = "\(session.currentRoute.inputs.first?.portName ?? "No input") → \(session.currentRoute.outputs.first?.portName ?? "No output") · volume \(Int((session.outputVolume * 100).rounded()))%"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("tailview-mic-diagnostic.caf")
+            let settings: [String: Any] = [AVFormatIDKey: Int(kAudioFormatLinearPCM),
+                                           AVSampleRateKey: 48_000, AVNumberOfChannelsKey: 1,
+                                           AVLinearPCMBitDepthKey: 16, AVLinearPCMIsFloatKey: false]
+            let recorder = try AVAudioRecorder(url: url, settings: settings)
+            recorder.isMeteringEnabled = true
+            guard recorder.record(forDuration: 4) else { throw MicrophoneError.testRecordingFailed }
+            diagnosticRecorder = recorder
+            diagnosticPeak = -90
+            debugStatus = "Recorder test running: \(route)"
+            diagnosticTimer?.invalidate()
+            diagnosticTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] timer in
+                guard let self, let recorder = self.diagnosticRecorder else { timer.invalidate(); return }
+                recorder.updateMeters()
+                self.diagnosticPeak = max(self.diagnosticPeak, Double(recorder.peakPower(forChannel: 0)))
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self, self.diagnosticRecorder === recorder else { return }
+                do { try self.playTestTone() }
+                catch { self.debugStatus = "Tone playback failed: \(error.localizedDescription)" }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.2) { [weak self] in
+                guard let self, self.diagnosticRecorder === recorder else { return }
+                self.diagnosticTimer?.invalidate()
+                self.diagnosticTimer = nil
+                recorder.stop()
+                self.diagnosticRecorder = nil
+                self.acousticTestPlayer?.stop()
+                self.acousticTestPlayer = nil
+                let filePeak = self.recordedFilePeak(url)
+                try? FileManager.default.removeItem(at: url)
+                self.debugStatus = "Recorder meter: \(Int(self.diagnosticPeak.rounded())) dBFS · file: \(filePeak) dBFS · \(route)"
+                try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            }
+        } catch {
+            debugStatus = "Recorder test failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func recordedFilePeak(_ url: URL) -> Int {
+        guard let file = try? AVAudioFile(forReading: url), file.length > 0,
+              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat,
+                                            frameCapacity: AVAudioFrameCount(min(file.length, 240_000))),
+              (try? file.read(into: buffer)) != nil else { return -90 }
+        var peak = 0.0
+        for channelIndex in 0..<Int(buffer.format.channelCount) {
+            if let channel = buffer.floatChannelData?[channelIndex] {
+                for index in 0..<Int(buffer.frameLength) { peak = max(peak, abs(Double(channel[index]))) }
+            } else if let channel = buffer.int16ChannelData?[channelIndex] {
+                for index in 0..<Int(buffer.frameLength) { peak = max(peak, abs(Double(channel[index]) / 32768.0)) }
+            }
+        }
+        return peak > 0 ? max(-90, Int((20 * log10(peak)).rounded())) : -90
+    }
+
+    func sendSyntheticAudioTest() {
+        guard let connection, isConnected else {
+            debugStatus = "Connect to the Mac before testing transport"
+            return
+        }
+        debugStatus = "Sending generated PCM to Mac (microphone bypassed)…"
+        let packetCount = 100
+        for packet in 0..<packetCount {
+            networkQueue.asyncAfter(deadline: .now() + Double(packet) * 0.02) { [weak self, weak connection] in
+                guard let self, let connection, self.connection === connection else { return }
+                var samples = Data(capacity: 960 * 2)
+                for index in 0..<960 {
+                    let sample = packet * 960 + index
+                    let value = Int16((sin(2 * .pi * 750 * Double(sample) / 48_000) * 8_000).rounded())
+                    withUnsafeBytes(of: value.littleEndian) { samples.append(contentsOf: $0) }
+                }
+                connection.send(content: Packet.encode(.microphone, samples), completion: .contentProcessed { _ in })
+                if packet == packetCount - 1 {
+                    DispatchQueue.main.async { self.debugStatus = "Generated PCM sent to Mac; check Mac peak (mic bypassed)" }
+                }
+            }
+        }
+    }
+    #endif
+
     private enum MicrophoneError: LocalizedError {
-        case unsupportedFormat
-        var errorDescription: String? { "Audio format is unavailable" }
+        case unsupportedFormat, testPlaybackFailed, testRecordingFailed
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedFormat: "Audio format is unavailable"
+            case .testPlaybackFailed: "Could not play through the iPhone speaker"
+            case .testRecordingFailed: "Could not start a temporary diagnostic recording"
+            }
+        }
     }
 }

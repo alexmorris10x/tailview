@@ -2,7 +2,7 @@
 
 An exploratory, private Mac-to-iPhone/iPad screen viewer with microphone return. The Mac app captures its main display using ScreenCaptureKit and sends JPEG frames directly to one authenticated viewer over the existing Tailscale network. The iOS app displays the frames and sends its microphone to the Mac. The Mac can expose that audio as an input through BlackHole 2ch.
 
-This is a prototype. It does not yet provide remote keyboard/mouse control, Mac sound playback, reconnect, clipboard transfer, file transfer, H.264 compression, or a reviewed security release. Screen sharing is only active after pressing **Start sharing** on the Mac. The Mac listens on its Tailscale IPv4 address, with a fresh session code for each run. No frame or audio recording is written to disk.
+This is a prototype. It does not yet provide remote keyboard/mouse control, Mac sound playback, reconnect, clipboard transfer, file transfer, H.264 compression, or a reviewed security release. Screen sharing is only active after pressing **Start sharing** on the Mac. The Mac listens on its Tailscale IPv4 address, with a fresh session code for each run. Normal viewing and microphone streaming do not record frames or audio to disk.
 
 ## Build
 
@@ -20,9 +20,13 @@ The iOS viewer offers **Cancel connection** while connecting and times out after
 
 If the iOS app cannot connect, check that macOS Firewall allows incoming connections for TailView Mac. The host still binds only to its Tailscale IPv4 address. Keep the Mac awake and signed in while sharing.
 
-BlackHole installation requires the Mac administrator password. TailView does not install or change the audio driver itself. Video can be tested before BlackHole is installed; the Mac app reports microphone routing as unavailable in that case.
+BlackHole installation requires the Mac administrator password and a restart. TailView does not install or change the audio driver itself. Video can be tested before BlackHole appears in macOS Audio Devices; the Mac app reports microphone routing as unavailable in that case.
 
-Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display the viewer, but macOS does not expose the mirrored iPhone's microphone to it. The Mac app reports the received audio level in dBFS, even if BlackHole is unavailable.
+Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display the viewer, but macOS does not expose the mirrored iPhone's microphone to it. TailView selects the device's built-in microphone when available and displays its input peak. The Mac app reports the received audio level in dBFS, even if BlackHole is unavailable.
+
+Debug builds have **Debug Settings** in the iOS toolbar. **Play test tone** plays through the device speaker while the microphone is streaming; a nonzero input peak is needed to prove acoustic capture. **Compare with system recorder** records a short temporary audio file, reports both meter and file peaks, then deletes the file. **Send generated audio** bypasses the microphone and verifies only the network path and Mac receiver. These are separate checks: a successful generated-audio test does not prove microphone capture.
+
+On the physical iPhone used during development, screen viewing worked and generated PCM reached the Mac at a nonzero level. The live microphone and recorder diagnostics reported silence. The iPhone audio route showed its built-in microphone and speaker with output volume at zero. The cause of the silent input is still unresolved. BlackHole's package and receipt were installed, but macOS did not expose the device before a restart, so selectable Mac microphone routing has not been validated.
 
 ## Transport and scope
 

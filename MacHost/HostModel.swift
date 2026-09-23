@@ -12,10 +12,12 @@ final class HostModel: ObservableObject {
 
     private var capture: ScreenCapture?
     private var server: VideoServer?
+    private var peakMicrophoneLevel = 0.0
 
     func start() {
         guard !isSharing, !isStarting else { return }
         isStarting = true
+        peakMicrophoneLevel = 0
         status = "Starting screen capture…"
         Task { [self] in
             do {
@@ -31,6 +33,7 @@ final class HostModel: ObservableObject {
                     Task { @MainActor in
                         self?.viewerStatus = message
                         if message == "Disconnected" {
+                            self?.peakMicrophoneLevel = 0
                             self?.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
                         }
                     }
@@ -42,9 +45,12 @@ final class HostModel: ObservableObject {
                 }
                 server.onMicrophoneLevel = { [weak self] level in
                     Task { @MainActor in
+                        guard let self else { return }
+                        self.peakMicrophoneLevel = max(self.peakMicrophoneLevel, level)
                         let decibels = level > 0 ? max(-90, Int((20 * log10(level)).rounded())) : -90
+                        let peak = self.peakMicrophoneLevel > 0 ? max(-90, Int((20 * log10(self.peakMicrophoneLevel)).rounded())) : -90
                         let routing = sink == nil ? " · BlackHole 2ch needed for Mac input" : " · BlackHole 2ch"
-                        self?.microphoneStatus = "Receiving voice · \(decibels) dBFS\(routing)"
+                        self.microphoneStatus = "Voice \(decibels) dBFS · peak \(peak) dBFS\(routing)"
                     }
                 }
                 server.onError = { [weak self] message in
@@ -79,6 +85,7 @@ final class HostModel: ObservableObject {
         status = "Stopped"
         viewerStatus = "Disconnected"
         microphoneStatus = "Unavailable until BlackHole 2ch is installed"
+        peakMicrophoneLevel = 0
         sessionCode = ""
     }
 
