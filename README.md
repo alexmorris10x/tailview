@@ -36,6 +36,8 @@ On the physical iPad running iPadOS 27, the record-only diagnostic captured zero
 
 TCP port 47820 is bound to the Mac's Tailscale IPv4 address only. A 36-character random session code is required before any frame is sent. Tailscale encrypts the transport; TailView does not add a second layer of encryption, so use it only on a tailnet whose members you trust. This removes Jump Desktop from the screen and microphone path, while Tailscale still supplies connectivity and may use its relay infrastructure.
 
+The Mac app currently runs without App Sandbox because its Tailscale address lookup, screen capture, socket listener, and BlackHole output have only been validated in that configuration. Any tailnet peer with the current session code can connect while sharing is active. The prototype has no peer allowlist, repeated-attempt limit, or independent security review. Keep the GitHub repository private and use this build only on a trusted tailnet until those controls and a sandboxed build have been tested.
+
 The initial implementation captures only the Mac's first display at up to 8 frames per second and a maximum width of 1280 pixels. JPEG favors implementation simplicity over bandwidth and responsiveness. The microphone uses 48 kHz, 16-bit, mono PCM. Packet type 1 is JPEG, type 2 is PCM; each packet has a one-byte type and a four-byte big-endian length.
 
 Run `scripts/test-transport.sh` to test the connection protocol on loopback without Screen Recording permission or a virtual audio driver.
