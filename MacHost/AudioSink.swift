@@ -55,6 +55,7 @@ final class AudioSink {
             sink.fill(queue: queue, buffer: buffer)
         }, Unmanaged.passUnretained(self).toOpaque(), nil, nil, 0, &queue))
         guard let queue else { throw SinkError.unavailable }
+        self.queue = queue
         var uid: CFString = deviceUID as CFString
         let status = withUnsafePointer(to: &uid) {
             AudioQueueSetProperty(queue, kAudioQueueProperty_CurrentDevice, UnsafeRawPointer($0), UInt32(MemoryLayout<CFString>.size))

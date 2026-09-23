@@ -26,7 +26,7 @@ Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display
 
 Debug builds have **Debug Settings** in the iOS toolbar. **Play test tone** plays through the device speaker while the microphone is streaming; a nonzero input peak is needed to prove acoustic capture. **Compare with system recorder** records a short temporary audio file, reports both meter and file peaks, then deletes the file. **Send generated audio** bypasses the microphone and verifies only the network path and Mac receiver. These are separate checks: a successful generated-audio test does not prove microphone capture.
 
-On the physical iPhone used during development, screen viewing worked and generated PCM reached the Mac at a nonzero level. The live microphone and recorder diagnostics reported silence. The iPhone audio route showed its built-in microphone and speaker with output volume at zero. The cause of the silent input is still unresolved. BlackHole's package and receipt were installed, but macOS did not expose the device before a restart, so selectable Mac microphone routing has not been validated.
+On the physical iPhone used during development, screen viewing worked and generated PCM reached the Mac at a nonzero level. After installing BlackHole and restarting the Mac, an independent recording of BlackHole's input measured iPhone-generated PCM at about -12 dBFS. The live microphone, recorder meter, and temporary recording file still reported silence (-90 dBFS). The iPhone audio route showed its built-in microphone and speaker with output volume at zero, so the on-device acoustic tone did not provide a reliable stimulus. Real microphone capture remains unverified.
 
 ## Transport and scope
 
