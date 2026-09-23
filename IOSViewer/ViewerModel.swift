@@ -374,7 +374,7 @@ final class ViewerModel: ObservableObject {
             guard acousticTestPlayer?.play() == true else { throw MicrophoneError.testPlaybackFailed }
     }
 
-    func runRecorderTest() {
+    func runRecorderTest(isolated: Bool = false) {
         guard diagnosticRecorder == nil else { return }
         stopMicrophone()
         debugStatus = "Requesting microphone permission…"
@@ -382,7 +382,7 @@ final class ViewerModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self else { return }
                 guard allowed else { self.debugStatus = "Microphone permission denied"; return }
-                self.beginRecorderTest()
+                self.beginRecorderTest(isolated: isolated)
             }
         }
     }
@@ -396,12 +396,16 @@ final class ViewerModel: ObservableObject {
             .appendingPathComponent("tailview-mic-diagnostic.caf"))
     }
 
-    private func beginRecorderTest() {
+    private func beginRecorderTest(isolated: Bool) {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            if isolated {
+                try session.setCategory(.record, mode: .default)
+            } else {
+                try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            }
             try session.setActive(true)
-            try session.overrideOutputAudioPort(.speaker)
+            if !isolated { try session.overrideOutputAudioPort(.speaker) }
             if let builtIn = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
                 try session.setPreferredInput(builtIn)
             }
@@ -424,6 +428,7 @@ final class ViewerModel: ObservableObject {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 guard let self, self.diagnosticRecorder === recorder else { return }
+                guard !isolated else { return }
                 do { try self.playTestTone() }
                 catch { self.debugStatus = "Tone playback failed: \(error.localizedDescription)" }
             }
@@ -431,13 +436,21 @@ final class ViewerModel: ObservableObject {
                 guard let self, self.diagnosticRecorder === recorder else { return }
                 self.diagnosticTimer?.invalidate()
                 self.diagnosticTimer = nil
+                let recordedSeconds = recorder.currentTime
                 recorder.stop()
                 self.diagnosticRecorder = nil
                 self.acousticTestPlayer?.stop()
                 self.acousticTestPlayer = nil
+                let fileFrames = (try? AVAudioFile(forReading: url).length) ?? 0
                 let filePeak = self.recordedFilePeak(url)
+                let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? NSNumber)?.intValue ?? 0
                 try? FileManager.default.removeItem(at: url)
-                self.debugStatus = "Recorder meter: \(Int(self.diagnosticPeak.rounded())) dBFS · file: \(filePeak) dBFS · \(route)"
+                self.debugStatus = "\(isolated ? "Isolated recorder" : "Recorder") meter: \(Int(self.diagnosticPeak.rounded())) dBFS · file: \(filePeak) dBFS (\(fileFrames) frames, \(fileSize) bytes, \(String(format: "%.1f", recordedSeconds))s) · inputAvailable: \(session.isInputAvailable) · inputChannels: \(session.inputNumberOfChannels) · \(route)"
+                if isolated,
+                   let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                    try? self.debugStatus.write(to: directory.appendingPathComponent("tailview-mic-diagnostic.txt"),
+                                                atomically: true, encoding: .utf8)
+                }
                 try? session.setActive(false, options: .notifyOthersOnDeactivation)
             }
         } catch {

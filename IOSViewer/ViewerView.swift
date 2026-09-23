@@ -107,6 +107,10 @@ struct ViewerView: View {
             guard !didRunDebugLaunch else { return }
             didRunDebugLaunch = true
             let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--tailview-test-isolated-recorder") {
+                viewer.runRecorderTest(isolated: true)
+                return
+            }
             if let index = arguments.firstIndex(of: "--tailview-test-connect"),
                arguments.count > index + 2 {
                 macAddress = arguments[index + 1]

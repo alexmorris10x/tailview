@@ -26,7 +26,11 @@ Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display
 
 Debug builds have **Debug Settings** in the iOS toolbar. **Play test tone** plays through the device speaker while the microphone is streaming; a nonzero input peak is needed to prove acoustic capture. **Compare with system recorder** records a short temporary audio file, reports both meter and file peaks, then deletes the file. **Send generated audio** bypasses the microphone and verifies only the network path and Mac receiver. These are separate checks: a successful generated-audio test does not prove microphone capture.
 
+For an isolated hardware check on a paired physical device, launch the debug iOS app with `--tailview-test-isolated-recorder`. This uses the system's record-only audio session without connecting to the Mac or playing a tone. It deletes the temporary audio and writes only the meter, file frame count, file size, duration, and route summary to `Documents/tailview-mic-diagnostic.txt` in TailView's app container. The diagnostic can be retrieved with `xcrun devicectl device copy from` using that device's exact identifier and TailView's app data container.
+
 On the physical iPhone used during development, screen viewing worked and generated PCM reached the Mac at a nonzero level. After installing BlackHole and restarting the Mac, an independent recording of BlackHole's input measured iPhone-generated PCM at about -12 dBFS. The live microphone, recorder meter, and temporary recording file still reported silence (-90 dBFS). The iPhone audio route showed its built-in microphone and speaker with output volume at zero, so the on-device acoustic tone did not provide a reliable stimulus. Real microphone capture remains unverified.
+
+On the physical iPad running iPadOS 27 with its Device Hub screen view open, the isolated record-only diagnostic reported the built-in microphone available with one input channel, yet captured zero frames in about four seconds. The temporary PCM file was 4 KB and the meter stayed at -90 dBFS. That narrows this failure to device-side capture; it does not establish whether Device Hub, iPadOS, or TailView's audio session is responsible. A retest with only the iPad Device Hub view closed is pending.
 
 ## Transport and scope
 
