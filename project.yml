@@ -1,0 +1,30 @@
+name: TailView
+options:
+  bundleIdPrefix: com.10x
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    DEVELOPMENT_TEAM: 98CDQPW36W
+targets:
+  TailViewMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources: [MacHost, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.mac
+        INFOPLIST_FILE: MacHost/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_APP_SANDBOX: NO
+  TailViewIOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources: [IOSViewer, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios
+        INFOPLIST_FILE: IOSViewer/Info.plist
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
