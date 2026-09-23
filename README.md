@@ -20,6 +20,8 @@ If the iOS app cannot connect, check that macOS Firewall allows incoming connect
 
 BlackHole installation requires the Mac administrator password. TailView does not install or change the audio driver itself. Video can be tested before BlackHole is installed; the Mac app reports microphone routing as unavailable in that case.
 
+Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display the viewer, but macOS does not expose the mirrored iPhone's microphone to it. The Mac app reports when it receives an audio packet, even if BlackHole is unavailable.
+
 ## Transport and scope
 
 TCP port 47820 is bound to the Mac's Tailscale IPv4 address only. A 36-character random session code is required before any frame is sent. Tailscale encrypts the transport; TailView does not add a second layer of encryption, so use it only on a tailnet whose members you trust. This removes Jump Desktop from the screen and microphone path, while Tailscale still supplies connectivity and may use its relay infrastructure.

@@ -28,7 +28,17 @@ final class HostModel: ObservableObject {
                 let sink = try? AudioSink.blackHole()
                 let server = try VideoServer(address: ip, code: code, audioSink: sink)
                 server.onViewerStatus = { [weak self] message in
-                    Task { @MainActor in self?.viewerStatus = message }
+                    Task { @MainActor in
+                        self?.viewerStatus = message
+                        if message == "Disconnected" {
+                            self?.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
+                        }
+                    }
+                }
+                server.onMicrophonePacket = { [weak self] in
+                    Task { @MainActor in
+                        self?.microphoneStatus = sink == nil ? "Receiving voice; install BlackHole 2ch to route it" : "Receiving voice through BlackHole 2ch"
+                    }
                 }
                 server.onError = { [weak self] message in
                     Task { @MainActor in self?.stop(); self?.status = message }
@@ -61,6 +71,7 @@ final class HostModel: ObservableObject {
         isStarting = false
         status = "Stopped"
         viewerStatus = "Disconnected"
+        microphoneStatus = "Unavailable until BlackHole 2ch is installed"
         sessionCode = ""
     }
 

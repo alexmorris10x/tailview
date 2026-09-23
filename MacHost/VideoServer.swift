@@ -3,6 +3,7 @@ import Foundation
 
 final class VideoServer {
     var onViewerStatus: ((String) -> Void)?
+    var onMicrophonePacket: (() -> Void)?
     var onError: ((String) -> Void)?
 
     private let lock = NSLock()
@@ -14,6 +15,7 @@ final class VideoServer {
     private var running = false
     private var sendPending = false
     private var latestFrame: Data?
+    private var didReportMicrophone = false
 
     init(address: String, code: String, audioSink: AudioSink?) throws {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
@@ -116,6 +118,7 @@ final class VideoServer {
             activeFD = client
             let frame = latestFrame
             lock.unlock()
+            didReportMicrophone = false
             onViewerStatus?("Connected")
             if let frame { publish(frame) }
             receiveMicrophone(client)
@@ -129,6 +132,10 @@ final class VideoServer {
             let length = header.dropFirst().reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
             guard length > 0, length <= 65_536, length.isMultiple(of: 2),
                   let payload = Self.readExactly(fd, Int(length)) else { return }
+            if !didReportMicrophone {
+                didReportMicrophone = true
+                onMicrophonePacket?()
+            }
             audioSink?.append(payload)
         }
     }
