@@ -12,11 +12,12 @@ Run `xcodegen generate` in this folder, then open `TailView.xcodeproj` in Xcode.
 
 1. Connect the Mac and iPhone/iPad to Tailscale.
 2. Open TailViewMac and press **Start sharing**. macOS will request Screen Recording permission. If you grant it, quit and reopen the app before trying again.
-3. Enter the Mac's displayed address and session code into TailViewIOS and tap **Connect**. Tap **Start microphone** when you want to send your voice, then allow microphone access when prompted.
-4. To make the device microphone available to Mac apps, install [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) (`brew install --cask blackhole-2ch`), reboot the Mac, and select **BlackHole 2ch** as the input in the Mac app that needs your voice.
-5. Press **Stop sharing** on the Mac to end capture and close the connection.
+3. On the Mac, choose **Pair a new device**. In TailView on the iPhone or iPad, enter the Mac's Tailscale address, a profile name, and the current session code. Tap **Pair and connect**. Pairing is open for five minutes or until one device pairs.
+4. On later sessions, press **Start sharing** on the Mac and tap its saved profile on the iPhone or iPad. The session code does not need to be entered again. Tap **Start microphone** when you want to send your voice, then allow microphone access when prompted.
+5. To make the device microphone available to Mac apps, install [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) (`brew install --cask blackhole-2ch`), reboot the Mac, and select **BlackHole 2ch** as the input in the Mac app that needs your voice.
+6. Press **Stop sharing** on the Mac to end capture and close the connection.
 
-The iOS viewer offers **Cancel connection** while connecting and times out after 10 seconds. A new Mac sharing session generates a new code; reconnect with the newly displayed code.
+The iOS viewer offers **Cancel connection** while connecting and times out after 10 seconds. A new Mac sharing session generates a new code, but saved profiles reconnect through a separate credential. **Connect once** still accepts the current code without pairing. You can remove a profile on the iOS device; to remove its access to the Mac, use **Revoke** in the Mac app's paired devices list. Revocation disconnects an active viewer. To pair it again, open a new pairing window on the Mac and use the current code.
 
 If the iOS app cannot connect, check that macOS Firewall allows incoming connections for TailView Mac. The host still binds only to its Tailscale IPv4 address. Keep the Mac awake and signed in while sharing.
 
@@ -34,9 +35,9 @@ On the physical iPad running iPadOS 27, the record-only diagnostic captured zero
 
 ## Transport and scope
 
-TCP port 47820 is bound to the Mac's Tailscale IPv4 address only. A 36-character random session code is required before any frame is sent. Tailscale encrypts the transport; TailView does not add a second layer of encryption, so use it only on a tailnet whose members you trust. This removes Jump Desktop from the screen and microphone path, while Tailscale still supplies connectivity and may use its relay infrastructure.
+TCP port 47820 is bound to the Mac's Tailscale IPv4 address only. A 36-character random session code is required for one-time viewing or for creating a saved pairing while the Mac has explicitly opened pairing. Saved profiles use a randomly generated 256-bit credential held in the iOS Keychain; the Mac Keychain holds a SHA-256 digest for validation. The session code itself is not saved. Mac screen capture still requires **Start sharing** for every session. Tailscale encrypts the transport; TailView does not add a second layer of encryption, so use it only on a tailnet whose members you trust. This removes Jump Desktop from the screen and microphone path, while Tailscale still supplies connectivity and may use its relay infrastructure.
 
-The Mac app currently runs without App Sandbox because its Tailscale address lookup, screen capture, socket listener, and BlackHole output have only been validated in that configuration. Any tailnet peer with the current session code can connect while sharing is active. The prototype has no peer allowlist, repeated-attempt limit, or independent security review. Keep the GitHub repository private and use this build only on a trusted tailnet until those controls and a sandboxed build have been tested.
+The Mac app currently runs without App Sandbox because its Tailscale address lookup, screen capture, socket listener, and BlackHole output have only been validated in that configuration. Any tailnet peer with the current session code can connect while sharing is active; a device with a valid saved credential can connect whenever sharing is active. The prototype has no peer allowlist, repeated-attempt limit, or independent security review. Keep the GitHub repository private and use this build only on a trusted tailnet until those controls and a sandboxed build have been tested.
 
 The initial implementation captures only the Mac's first display at up to 8 frames per second and a maximum width of 1280 pixels. JPEG favors implementation simplicity over bandwidth and responsiveness. The microphone uses 48 kHz, 16-bit, mono PCM. Packet type 1 is JPEG, type 2 is PCM; each packet has a one-byte type and a four-byte big-endian length.
 

@@ -8,21 +8,23 @@ struct TransportSmoke {
         let address = CommandLine.arguments[1]
         let code = UUID().uuidString.lowercased()
         let server = try VideoServer(address: address, code: code, audioSink: nil)
+        let deviceID = UUID()
+        let token = String(repeating: "ab", count: 32)
+        let pair = PairingRequest.pair(code: code, id: deviceID, token: token, deviceName: "Test iPad")
+        let saved = PairingRequest.authenticate(id: deviceID, token: token)
+        let credentials = CredentialStore()
+        server.authenticateSaved = { credentials.authenticate($0, token: $1) }
+        server.onPairingRequest = { credentials.add($0, token: $2); return true }
         let connected = DispatchSemaphore(value: 0)
         server.onViewerStatus = { if $0 == "Connected" { connected.signal() } }
         server.start()
         defer { server.stop() }
 
-        let rejected = try connect(to: address)
-        _ = writeExactly(rejected, Data((UUID().uuidString.lowercased() + "\n").utf8))
-        var byte: UInt8 = 0
-        let rejection = Darwin.recv(rejected, &byte, 1, 0)
-        let rejectionError = errno
-        Darwin.close(rejected)
-        guard rejection == 0 else { throw TestError.message("Wrong session code was accepted or timed out (recv=\(rejection), errno=\(rejectionError))") }
+        try expectRejected(address, line: UUID().uuidString.lowercased() + "\n", reason: "wrong session code")
+        try expectRejected(address, line: pair.line, reason: "pairing without Mac consent")
+        try expectRejected(address, line: saved.line, reason: "unknown saved device")
 
         let client = try connect(to: address)
-        defer { Darwin.close(client) }
         guard writeExactly(client, Data((code + "\n").utf8)),
               readExactly(client, 3) == Data("OK\n".utf8) else {
             throw TestError.message("Correct session code was not acknowledged")
@@ -41,7 +43,37 @@ struct TransportSmoke {
         guard writeExactly(client, Packet.encode(.microphone, microphone)) else {
             throw TestError.message("Microphone packet was not sent")
         }
-        print("Transport smoke passed: binding, rejection, authentication, frame, microphone packet")
+        Darwin.shutdown(client, SHUT_RDWR)
+        Darwin.close(client)
+
+        server.enablePairing()
+        try expectAccepted(address, line: pair.line, acknowledgment: "PAIRED\n")
+        try expectRejected(address, line: pair.line, reason: "pairing window reused")
+        try expectAccepted(address, line: saved.line, acknowledgment: "OK\n")
+        try expectRejected(address,
+                           line: PairingRequest.authenticate(id: deviceID, token: String(repeating: "cd", count: 32)).line,
+                           reason: "wrong saved token")
+        credentials.revoke(deviceID)
+        try expectRejected(address, line: saved.line, reason: "revoked device")
+        print("Transport smoke passed: session code, pairing consent, saved reconnect, revocation, frame, microphone packet")
+    }
+
+    private static func expectAccepted(_ address: String, line: String, acknowledgment: String) throws {
+        let client = try connect(to: address)
+        defer { Darwin.close(client) }
+        guard writeExactly(client, Data(line.utf8)),
+              readExactly(client, acknowledgment.utf8.count) == Data(acknowledgment.utf8) else {
+            throw TestError.message("Request was not accepted: \(line.prefix(5))")
+        }
+    }
+
+    private static func expectRejected(_ address: String, line: String, reason: String) throws {
+        let client = try connect(to: address)
+        defer { Darwin.close(client) }
+        guard writeExactly(client, Data(line.utf8)) else { throw TestError.message("Could not send \(reason)") }
+        var byte: UInt8 = 0
+        let result = Darwin.recv(client, &byte, 1, 0)
+        guard result == 0 else { throw TestError.message("Accepted \(reason) or timed out (recv=\(result), errno=\(errno))") }
     }
 
     private static func connect(to address: String) throws -> Int32 {
@@ -96,5 +128,25 @@ struct TransportSmoke {
     private enum TestError: LocalizedError {
         case message(String)
         var errorDescription: String? { if case .message(let value) = self { return value }; return nil }
+    }
+}
+
+private final class CredentialStore {
+    private let lock = NSLock()
+    private var tokens = [UUID: String]()
+
+    func add(_ id: UUID, token: String) {
+        lock.lock(); defer { lock.unlock() }
+        tokens[id] = token
+    }
+
+    func authenticate(_ id: UUID, token: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return tokens[id] == token
+    }
+
+    func revoke(_ id: UUID) {
+        lock.lock(); defer { lock.unlock() }
+        tokens.removeValue(forKey: id)
     }
 }

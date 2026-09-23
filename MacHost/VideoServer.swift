@@ -6,6 +6,9 @@ final class VideoServer {
     var onMicrophonePacket: (() -> Void)?
     var onMicrophoneLevel: ((Double) -> Void)?
     var onError: ((String) -> Void)?
+    var authenticateSaved: ((UUID, String) -> Bool)?
+    var onPairingRequest: ((UUID, String, String) -> Bool)?
+    var onPairingSuccess: ((UUID, String) -> Void)?
 
     private let lock = NSLock()
     private let sendQueue = DispatchQueue(label: "TailView.frameSend")
@@ -13,7 +16,9 @@ final class VideoServer {
     private let audioSink: AudioSink?
     private var listenerFD: Int32
     private var activeFD: Int32 = -1
+    private var activePairedID: UUID?
     private var running = false
+    private var pairingDeadline = 0.0
     private var sendPending = false
     private var latestFrame: Data?
     private var didReportMicrophone = false
@@ -54,6 +59,21 @@ final class VideoServer {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.acceptLoop() }
     }
 
+    func enablePairing(for seconds: TimeInterval = 300) {
+        lock.lock(); pairingDeadline = ProcessInfo.processInfo.systemUptime + seconds; lock.unlock()
+    }
+
+    func disablePairing() {
+        lock.lock(); pairingDeadline = 0; lock.unlock()
+    }
+
+    func disconnectPairedDevice(_ id: UUID) {
+        lock.lock()
+        let client = activePairedID == id ? activeFD : -1
+        lock.unlock()
+        if client >= 0 { Darwin.shutdown(client, SHUT_RDWR) }
+    }
+
     func stop() {
         lock.lock()
         guard running || listenerFD >= 0 else { lock.unlock(); return }
@@ -62,6 +82,7 @@ final class VideoServer {
         let client = activeFD
         listenerFD = -1
         activeFD = -1
+        activePairedID = nil
         sendPending = false
         latestFrame = nil
         lock.unlock()
@@ -106,11 +127,30 @@ final class VideoServer {
             setsockopt(client, SOL_SOCKET, SO_NOSIGPIPE, &yes, socklen_t(MemoryLayout<Int32>.size))
             var timeout = timeval(tv_sec: 5, tv_usec: 0)
             setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
-            guard let auth = Self.readExactly(client, 37), String(data: auth, encoding: .utf8) == code + "\n",
-                  Self.writeExactly(client, Data("OK\n".utf8)) else {
+            guard let line = Self.readLine(client, maximum: PairingRequest.maximumLineBytes),
+                  let request = PairingRequest.parse(line) else {
                 Darwin.close(client)
                 continue
             }
+            var pairedID: UUID?
+            var acknowledgment = Data("OK\n".utf8)
+            switch request {
+            case .session(let suppliedCode):
+                guard suppliedCode == code else { Darwin.close(client); continue }
+            case .authenticate(let id, let token):
+                guard authenticateSaved?(id, token) == true else { Darwin.close(client); continue }
+                pairedID = id
+            case .pair(let suppliedCode, let id, let token, let deviceName):
+                guard suppliedCode == code, isPairingAvailable(),
+                      onPairingRequest?(id, deviceName, token) == true else {
+                    Darwin.close(client); continue
+                }
+                pairedID = id
+                acknowledgment = Data("PAIRED\n".utf8)
+                disablePairing()
+                onPairingSuccess?(id, deviceName)
+            }
+            guard Self.writeExactly(client, acknowledgment) else { Darwin.close(client); continue }
             timeout = timeval(tv_sec: 0, tv_usec: 0)
             setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
             var sendTimeout = timeval(tv_sec: 0, tv_usec: 250_000)
@@ -118,6 +158,7 @@ final class VideoServer {
             lock.lock()
             guard running else { lock.unlock(); Darwin.close(client); return }
             activeFD = client
+            activePairedID = pairedID
             let frame = latestFrame
             lock.unlock()
             didReportMicrophone = false
@@ -166,6 +207,7 @@ final class VideoServer {
         lock.lock()
         guard activeFD == fd else { lock.unlock(); return }
         activeFD = -1
+        activePairedID = nil
         sendPending = false
         lock.unlock()
         sendQueue.async { Darwin.shutdown(fd, SHUT_RDWR); Darwin.close(fd) }
@@ -186,6 +228,22 @@ final class VideoServer {
             return true
         }
         return success ? data : nil
+    }
+
+    private func isPairingAvailable() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return pairingDeadline > ProcessInfo.processInfo.systemUptime
+    }
+
+    private static func readLine(_ fd: Int32, maximum: Int) -> String? {
+        var data = Data()
+        for _ in 0..<maximum {
+            var byte: UInt8 = 0
+            guard Darwin.recv(fd, &byte, 1, 0) == 1 else { return nil }
+            if byte == 10 { return String(data: data, encoding: .utf8) }
+            data.append(byte)
+        }
+        return nil
     }
 
     private static func writeExactly(_ fd: Int32, _ data: Data) -> Bool {

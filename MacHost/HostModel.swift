@@ -9,10 +9,17 @@ final class HostModel: ObservableObject {
     @Published private(set) var sessionCode = ""
     @Published private(set) var isSharing = false
     @Published private(set) var isStarting = false
+    @Published private(set) var isPairingOpen = false
+    @Published private(set) var pairedDevices = [PairedDeviceRecord]()
+    @Published private(set) var pairingStatus = ""
 
+    private let pairedStore = PairedDeviceStore()
     private var capture: ScreenCapture?
     private var server: VideoServer?
     private var peakMicrophoneLevel = 0.0
+    private var pairingWindowID = UUID()
+
+    init() { reloadPairedDevices() }
 
     func start() {
         guard !isSharing, !isStarting else { return }
@@ -29,8 +36,27 @@ final class HostModel: ObservableObject {
                 }
                 let sink = try? AudioSink.blackHole()
                 let server = try VideoServer(address: ip, code: code, audioSink: sink)
+                let store = pairedStore
+                server.authenticateSaved = { id, token in store.authenticate(id: id, token: token) }
+                server.onPairingRequest = { [weak self] id, name, token in
+                    do {
+                        try store.add(id: id, name: name, token: token)
+                        return true
+                    } catch {
+                        Task { @MainActor in self?.pairingStatus = "Could not save pairing: \(error.localizedDescription)" }
+                        return false
+                    }
+                }
+                server.onPairingSuccess = { [weak self] _, name in
+                    Task { @MainActor in
+                        self?.reloadPairedDevices()
+                        self?.isPairingOpen = false
+                        self?.pairingStatus = "Paired \(name)"
+                    }
+                }
                 server.onViewerStatus = { [weak self] message in
                     Task { @MainActor in
+                        guard self?.isSharing == true else { return }
                         self?.viewerStatus = message
                         if message == "Disconnected" {
                             self?.peakMicrophoneLevel = 0
@@ -75,6 +101,7 @@ final class HostModel: ObservableObject {
 
     func stop() {
         guard isSharing || isStarting else { return }
+        server?.disablePairing()
         server?.stop()
         server = nil
         let capture = self.capture
@@ -87,6 +114,44 @@ final class HostModel: ObservableObject {
         microphoneStatus = "Unavailable until BlackHole 2ch is installed"
         peakMicrophoneLevel = 0
         sessionCode = ""
+        isPairingOpen = false
+    }
+
+    func enablePairing() {
+        guard isSharing, viewerStatus != "Connected", let server else { return }
+        server.enablePairing()
+        pairingWindowID = UUID()
+        let windowID = pairingWindowID
+        isPairingOpen = true
+        pairingStatus = "Pairing is open for five minutes or until one device pairs"
+        Task { [weak self, weak server] in
+            try? await Task.sleep(for: .seconds(300))
+            guard let self, self.server === server, self.isPairingOpen,
+                  self.pairingWindowID == windowID else { return }
+            self.disablePairing()
+        }
+    }
+
+    func disablePairing() {
+        server?.disablePairing()
+        isPairingOpen = false
+        pairingStatus = "Pairing closed"
+    }
+
+    func revoke(_ id: UUID) {
+        do {
+            try pairedStore.revoke(id: id)
+            server?.disconnectPairedDevice(id)
+            reloadPairedDevices()
+            pairingStatus = "Device access revoked"
+        } catch {
+            pairingStatus = "Could not revoke device: \(error.localizedDescription)"
+        }
+    }
+
+    private func reloadPairedDevices() {
+        do { pairedDevices = try pairedStore.list() }
+        catch { pairingStatus = "Could not read paired devices: \(error.localizedDescription)" }
     }
 
     private static func tailscaleIPv4() throws -> String {

@@ -3,6 +3,8 @@ import SwiftUI
 struct ViewerView: View {
     @AppStorage("macAddress") private var macAddress = ""
     @State private var code = ""
+    @State private var profileName = "My Mac"
+    @State private var showPairing = false
     @State private var didRunDebugLaunch = false
     @StateObject private var viewer = ViewerModel()
 
@@ -25,25 +27,74 @@ struct ViewerView: View {
 
                 VStack(spacing: 10) {
                     if !viewer.isConnected {
-                        TextField("Mac Tailscale address (100.x.x.x)", text: $macAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .keyboardType(.numbersAndPunctuation)
-                            .textFieldStyle(.roundedBorder)
-                        SecureField("Session code shown on Mac", text: $code)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .textFieldStyle(.roundedBorder)
-                        Button(viewer.isConnecting ? "Cancel connection" : "Connect") {
-                            if viewer.isConnecting {
-                                viewer.disconnect()
-                            } else {
-                                viewer.connect(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
-                                               code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 10) {
+                                if !viewer.savedMacs.isEmpty {
+                                    Text("Saved Macs").font(.headline)
+                                    ForEach(viewer.savedMacs) { profile in
+                                        HStack {
+                                            Button {
+                                                viewer.connect(profile: profile)
+                                            } label: {
+                                                Label {
+                                                    VStack(alignment: .leading) {
+                                                        Text(profile.name)
+                                                        Text(profile.address).font(.caption).foregroundStyle(.secondary)
+                                                    }
+                                                } icon: { Image(systemName: "desktopcomputer") }
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            }
+                                            .buttonStyle(.borderedProminent)
+                                            .disabled(viewer.isConnecting)
+                                            Menu {
+                                                Button("Forget on this device", role: .destructive) {
+                                                    viewer.forget(profile: profile)
+                                                }
+                                            } label: { Image(systemName: "ellipsis.circle") }
+                                        }
+                                    }
+                                    Button(showPairing ? "Hide pairing" : "Pair another Mac") {
+                                        showPairing.toggle()
+                                    }
+                                    .disabled(viewer.isConnecting)
+                                }
+                                if viewer.savedMacs.isEmpty || showPairing {
+                                    Text("Pair once").font(.headline)
+                                    Text("Start sharing and choose Pair a new device on the Mac.")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    TextField("Profile name", text: $profileName)
+                                        .textFieldStyle(.roundedBorder)
+                                    TextField("Mac Tailscale address (100.x.x.x)", text: $macAddress)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        .keyboardType(.numbersAndPunctuation)
+                                        .textFieldStyle(.roundedBorder)
+                                    SecureField("Session code shown on Mac", text: $code)
+                                        .textInputAutocapitalization(.never)
+                                        .autocorrectionDisabled()
+                                        .textFieldStyle(.roundedBorder)
+                                    HStack {
+                                        Button("Pair and connect") {
+                                            viewer.pair(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                        code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                                                        name: profileName)
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        Button("Connect once") {
+                                            viewer.connect(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
+                                                           code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+                                        }
+                                    }
+                                    .disabled(viewer.isConnecting || macAddress.isEmpty || code.isEmpty)
+                                }
+                                if viewer.isConnecting {
+                                    Button("Cancel connection") { viewer.disconnect() }
+                                }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(!viewer.isConnecting && (macAddress.isEmpty || code.isEmpty))
+                        .frame(maxHeight: 330)
                     } else {
                         HStack {
                             Button(viewer.isMicrophoneOn ? "Stop microphone" : "Start microphone") {
@@ -106,6 +157,9 @@ struct ViewerView: View {
             }
             #endif
         }
+        .onChange(of: viewer.isConnected) { _, connected in
+            if connected { showPairing = false; code = "" }
+        }
         .task {
             #if DEBUG
             guard !didRunDebugLaunch else { return }
@@ -113,6 +167,11 @@ struct ViewerView: View {
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("--tailview-test-isolated-recorder") {
                 viewer.runRecorderTest(isolated: true)
+                return
+            }
+            if arguments.contains("--tailview-test-saved-microphone"),
+               let profile = viewer.savedMacs.first {
+                viewer.connect(profile: profile, startMicrophoneOnConnect: true)
                 return
             }
             if let index = arguments.firstIndex(of: "--tailview-test-connect"),

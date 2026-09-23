@@ -14,6 +14,38 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var isConnected = false
     @Published private(set) var isConnecting = false
     @Published private(set) var isMicrophoneOn = false
+    @Published private(set) var savedMacs = [SavedMac]()
+
+    private enum Credential {
+        case session(String)
+        case saved(SavedMac)
+        case pair(SavedMac, code: String)
+
+        var request: PairingRequest {
+            switch self {
+            case .session(let code): return .session(code: code)
+            case .saved(let profile): return .authenticate(id: profile.id, token: profile.token)
+            case .pair(let profile, let code):
+                return .pair(code: code, id: profile.id, token: profile.token,
+                             deviceName: UIDevice.current.name)
+            }
+        }
+
+        var acknowledgment: Data {
+            switch self {
+            case .pair: return Data("PAIRED\n".utf8)
+            default: return Data("OK\n".utf8)
+            }
+        }
+
+        var rejectionMessage: String {
+            switch self {
+            case .session: return "Session code rejected"
+            case .saved: return "Saved Mac was rejected; it may have been revoked"
+            case .pair: return "Pairing rejected; open Pair a new device on the Mac"
+            }
+        }
+    }
 
     private let networkQueue = DispatchQueue(label: "TailView.viewerNetwork")
     private let packetLock = NSLock()
@@ -36,13 +68,63 @@ final class ViewerModel: ObservableObject {
     private var startMicrophoneAfterConnect = false
     private var inputRouteName = "iPhone microphone"
 
+    init() {
+        do { savedMacs = try SavedMacStore.load() }
+        catch { status = "Could not load saved Macs: \(error.localizedDescription)" }
+    }
+
+    func pair(host: String, code: String, name: String) {
+        guard PairingRequest.validCode(code) else {
+            status = "Enter the current session code shown on the Mac"
+            return
+        }
+        do {
+            let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let profile = SavedMac(id: UUID(), name: title.isEmpty ? "My Mac" : String(title.prefix(40)),
+                                   address: host, token: try SavedMacStore.newToken())
+            beginConnection(host: host, credential: .pair(profile, code: code))
+        } catch {
+            status = "Could not create a pairing credential: \(error.localizedDescription)"
+        }
+    }
+
+    func connect(profile: SavedMac, startMicrophoneOnConnect: Bool = false) {
+        beginConnection(host: profile.address, credential: .saved(profile),
+                        startMicrophoneOnConnect: startMicrophoneOnConnect)
+    }
+
+    func forget(profile: SavedMac) {
+        do {
+            let remaining = savedMacs.filter { $0.id != profile.id }
+            try SavedMacStore.save(remaining)
+            savedMacs = remaining
+            status = "Profile removed from this device; revoke it on the Mac to remove access there"
+        } catch {
+            status = "Could not remove profile: \(error.localizedDescription)"
+        }
+    }
+
     func connect(host: String, code: String, startMicrophoneOnConnect: Bool = false,
                  runRecorderTestOnConnect: Bool = false,
                  runSyntheticTestOnConnect: Bool = false) {
+        guard PairingRequest.validCode(code) else {
+            status = "Enter the current session code shown on the Mac"
+            return
+        }
+        beginConnection(host: host, credential: .session(code),
+                        startMicrophoneOnConnect: startMicrophoneOnConnect,
+                        runRecorderTestOnConnect: runRecorderTestOnConnect,
+                        runSyntheticTestOnConnect: runSyntheticTestOnConnect)
+    }
+
+    private func beginConnection(host: String, credential: Credential,
+                                 startMicrophoneOnConnect: Bool = false,
+                                 runRecorderTestOnConnect: Bool = false,
+                                 runSyntheticTestOnConnect: Bool = false) {
         guard connection == nil else { return }
-        guard host.hasPrefix("100."), code.count == 36,
+        guard host.hasPrefix("100."),
               let port = NWEndpoint.Port(rawValue: 47_820) else {
-            status = "Enter the Mac Tailscale address and session code"
+            status = "Enter the Mac Tailscale address (100.x.x.x)"
             return
         }
         status = "Connecting…"
@@ -59,10 +141,10 @@ final class ViewerModel: ObservableObject {
                 guard let self, let connection, self.connection === connection else { return }
                 switch state {
                 case .ready:
-                    connection.send(content: Data((code + "\n").utf8), completion: .contentProcessed { [weak self, weak connection] error in
+                    connection.send(content: Data(credential.request.line.utf8), completion: .contentProcessed { [weak self, weak connection] error in
                         guard let self, let connection else { return }
                         if error != nil { DispatchQueue.main.async { self.disconnect(); self.status = "Could not authenticate" } }
-                        else { self.receiveAuth(connection, partial: Data()) }
+                        else { self.receiveAuth(connection, credential: credential, partial: Data()) }
                     })
                 case .failed(let error):
                     self.disconnect()
@@ -96,26 +178,40 @@ final class ViewerModel: ObservableObject {
         status = "Disconnected"
     }
 
-    private func receiveAuth(_ connection: NWConnection, partial: Data) {
-        connection.receive(minimumIncompleteLength: 1, maximumLength: 3 - partial.count) { [weak self, weak connection] data, _, complete, error in
+    private func receiveAuth(_ connection: NWConnection, credential: Credential, partial: Data) {
+        let expected = credential.acknowledgment
+        connection.receive(minimumIncompleteLength: 1, maximumLength: expected.count - partial.count) { [weak self, weak connection] data, _, complete, error in
             guard let self, let connection, self.connection === connection else { return }
             guard error == nil, !complete, let data, !data.isEmpty else {
-                DispatchQueue.main.async { self.disconnect(); self.status = "Mac closed the connection" }
+                DispatchQueue.main.async { self.disconnect(); self.status = credential.rejectionMessage }
                 return
             }
             var partial = partial
             partial.append(data)
-            guard partial.count <= 3 else {
+            guard partial.count <= expected.count else {
                 DispatchQueue.main.async { self.disconnect(); self.status = "Invalid Mac response" }
                 return
             }
-            if partial.count == 3 {
-                guard partial == Data("OK\n".utf8) else {
-                    DispatchQueue.main.async { self.disconnect(); self.status = "Session code rejected" }
+            if partial.count == expected.count {
+                guard partial == expected else {
+                    DispatchQueue.main.async { self.disconnect(); self.status = credential.rejectionMessage }
                     return
                 }
                 DispatchQueue.main.async {
                     guard self.connection === connection else { return }
+                    if case .pair(let profile, _) = credential {
+                        do {
+                            var profiles = try SavedMacStore.load()
+                            profiles.removeAll { $0.id == profile.id }
+                            profiles.append(profile)
+                            try SavedMacStore.save(profiles)
+                            self.savedMacs = profiles
+                        } catch {
+                            self.disconnect()
+                            self.status = "Mac paired, but this iPad could not save its profile: \(error.localizedDescription)"
+                            return
+                        }
+                    }
                     self.isConnected = true
                     self.isConnecting = false
                     self.status = "Viewing Mac screen"
@@ -135,9 +231,9 @@ final class ViewerModel: ObservableObject {
                         self.startMicrophone()
                         #endif
                     }
+                    self.receiveFrames(connection, parser: PacketParser())
                 }
-                self.receiveFrames(connection, parser: PacketParser())
-            } else { self.receiveAuth(connection, partial: partial) }
+            } else { self.receiveAuth(connection, credential: credential, partial: partial) }
         }
     }
 

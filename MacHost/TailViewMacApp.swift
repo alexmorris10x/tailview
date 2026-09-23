@@ -8,7 +8,7 @@ struct TailViewMacApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(host)
-                .frame(minWidth: 520, minHeight: 430)
+                .frame(minWidth: 560, minHeight: 520)
         }
     }
 }
