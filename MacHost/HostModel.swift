@@ -4,7 +4,7 @@ import Foundation
 final class HostModel: ObservableObject {
     @Published private(set) var status = "Stopped"
     @Published private(set) var viewerStatus = "Disconnected"
-    @Published private(set) var microphoneStatus = "Unavailable until BlackHole 2ch is installed"
+    @Published private(set) var microphoneStatus = "Start sharing to receive the device microphone"
     @Published private(set) var address = ""
     @Published private(set) var sessionCode = ""
     @Published private(set) var isSharing = false
@@ -111,7 +111,7 @@ final class HostModel: ObservableObject {
         isStarting = false
         status = "Stopped"
         viewerStatus = "Disconnected"
-        microphoneStatus = "Unavailable until BlackHole 2ch is installed"
+        microphoneStatus = "Start sharing to receive the device microphone"
         peakMicrophoneLevel = 0
         sessionCode = ""
         isPairingOpen = false

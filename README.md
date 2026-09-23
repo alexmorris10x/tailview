@@ -21,6 +21,8 @@ The iOS viewer offers **Cancel connection** while connecting and times out after
 
 If the iOS app cannot connect, check that macOS Firewall allows incoming connections for TailView Mac. The host still binds only to its Tailscale IPv4 address. Keep the Mac awake and signed in while sharing.
 
+If BlackHole's input meter stays silent, first confirm TailView Mac says **Sharing main display** rather than **Stopped**, then tap the saved Mac profile and **Start microphone** on the iPhone or iPad. The Mac app should report a changing Voice level. A Mac app must select **BlackHole 2ch** as its input to receive that stream. During physical iPad testing, close its Device Hub screen view before judging microphone levels; that view produced digital silence in our tests.
+
 BlackHole installation requires the Mac administrator password and a restart. TailView does not install or change the audio driver itself. Video can be tested before BlackHole appears in macOS Audio Devices; the Mac app reports microphone routing as unavailable in that case.
 
 Test the microphone on the physical iPhone or iPad. iPhone Mirroring can display the viewer, but macOS does not expose the mirrored iPhone's microphone to it. TailView selects the device's built-in microphone when available and displays its input peak. The Mac app reports the received audio level in dBFS, even if BlackHole is unavailable.
