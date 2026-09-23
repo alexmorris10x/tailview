@@ -21,6 +21,7 @@ struct ContentView: View {
             LabeledContent("Screen", value: host.status)
             LabeledContent("Viewer", value: host.viewerStatus)
             LabeledContent("Microphone", value: host.microphoneStatus)
+            LabeledContent("Remote control", value: host.isControlEnabled ? "Allowed" : "Off")
 
             if host.isSharing {
                 GroupBox("Connect from TailView on iPhone or iPad") {
@@ -43,6 +44,26 @@ struct ContentView: View {
                     Text(host.isPairingOpen ? "Enter the session code once on your device." : "Saved devices can connect while sharing is on.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                GroupBox("Remote control") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            if host.isControlEnabled {
+                                Button("Stop Control", role: .destructive) { host.disableControl() }
+                            } else {
+                                Button("Allow Control") { host.enableControl() }
+                                    .disabled(host.viewerStatus != "Connected")
+                            }
+                            Text("Only a connected, paired device can control this Mac. Approval ends when sharing stops or the device disconnects.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(host.controlStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(4)
                 }
             }
 

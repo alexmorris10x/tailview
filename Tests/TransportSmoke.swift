@@ -13,8 +13,10 @@ struct TransportSmoke {
         let pair = PairingRequest.pair(code: code, id: deviceID, token: token, deviceName: "Test iPad")
         let saved = PairingRequest.authenticate(id: deviceID, token: token)
         let credentials = CredentialStore()
+        let delivered = ControlRecorder()
         server.authenticateSaved = { credentials.authenticate($0, token: $1) }
         server.onPairingRequest = { credentials.add($0, token: $2); return true }
+        server.onControlCommand = { delivered.append($0) }
         let connected = DispatchSemaphore(value: 0)
         server.onViewerStatus = { if $0 == "Connected" { connected.signal() } }
         server.start()
@@ -32,11 +34,28 @@ struct TransportSmoke {
         guard connected.wait(timeout: .now() + 5) == .success else {
             throw TestError.message("Viewer did not become active")
         }
+        try expectState(client, allowed: false, phase: "session connect")
+        let click = ControlCommand(kind: .leftClick, x: 0.25, y: 0.75)
+        guard let clickData = click.encoded(), ControlCommand.decode(clickData) == click else {
+            throw TestError.message("Valid control command did not round trip")
+        }
+        guard ControlCommand(kind: .leftClick, x: -0.01, y: 0.5).encoded() == nil,
+              ControlCommand(kind: .scroll, amount: 100).encoded() == nil,
+              ControlCommand(kind: .text, text: "\u{0000}").encoded() == nil,
+              ControlCommand.decode(Data("bad JSON".utf8)) == nil else {
+            throw TestError.message("Invalid control command was accepted")
+        }
+        server.setControlEnabled(true)
+        try expectState(client, allowed: false, phase: "session enable attempt")
+        guard writeExactly(client, Packet.encode(.control, clickData)) else {
+            throw TestError.message("Session-only control packet could not be sent")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard delivered.count == 0 else { throw TestError.message("Session-code viewer controlled the Mac") }
 
         let jpeg = Data([0xff, 0xd8, 0xff, 0xd9])
         server.publish(jpeg)
-        guard let header = readExactly(client, 5), header[0] == PacketKind.jpeg.rawValue,
-              let frame = readExactly(client, 4), frame == jpeg else {
+        guard let frame = readPacket(client), frame.kind == .jpeg, frame.payload == jpeg else {
             throw TestError.message("Screen frame was not delivered")
         }
         let microphone = Data([0x01, 0x00, 0x02, 0x00])
@@ -47,7 +66,32 @@ struct TransportSmoke {
         Darwin.close(client)
 
         server.enablePairing()
-        try expectAccepted(address, line: pair.line, acknowledgment: "PAIRED\n")
+        let pairedClient = try connect(to: address)
+        guard writeExactly(pairedClient, Data(pair.line.utf8)),
+              readExactly(pairedClient, 7) == Data("PAIRED\n".utf8) else {
+            throw TestError.message("Pairing was not acknowledged")
+        }
+        try expectState(pairedClient, allowed: false, phase: "paired connect")
+        guard writeExactly(pairedClient, Packet.encode(.control, clickData)) else {
+            throw TestError.message("Paired control packet could not be sent")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard delivered.count == 0 else { throw TestError.message("Paired viewer controlled the Mac without approval") }
+        server.setControlEnabled(true)
+        try expectState(pairedClient, allowed: true, phase: "paired enable")
+        guard writeExactly(pairedClient, Packet.encode(.control, clickData)),
+              delivered.waitForCount(1), delivered.count == 1 else {
+            throw TestError.message("Approved paired control did not reach the Mac")
+        }
+        server.setControlEnabled(false)
+        try expectState(pairedClient, allowed: false, phase: "paired disable")
+        guard writeExactly(pairedClient, Packet.encode(.control, clickData)) else {
+            throw TestError.message("Control revoke packet could not be sent")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard delivered.count == 1 else { throw TestError.message("Control worked after Mac revoked it") }
+        Darwin.shutdown(pairedClient, SHUT_RDWR)
+        Darwin.close(pairedClient)
         try expectRejected(address, line: pair.line, reason: "pairing window reused")
         try expectAccepted(address, line: saved.line, acknowledgment: "OK\n")
         try expectRejected(address,
@@ -55,7 +99,24 @@ struct TransportSmoke {
                            reason: "wrong saved token")
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
-        print("Transport smoke passed: session code, pairing consent, saved reconnect, revocation, frame, microphone packet")
+        print("Transport smoke passed: session code, pairing consent, saved reconnect, revocation, frame, microphone, gated control")
+    }
+
+    private static func expectState(_ fd: Int32, allowed: Bool, phase: String) throws {
+        for _ in 0..<3 {
+            guard let packet = readPacket(fd) else { break }
+            if packet.kind == .jpeg { continue }
+            if packet.kind == .controlState, packet.payload == Data([allowed ? 1 : 0]) { return }
+            break
+        }
+        throw TestError.message("Incorrect remote-control state at \(phase)")
+    }
+
+    private static func readPacket(_ fd: Int32) -> (kind: PacketKind, payload: Data)? {
+        guard let header = readExactly(fd, 5), let kind = PacketKind(rawValue: header[0]) else { return nil }
+        let length = header.dropFirst().reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+        guard length > 0, length <= 2_000_000, let payload = readExactly(fd, Int(length)) else { return nil }
+        return (kind, payload)
     }
 
     private static func expectAccepted(_ address: String, line: String, acknowledgment: String) throws {
@@ -128,6 +189,29 @@ struct TransportSmoke {
     private enum TestError: LocalizedError {
         case message(String)
         var errorDescription: String? { if case .message(let value) = self { return value }; return nil }
+    }
+}
+
+private final class ControlRecorder {
+    private let lock = NSLock()
+    private let signal = DispatchSemaphore(value: 0)
+    private var commands = [ControlCommand]()
+
+    var count: Int {
+        lock.lock(); defer { lock.unlock() }
+        return commands.count
+    }
+
+    func append(_ command: ControlCommand) {
+        lock.lock(); commands.append(command); lock.unlock()
+        signal.signal()
+    }
+
+    func waitForCount(_ wanted: Int) -> Bool {
+        while count < wanted {
+            if signal.wait(timeout: .now() + 2) != .success { return false }
+        }
+        return true
     }
 }
 

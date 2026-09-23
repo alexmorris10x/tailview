@@ -3,6 +3,8 @@ import Foundation
 enum PacketKind: UInt8 {
     case jpeg = 1
     case microphone = 2
+    case control = 3
+    case controlState = 4
 }
 
 enum Packet {
@@ -27,7 +29,13 @@ final class PacketParser {
                 | (UInt32(buffer[offset + 2]) << 16)
                 | (UInt32(buffer[offset + 3]) << 8)
                 | UInt32(buffer[offset + 4])
-            let limit: UInt32 = kind == .jpeg ? 2_000_000 : 65_536
+            let limit: UInt32
+            switch kind {
+            case .jpeg: limit = 2_000_000
+            case .microphone: limit = 65_536
+            case .control: limit = 1_024
+            case .controlState: limit = 1
+            }
             guard length > 0, length <= limit else { throw PacketError.invalidLength }
             let total = 5 + Int(length)
             guard buffer.count >= total else { return }

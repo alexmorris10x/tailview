@@ -14,6 +14,8 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var isConnected = false
     @Published private(set) var isConnecting = false
     @Published private(set) var isMicrophoneOn = false
+    @Published private(set) var isPairedSession = false
+    @Published private(set) var isControlAllowed = false
     @Published private(set) var savedMacs = [SavedMac]()
 
     private enum Credential {
@@ -129,6 +131,8 @@ final class ViewerModel: ObservableObject {
         }
         status = "Connecting…"
         isConnecting = true
+        isControlAllowed = false
+        isPairedSession = false
         startMicrophoneAfterConnect = startMicrophoneOnConnect
         #if DEBUG
         runRecorderTestAfterConnect = runRecorderTestOnConnect
@@ -174,6 +178,8 @@ final class ViewerModel: ObservableObject {
         image = nil
         isConnected = false
         isConnecting = false
+        isControlAllowed = false
+        isPairedSession = false
         startMicrophoneAfterConnect = false
         status = "Disconnected"
     }
@@ -214,6 +220,10 @@ final class ViewerModel: ObservableObject {
                     }
                     self.isConnected = true
                     self.isConnecting = false
+                    switch credential {
+                    case .session: self.isPairedSession = false
+                    case .saved, .pair: self.isPairedSession = true
+                    }
                     self.status = "Viewing Mac screen"
                     if self.startMicrophoneAfterConnect {
                         self.startMicrophoneAfterConnect = false
@@ -246,10 +256,20 @@ final class ViewerModel: ObservableObject {
             }
             do {
                 try parser.append(data) { kind, payload in
-                    guard kind == .jpeg, UIApplication.shared.applicationState == .active,
-                          let image = UIImage(data: payload) else { return }
-                    DispatchQueue.main.async {
-                        if self.connection === connection { self.image = image }
+                    switch kind {
+                    case .jpeg:
+                        guard UIApplication.shared.applicationState == .active,
+                              let image = UIImage(data: payload) else { return }
+                        DispatchQueue.main.async {
+                            if self.connection === connection { self.image = image }
+                        }
+                    case .controlState:
+                        guard payload.count == 1, payload[0] <= 1 else { return }
+                        DispatchQueue.main.async {
+                            if self.connection === connection { self.isControlAllowed = payload[0] == 1 }
+                        }
+                    case .microphone, .control:
+                        return
                     }
                 }
                 self.receiveFrames(connection, parser: parser)
@@ -257,6 +277,47 @@ final class ViewerModel: ObservableObject {
                 DispatchQueue.main.async { self.disconnect(); self.status = "Invalid screen data" }
             }
         }
+    }
+
+    func sendControl(_ command: ControlCommand) {
+        guard isConnected, isPairedSession, isControlAllowed,
+              let connection, let payload = command.encoded() else { return }
+        connection.send(content: Packet.encode(.control, payload), completion: .contentProcessed { [weak self, weak connection] error in
+            guard error != nil else { return }
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection else { return }
+                self.disconnect()
+                self.status = "Mac connection lost while sending control"
+            }
+        })
+    }
+
+    func sendText(_ text: String) {
+        var chunk = ""
+        func flush() {
+            if !chunk.isEmpty { sendControl(ControlCommand(kind: .text, text: chunk)) }
+            chunk = ""
+        }
+        for character in text {
+            let next = String(character)
+            if next == "\n" || next == "\r" {
+                flush()
+                sendControl(ControlCommand(kind: .key, key: .returnKey))
+                continue
+            }
+            if next == "\t" {
+                flush()
+                sendControl(ControlCommand(kind: .key, key: .tab))
+                continue
+            }
+            guard next.utf16.count <= 64,
+                  !next.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else { continue }
+            if chunk.utf16.count + next.utf16.count > 64 {
+                flush()
+            }
+            chunk += next
+        }
+        flush()
     }
 
     func startMicrophone() {

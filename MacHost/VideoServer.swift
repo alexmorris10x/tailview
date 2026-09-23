@@ -9,6 +9,7 @@ final class VideoServer {
     var authenticateSaved: ((UUID, String) -> Bool)?
     var onPairingRequest: ((UUID, String, String) -> Bool)?
     var onPairingSuccess: ((UUID, String) -> Void)?
+    var onControlCommand: ((ControlCommand) -> Void)?
 
     private let lock = NSLock()
     private let sendQueue = DispatchQueue(label: "TailView.frameSend")
@@ -17,6 +18,7 @@ final class VideoServer {
     private var listenerFD: Int32
     private var activeFD: Int32 = -1
     private var activePairedID: UUID?
+    private var controlEnabled = false
     private var running = false
     private var pairingDeadline = 0.0
     private var sendPending = false
@@ -74,6 +76,20 @@ final class VideoServer {
         if client >= 0 { Darwin.shutdown(client, SHUT_RDWR) }
     }
 
+    var hasPairedViewer: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return running && activeFD >= 0 && activePairedID != nil
+    }
+
+    func setControlEnabled(_ enabled: Bool) {
+        lock.lock()
+        controlEnabled = enabled && running && activeFD >= 0 && activePairedID != nil
+        let client = activeFD
+        let state = controlEnabled
+        lock.unlock()
+        if client >= 0 { sendControlState(state, to: client) }
+    }
+
     func stop() {
         lock.lock()
         guard running || listenerFD >= 0 else { lock.unlock(); return }
@@ -83,6 +99,7 @@ final class VideoServer {
         listenerFD = -1
         activeFD = -1
         activePairedID = nil
+        controlEnabled = false
         sendPending = false
         latestFrame = nil
         lock.unlock()
@@ -159,33 +176,56 @@ final class VideoServer {
             guard running else { lock.unlock(); Darwin.close(client); return }
             activeFD = client
             activePairedID = pairedID
+            controlEnabled = false
             let frame = latestFrame
             lock.unlock()
             didReportMicrophone = false
             lastLevelReport = 0
             onViewerStatus?("Connected")
+            sendControlState(false, to: client)
             if let frame { publish(frame) }
-            receiveMicrophone(client)
+            receiveViewerPackets(client)
             finish(client)
         }
     }
 
-    private func receiveMicrophone(_ fd: Int32) {
+    private func receiveViewerPackets(_ fd: Int32) {
         while let header = Self.readExactly(fd, 5) {
-            guard header[0] == PacketKind.microphone.rawValue else { return }
             let length = header.dropFirst().reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
-            guard length > 0, length <= 65_536, length.isMultiple(of: 2),
-                  let payload = Self.readExactly(fd, Int(length)) else { return }
-            if !didReportMicrophone {
-                didReportMicrophone = true
-                onMicrophonePacket?()
+            guard let kind = PacketKind(rawValue: header[0]) else { return }
+            switch kind {
+            case .microphone:
+                guard length > 0, length <= 65_536, length.isMultiple(of: 2),
+                      let payload = Self.readExactly(fd, Int(length)) else { return }
+                if !didReportMicrophone {
+                    didReportMicrophone = true
+                    onMicrophonePacket?()
+                }
+                let now = ProcessInfo.processInfo.systemUptime
+                if now - lastLevelReport >= 0.2 {
+                    lastLevelReport = now
+                    onMicrophoneLevel?(Self.microphoneLevel(payload))
+                }
+                audioSink?.append(payload)
+            case .control:
+                guard length > 0, length <= ControlCommand.maximumBytes,
+                      let payload = Self.readExactly(fd, Int(length)),
+                      let command = ControlCommand.decode(payload) else { return }
+                lock.lock()
+                let allowed = running && activeFD == fd && activePairedID != nil && controlEnabled
+                lock.unlock()
+                if allowed { onControlCommand?(command) }
+            case .jpeg, .controlState:
+                return
             }
-            let now = ProcessInfo.processInfo.systemUptime
-            if now - lastLevelReport >= 0.2 {
-                lastLevelReport = now
-                onMicrophoneLevel?(Self.microphoneLevel(payload))
-            }
-            audioSink?.append(payload)
+        }
+    }
+
+    private func sendControlState(_ enabled: Bool, to fd: Int32) {
+        sendQueue.async { [weak self] in
+            guard let self else { return }
+            let sent = Self.writeExactly(fd, Packet.encode(.controlState, Data([enabled ? 1 : 0])))
+            if !sent { self.finish(fd) }
         }
     }
 
@@ -208,6 +248,7 @@ final class VideoServer {
         guard activeFD == fd else { lock.unlock(); return }
         activeFD = -1
         activePairedID = nil
+        controlEnabled = false
         sendPending = false
         lock.unlock()
         sendQueue.async { Darwin.shutdown(fd, SHUT_RDWR); Darwin.close(fd) }

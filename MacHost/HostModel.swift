@@ -12,8 +12,11 @@ final class HostModel: ObservableObject {
     @Published private(set) var isPairingOpen = false
     @Published private(set) var pairedDevices = [PairedDeviceRecord]()
     @Published private(set) var pairingStatus = ""
+    @Published private(set) var isControlEnabled = false
+    @Published private(set) var controlStatus = "Control is off"
 
     private let pairedStore = PairedDeviceStore()
+    private let controlInjector = ControlInjector()
     private var capture: ScreenCapture?
     private var server: VideoServer?
     private var peakMicrophoneLevel = 0.0
@@ -59,11 +62,14 @@ final class HostModel: ObservableObject {
                         guard self?.isSharing == true else { return }
                         self?.viewerStatus = message
                         if message == "Disconnected" {
+                            self?.disableControl()
                             self?.peakMicrophoneLevel = 0
                             self?.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
                         }
                     }
                 }
+                let injector = controlInjector
+                server.onControlCommand = { command in injector.submit(command) }
                 server.onMicrophonePacket = { [weak self] in
                     Task { @MainActor in
                         self?.microphoneStatus = sink == nil ? "Receiving voice; install BlackHole 2ch to route it" : "Receiving voice through BlackHole 2ch"
@@ -101,6 +107,7 @@ final class HostModel: ObservableObject {
 
     func stop() {
         guard isSharing || isStarting else { return }
+        disableControl()
         server?.disablePairing()
         server?.stop()
         server = nil
@@ -115,6 +122,29 @@ final class HostModel: ObservableObject {
         peakMicrophoneLevel = 0
         sessionCode = ""
         isPairingOpen = false
+    }
+
+    func enableControl() {
+        guard isSharing, let server, server.hasPairedViewer else {
+            controlStatus = "Connect with a saved, paired device before allowing control"
+            return
+        }
+        guard ControlInjector.hasPermission() else {
+            _ = ControlInjector.requestPermission()
+            controlStatus = "Allow TailView Mac in the Privacy & Security pane macOS opened, then relaunch TailView Mac and try again"
+            return
+        }
+        controlInjector.setEnabled(true)
+        server.setControlEnabled(true)
+        isControlEnabled = true
+        controlStatus = "Control allowed for this connected device until you turn it off or sharing ends"
+    }
+
+    func disableControl() {
+        controlInjector.setEnabled(false)
+        server?.setControlEnabled(false)
+        isControlEnabled = false
+        controlStatus = "Control is off"
     }
 
     func enablePairing() {
