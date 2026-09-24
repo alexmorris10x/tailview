@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
+		12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */; };
 		1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
 		3490C489727F9C7FBE54BECF /* TailViewMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */; };
 		3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
@@ -15,6 +16,7 @@
 		4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E90C7F0AF464E7238A871F0 /* ContentView.swift */; };
 		5B1BC0F9D158C872A6F8C1C9 /* HostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FB29C814C93650C267420E /* HostModel.swift */; };
 		5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */; };
+		66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */; };
 		750DF88B49955570BD944C02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2ED200EAE69D0972F6653D93 /* Assets.xcassets */; };
 		7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5F28AE665343293EA19C0A /* SavedMacStore.swift */; };
 		860CEB4A5170A59574801741 /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
@@ -33,6 +35,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierSelection.swift; sourceTree = "<group>"; };
 		10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewMacApp.swift; sourceTree = "<group>"; };
 		1E90C7F0AF464E7238A871F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		20D2B8181E5E82E5B6433F69 /* Packet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packet.swift; sourceTree = "<group>"; };
@@ -54,6 +57,7 @@
 		F54C4272B69B3D917AFDF90B /* ControlCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCommand.swift; sourceTree = "<group>"; };
 		FB734A9B934E848BE257E976 /* TailViewIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TailViewIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteScreenView.swift; sourceTree = "<group>"; };
+		FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteFallbackKeyboard.swift; sourceTree = "<group>"; };
 		FF5F28AE665343293EA19C0A /* SavedMacStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedMacStore.swift; sourceTree = "<group>"; };
 		FFAD381F1F4B2EF73F5FED87 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -100,6 +104,8 @@
 			children = (
 				2ED200EAE69D0972F6653D93 /* Assets.xcassets */,
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
+				0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */,
+				FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */,
 				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
 				FF5F28AE665343293EA19C0A /* SavedMacStore.swift */,
@@ -214,8 +220,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */,
+				66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */,
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,
+				12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */,
 				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,
 				7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */,

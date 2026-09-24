@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ViewerView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("macAddress") private var macAddress = ""
     @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
@@ -22,8 +23,12 @@ struct ViewerView: View {
     @State private var isPanningView = false
     @State private var keyboardActive = false
     @State private var keyboardFocusRequest = 0
+    @State private var keyboardOpenRequest = 0
+    @State private var nativeKeyboardVisible = false
+    @State private var fallbackKeyboardVisible = false
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
+    @State private var modifierSelection = ModifierSelection()
     @StateObject private var viewer = ViewerModel()
 
     var body: some View {
@@ -37,22 +42,39 @@ struct ViewerView: View {
                                      reverseScrollDirection: reverseScrollDirection,
                                      isTouchDraggingRemote: $isTouchDraggingRemote,
                                      pointer: $pointer, zoom: $screenZoom, offset: $screenOffset,
-                                     onCommand: viewer.sendControl)
+                                     onCommand: sendControl)
                 } else {
                     connectionView
                 }
                 RemoteKeyboardInput(
-                    isActive: keyboardActive && viewer.isControlAllowed && !showSettings,
+                    isActive: keyboardActive && !fallbackKeyboardVisible
+                        && viewer.isControlAllowed && !showSettings,
                     focusRequest: keyboardFocusRequest,
-                    onText: viewer.sendText,
+                    onText: sendText,
                     onDelete: { sendKey(.delete) },
-                    onReturn: { sendKey(.returnKey) }
+                    onReturn: { sendKey(.returnKey) },
+                    onSoftwareKeyboardVisibilityChange: { visible in
+                        nativeKeyboardVisible = visible
+                        if visible { fallbackKeyboardVisible = false }
+                    }
                 )
                 .frame(width: 1, height: 1)
             }
             .background(.black)
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if viewer.isConnected { controlBar }
+                if viewer.isConnected {
+                    VStack(spacing: 0) {
+                        if fallbackKeyboardVisible && viewer.isControlAllowed {
+                            RemoteFallbackKeyboard(
+                                onText: sendText,
+                                onDelete: { sendKey(.delete) },
+                                onReturn: { sendKey(.returnKey) },
+                                onDismiss: closeKeyboard
+                            )
+                        }
+                        controlBar
+                    }
+                }
             }
             .navigationTitle("TailView")
             .navigationBarTitleDisplayMode(.inline)
@@ -60,7 +82,8 @@ struct ViewerView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         releaseHeldMouse()
-                        keyboardActive = false
+                        modifierSelection.reset()
+                        closeKeyboard()
                         showSettings = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")
@@ -86,7 +109,8 @@ struct ViewerView: View {
                     preferredMacID = profile.id.uuidString
                 }
             } else {
-                keyboardActive = false
+                modifierSelection.reset()
+                closeKeyboard()
                 isDraggingRemote = false
                 isTouchDraggingRemote = false
                 isPanningView = false
@@ -98,6 +122,8 @@ struct ViewerView: View {
             keyboardActive = allowed && !showSettings
             if allowed { keyboardFocusRequest += 1 }
             else {
+                closeKeyboard()
+                modifierSelection.reset()
                 isDraggingRemote = false
                 isTouchDraggingRemote = false
                 isPanningView = false
@@ -118,7 +144,11 @@ struct ViewerView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { connectPreferredIfNeeded() }
-            else { releaseHeldMouse() }
+            else {
+                closeKeyboard()
+                releaseHeldMouse()
+                modifierSelection.reset()
+            }
         }
         .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
             connectPreferredIfNeeded()
@@ -224,45 +254,48 @@ struct ViewerView: View {
     }
 
     private var controlBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button {
-                keyboardActive = true
-                keyboardFocusRequest += 1
+                showKeyboard()
             } label: {
                 Image(systemName: "keyboard")
             }
             .accessibilityLabel("Keyboard")
             .accessibilityIdentifier("tailview.keyboardButton")
             .disabled(!viewer.isControlAllowed)
-            Button { sendPointer(.leftClick) } label: {
-                Image(systemName: "cursorarrow.click")
+            ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
+                modifierButton(modifier)
             }
-            .accessibilityLabel("Left click")
-            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
-            Button { sendPointer(.rightClick) } label: {
-                Image(systemName: "cursorarrow.click.2")
-            }
-            .accessibilityLabel("Right click")
-            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
-            Button {
-                isDraggingRemote.toggle()
-                sendPointer(isDraggingRemote ? .leftDown : .leftUp)
-            } label: {
-                Image(systemName: isDraggingRemote ? "hand.raised.fill" : "hand.draw")
-            }
-            .accessibilityLabel(isDraggingRemote ? "Release drag" : "Start drag")
-            .disabled(!viewer.isControlAllowed || isTouchDraggingRemote)
-            if screenZoom > 1.01 {
-                Button { isPanningView.toggle() } label: {
-                    Image(systemName: isPanningView ? "hand.point.up.left.fill" : "hand.point.up.left")
+            if horizontalSizeClass != .compact {
+                pointerButtons
+                if screenZoom > 1.01 {
+                    Button { isPanningView.toggle() } label: {
+                        Image(systemName: isPanningView ? "hand.point.up.left.fill" : "hand.point.up.left")
+                    }
+                    .accessibilityLabel(isPanningView ? "Stop panning view" : "Pan view")
+                    .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
                 }
-                .accessibilityLabel(isPanningView ? "Stop panning view" : "Pan view")
-                .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
             }
             Spacer(minLength: 0)
             Menu {
-                Button("Scroll up") { viewer.sendControl(ControlCommand(kind: .scroll, amount: -3)) }
-                Button("Scroll down") { viewer.sendControl(ControlCommand(kind: .scroll, amount: 3)) }
+                if horizontalSizeClass == .compact {
+                    Button("Left click", systemImage: "cursorarrow.click") { sendPointer(.leftClick) }
+                        .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+                    Button("Right click", systemImage: "cursorarrow.click.2") { sendPointer(.rightClick) }
+                        .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+                    Button(isDraggingRemote ? "Release drag" : "Start drag",
+                           systemImage: isDraggingRemote ? "hand.raised.fill" : "hand.draw") {
+                        toggleDrag()
+                    }
+                    .disabled(!viewer.isControlAllowed || isTouchDraggingRemote)
+                    if screenZoom > 1.01 {
+                        Button(isPanningView ? "Stop panning view" : "Pan view") { isPanningView.toggle() }
+                            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+                    }
+                    Divider()
+                }
+                Button("Scroll up") { sendControl(ControlCommand(kind: .scroll, amount: -3)) }
+                Button("Scroll down") { sendControl(ControlCommand(kind: .scroll, amount: 3)) }
                 Divider()
                 Button("Return") { sendKey(.returnKey) }
                 Button("Tab") { sendKey(.tab) }
@@ -284,6 +317,54 @@ struct ViewerView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
+    }
+
+    private var pointerButtons: some View {
+        Group {
+            Button { sendPointer(.leftClick) } label: {
+                Image(systemName: "cursorarrow.click")
+            }
+            .accessibilityLabel("Left click")
+            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+            Button { sendPointer(.rightClick) } label: {
+                Image(systemName: "cursorarrow.click.2")
+            }
+            .accessibilityLabel("Right click")
+            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+            Button { toggleDrag() } label: {
+                Image(systemName: isDraggingRemote ? "hand.raised.fill" : "hand.draw")
+            }
+            .accessibilityLabel(isDraggingRemote ? "Release drag" : "Start drag")
+            .disabled(!viewer.isControlAllowed || isTouchDraggingRemote)
+        }
+    }
+
+    private func modifierButton(_ modifier: ControlCommand.Modifier) -> some View {
+        let mode = modifierSelection.mode(for: modifier)
+        return Button {
+            modifierSelection.tap(modifier)
+        } label: {
+            HStack(spacing: 2) {
+                Text(modifier.symbol).font(.system(size: 18, weight: .semibold))
+                if mode == .held {
+                    Image(systemName: "lock.fill").font(.system(size: 8))
+                }
+            }
+            .frame(minWidth: 34, minHeight: 32)
+            .foregroundStyle(mode == .off ? Color.primary : Color.white)
+            .background(mode == .held ? Color.orange :
+                        mode == .next ? Color.accentColor : Color(uiColor: .tertiarySystemFill),
+                        in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(modifier.title) modifier")
+        .accessibilityValue(mode == .held ? "Held" : mode == .next ? "Next action" : "Off")
+        .accessibilityHint("Tap once for the next action. Double tap to hold. Tap a held modifier to release it.")
+        .accessibilityAction(named: "Hold \(modifier.title)") {
+            modifierSelection.hold(modifier)
+        }
+        .accessibilityIdentifier("tailview.modifier.\(modifier.rawValue)")
+        .disabled(!viewer.isControlAllowed)
     }
 
     private var settingsView: some View {
@@ -334,6 +415,9 @@ struct ViewerView: View {
                     Toggle("Reverse two-finger scroll direction", isOn: $reverseScrollDirection)
                     Text("Tap to click, slide one finger to move the Mac pointer, or press and hold then move to drag. Swipe two fingers to scroll the Mac. Pinch to zoom; while zoomed, use Pan view in the control bar to move the screen with two fingers.")
                 }
+                Section("Keyboard modifiers") {
+                    Text("Tap Control, Option, or Command once for the next key or click. Tap twice quickly to hold it for multiple actions; tap a held modifier again to release it. Blue means next action and orange means held.")
+                }
                 #if DEBUG
                 Section("Microphone input test") {
                     Button("Record-only microphone check") { viewer.runRecorderTest(isolated: true) }
@@ -372,7 +456,12 @@ struct ViewerView: View {
     }
 
     private func sendPointer(_ kind: ControlCommand.Kind) {
-        viewer.sendControl(ControlCommand(kind: kind, x: Double(pointer.x), y: Double(pointer.y)))
+        sendControl(ControlCommand(kind: kind, x: Double(pointer.x), y: Double(pointer.y)))
+    }
+
+    private func toggleDrag() {
+        isDraggingRemote.toggle()
+        sendPointer(isDraggingRemote ? .leftDown : .leftUp)
     }
 
     private func releaseHeldMouse() {
@@ -382,6 +471,69 @@ struct ViewerView: View {
     }
 
     private func sendKey(_ key: ControlCommand.Key) {
-        viewer.sendControl(ControlCommand(kind: .key, key: key))
+        sendControl(ControlCommand(kind: .key, key: key))
+    }
+
+    private func showKeyboard() {
+        if fallbackKeyboardVisible {
+            closeKeyboard()
+            return
+        }
+        keyboardActive = true
+        keyboardFocusRequest += 1
+        keyboardOpenRequest += 1
+        let request = keyboardOpenRequest
+        // An attached keyboard can give UIKit a first responder and a narrow
+        // accessory strip without showing the software keys. Offer our own
+        // remote keys if no full keyboard arrives after UIKit's transition.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+            guard request == keyboardOpenRequest, viewer.isControlAllowed,
+                  !showSettings, !nativeKeyboardVisible else { return }
+            fallbackKeyboardVisible = true
+        }
+    }
+
+    private func closeKeyboard() {
+        keyboardOpenRequest += 1
+        fallbackKeyboardVisible = false
+        nativeKeyboardVisible = false
+        keyboardActive = false
+    }
+
+    private func sendText(_ text: String) {
+        guard viewer.isControlAllowed else { return }
+        viewer.sendText(text, modifiers: modifierSelection.active)
+        modifierSelection.consumeNext()
+    }
+
+    private func sendControl(_ original: ControlCommand) {
+        guard viewer.isControlAllowed else { return }
+        var command = original
+        command.modifiers = modifierSelection.active
+        viewer.sendControl(command)
+        switch command.kind {
+        case .leftClick, .rightClick, .leftUp, .scroll, .text, .key:
+            modifierSelection.consumeNext()
+        case .move, .leftDown, .leftDrag:
+            break
+        }
+    }
+}
+
+private extension ControlCommand.Modifier {
+    var title: String {
+        switch self {
+        case .control: "Control"
+        case .option: "Option"
+        case .command: "Command"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .control: "⌃"
+        case .option: "⌥"
+        case .command: "⌘"
+        }
     }
 }

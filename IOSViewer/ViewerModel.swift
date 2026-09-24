@@ -339,22 +339,26 @@ final class ViewerModel: ObservableObject {
         })
     }
 
-    func sendText(_ text: String) {
+    func sendText(_ text: String, modifiers: [ControlCommand.Modifier]? = nil) {
+        // A pasted or composed string is text, not a sequence of shortcuts.
+        // Only a single key from the iOS keyboard gets modifier flags.
+        let keyModifiers = text.count == 1 ? modifiers : nil
         var chunk = ""
         func flush() {
-            if !chunk.isEmpty { sendControl(ControlCommand(kind: .text, text: chunk)) }
+            if !chunk.isEmpty { sendControl(ControlCommand(kind: .text, text: chunk,
+                                                           modifiers: keyModifiers)) }
             chunk = ""
         }
         for character in text {
             let next = String(character)
             if next == "\n" || next == "\r" {
                 flush()
-                sendControl(ControlCommand(kind: .key, key: .returnKey))
+                sendControl(ControlCommand(kind: .key, key: .returnKey, modifiers: keyModifiers))
                 continue
             }
             if next == "\t" {
                 flush()
-                sendControl(ControlCommand(kind: .key, key: .tab))
+                sendControl(ControlCommand(kind: .key, key: .tab, modifiers: keyModifiers))
                 continue
             }
             guard next.utf16.count <= 64,

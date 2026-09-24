@@ -10,6 +10,10 @@ struct ControlCommand: Codable, Equatable {
         case returnKey, tab, delete, escape, left, right, up, down
     }
 
+    enum Modifier: String, Codable, CaseIterable, Hashable {
+        case control, option, command
+    }
+
     let kind: Kind
     var x: Double? = nil
     var y: Double? = nil
@@ -17,6 +21,7 @@ struct ControlCommand: Codable, Equatable {
     var horizontalAmount: Int? = nil
     var text: String? = nil
     var key: Key? = nil
+    var modifiers: [Modifier]? = nil
 
     static let maximumBytes = 1_024
 
@@ -39,6 +44,9 @@ struct ControlCommand: Codable, Equatable {
     }
 
     private var isValid: Bool {
+        if let modifiers,
+           modifiers.isEmpty || modifiers.count > Modifier.allCases.count
+            || Set(modifiers).count != modifiers.count { return false }
         switch kind {
         case .move, .leftClick, .rightClick, .leftDown, .leftDrag, .leftUp:
             return hasPoint && amount == nil && horizontalAmount == nil && text == nil && key == nil

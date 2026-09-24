@@ -40,12 +40,24 @@ struct TransportSmoke {
         guard let clickData = click.encoded(), ControlCommand.decode(clickData) == click else {
             throw TestError.message("Valid control command did not round trip")
         }
+        let modifiedClick = ControlCommand(kind: .leftClick, x: 0.25, y: 0.75,
+                                           modifiers: [.command, .option])
+        let modifiedKey = ControlCommand(kind: .text, text: "c", modifiers: [.command])
+        guard let modifiedClickData = modifiedClick.encoded(),
+              ControlCommand.decode(modifiedClickData) == modifiedClick,
+              let modifiedKeyData = modifiedKey.encoded(),
+              ControlCommand.decode(modifiedKeyData) == modifiedKey else {
+            throw TestError.message("Modified control command did not round trip")
+        }
         guard ControlCommand(kind: .leftClick, x: -0.01, y: 0.5).encoded() == nil,
               ControlCommand(kind: .scroll, amount: 100).encoded() == nil,
               ControlCommand(kind: .scroll, amount: 0, horizontalAmount: 0).encoded() == nil,
               ControlCommand(kind: .scroll, horizontalAmount: 21).encoded() == nil,
               ControlCommand(kind: .leftClick, x: 0.5, y: 0.5, horizontalAmount: 1).encoded() == nil,
               ControlCommand(kind: .text, text: "\u{0000}").encoded() == nil,
+              ControlCommand(kind: .text, text: "a", modifiers: []).encoded() == nil,
+              ControlCommand(kind: .text, text: "a", modifiers: [.command, .command]).encoded() == nil,
+              ControlCommand.decode(Data(#"{"kind":"text","text":"a","modifiers":["superuser"]}"#.utf8)) == nil,
               ControlCommand.decode(Data("bad JSON".utf8)) == nil else {
             throw TestError.message("Invalid control command was accepted")
         }
