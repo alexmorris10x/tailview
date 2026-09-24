@@ -392,7 +392,9 @@ final class ViewerModel: ObservableObject {
                         }
                     case .macAudio:
                         self.deliveryLock.lock()
-                        let shouldDeliver = self.audioDeliveriesPending < 8
+                        // A delayed cellular burst can contain well over eight
+                        // 20 ms packets. Give playback time to absorb the burst.
+                        let shouldDeliver = self.audioDeliveriesPending < 150
                         if shouldDeliver { self.audioDeliveriesPending += 1 }
                         self.deliveryLock.unlock()
                         guard shouldDeliver else { return }
@@ -521,7 +523,12 @@ final class ViewerModel: ObservableObject {
             channels[1][frame] = right
             peak = max(peak, Double(abs(left)), Double(abs(right)))
         }
-        if queuedMacAudioFrames > 16_800 {
+        // Allow up to three seconds of delayed sound before discarding stale
+        // playback. The old 350 ms cap repeatedly reset on cellular bursts.
+        if queuedMacAudioFrames > 144_000 {
+            #if DEBUG
+            print("TailView Mac sound buffer exceeded three seconds; dropping old sound")
+            #endif
             macAudioGeneration &+= 1
             player.stop()
             queuedMacAudioFrames = 0
@@ -532,9 +539,17 @@ final class ViewerModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self, self.macAudioGeneration == generation else { return }
                 self.queuedMacAudioFrames = max(0, self.queuedMacAudioFrames - frameCount)
+                if self.queuedMacAudioFrames == 0, self.isMacAudioOn,
+                   self.macAudioPlayer === player {
+                    #if DEBUG
+                    print("TailView Mac sound buffer underrun; waiting to refill")
+                    #endif
+                    player.pause()
+                }
             }
         }
-        if !player.isPlaying && queuedMacAudioFrames >= 2_880 { player.play() }
+        // Hold about 600 ms before starting or resuming after an underrun.
+        if !player.isPlaying && queuedMacAudioFrames >= 28_800 { player.play() }
         #if DEBUG
         if UIApplication.shared.applicationState == .background,
            !didReportBackgroundMacAudio, peak > 0.01, player.isPlaying {

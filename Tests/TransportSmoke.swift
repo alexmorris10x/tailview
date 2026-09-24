@@ -316,6 +316,34 @@ struct TransportSmoke {
         try expectRejected(address,
                            line: PairingRequest.authenticate(id: deviceID, token: String(repeating: "cd", count: 32)).line,
                            reason: "wrong saved token")
+        // A cellular receiver can stop reading briefly while TCP retransmits.
+        // A delayed read must not discard an otherwise healthy paired session.
+        let slowClient = try connect(to: address, receiveBuffer: 16_384)
+        guard writeExactly(slowClient, Data(saved.line.utf8)),
+              readExactly(slowClient, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Slow viewer could not authenticate")
+        }
+        try expectState(slowClient, allowed: true, phase: "slow viewer")
+        try expectMicrophoneState(slowClient, allowed: true, phase: "slow viewer")
+        let largeFrame = Data(repeating: 0x5a, count: 2_000_000)
+        server.publish(largeFrame)
+        // Audio captured while a large video packet is blocked must remain
+        // available once the cellular receiver catches up.
+        for _ in 0..<40 { server.publishAudio(macAudio) }
+        Thread.sleep(forTimeInterval: 0.7)
+        guard server.viewerCount == 1 else {
+            throw TestError.message("Slow viewer was disconnected before it resumed reading")
+        }
+        try expectPayload(slowClient, kind: .jpeg, payload: largeFrame, phase: "slow viewer frame")
+        for index in 0..<40 {
+            try expectPayload(slowClient, kind: .macAudio, payload: macAudio,
+                              phase: "buffered audio packet \(index)")
+        }
+        Darwin.shutdown(slowClient, SHUT_RDWR)
+        Darwin.close(slowClient)
+        guard waitForViewerCount(server, 0) else {
+            throw TestError.message("Slow viewer did not disconnect after closing")
+        }
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
         server.stop()
@@ -401,9 +429,12 @@ struct TransportSmoke {
         guard result == 0 else { throw TestError.message("Accepted \(reason) or timed out (recv=\(result), errno=\(errno))") }
     }
 
-    private static func connect(to address: String) throws -> Int32 {
+    private static func connect(to address: String, receiveBuffer: Int32? = nil) throws -> Int32 {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { throw TestError.message("Socket failed") }
+        if var receiveBuffer {
+            setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receiveBuffer, socklen_t(MemoryLayout<Int32>.size))
+        }
         var destination = sockaddr_in()
         destination.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
         destination.sin_family = sa_family_t(AF_INET)

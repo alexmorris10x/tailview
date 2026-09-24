@@ -71,7 +71,9 @@ final class ScreenCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         guard let cgImage = imageContext.createCGImage(image, from: image.extent) else { return }
         let data = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { return }
-        CGImageDestinationAddImage(destination, cgImage, [kCGImageDestinationLossyCompressionQuality: 0.55] as CFDictionary)
+        // Leave more of a cellular connection available to continuous PCM audio.
+        let quality = capturesAudio ? 0.42 : 0.55
+        CGImageDestinationAddImage(destination, cgImage, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { return }
         onFrame?(data as Data)
     }
@@ -84,9 +86,10 @@ final class ScreenCapture: NSObject, SCStreamOutput, SCStreamDelegate {
 
     private func makeConfiguration(capturesAudio: Bool) -> SCStreamConfiguration {
         let config = SCStreamConfiguration()
-        config.width = captureWidth
-        config.height = captureHeight
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 8)
+        let scale = capturesAudio ? min(1, 1024.0 / Double(captureWidth)) : 1.0
+        config.width = max(1, Int(Double(captureWidth) * scale))
+        config.height = max(1, Int(Double(captureHeight) * scale))
+        config.minimumFrameInterval = CMTime(value: 1, timescale: capturesAudio ? 4 : 8)
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.queueDepth = 3
         config.showsCursor = true

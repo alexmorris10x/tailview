@@ -1,7 +1,12 @@
 import Darwin
 import Foundation
+import os
 
 final class VideoServer {
+    private static let transportLog = Logger(subsystem: "com.10x.tailview.mac", category: "Transport")
+    // 100 captured 20 ms blocks cover a short cellular stall without retaining
+    // an unbounded backlog. Playback may lag, but sound is not discarded at 240 ms.
+    private static let maximumPendingAudioPackets = 100
     private final class ViewerConnection {
         let id = UUID()
         let fd: Int32
@@ -173,7 +178,8 @@ final class VideoServer {
         guard !pcm.isEmpty, pcm.count <= 65_536, pcm.count.isMultiple(of: 4) else { return }
         lock.lock()
         let clients = running ? viewers.values.filter {
-            $0.pairedID != nil && $0.id == microphoneOwner && $0.audioPending < 12
+            $0.pairedID != nil && $0.id == microphoneOwner &&
+                $0.audioPending < Self.maximumPendingAudioPackets
         } : []
         for client in clients { client.audioPending += 1 }
         lock.unlock()
@@ -181,7 +187,7 @@ final class VideoServer {
         for client in clients {
             client.sendQueue.async { [weak self, client] in
                 guard let self else { return }
-                let sent = self.sendIfCurrent(packet, to: client)
+                let sent = self.sendIfAudioOwner(packet, to: client)
                 self.lock.lock(); client.audioPending = max(0, client.audioPending - 1); self.lock.unlock()
                 if !sent { self.finish(client) }
             }
@@ -269,7 +275,10 @@ final class VideoServer {
         }
         timeout = timeval(tv_sec: 0, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
-        var sendTimeout = timeval(tv_sec: 0, tv_usec: 250_000)
+        // Cellular RTT spikes and retransmissions can briefly fill the TCP
+        // window. Frame/audio queues are already bounded, so allow a stalled
+        // send to recover instead of resetting a healthy session at 250 ms.
+        var sendTimeout = timeval(tv_sec: 2, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, socklen_t(MemoryLayout<timeval>.size))
         if let pairedID, let pairingName { onPairingSuccess?(pairedID, pairingName) }
         onViewerStatus?("Connected")
@@ -358,6 +367,13 @@ final class VideoServer {
         return !current || Self.writeExactly(viewer.fd, packet)
     }
 
+    private func sendIfAudioOwner(_ packet: Data, to viewer: ViewerConnection) -> Bool {
+        lock.lock()
+        let currentOwner = running && viewers[viewer.id] === viewer && microphoneOwner == viewer.id
+        lock.unlock()
+        return !currentOwner || Self.writeExactly(viewer.fd, packet)
+    }
+
     private static func microphoneLevel(_ payload: Data) -> Double {
         payload.withUnsafeBytes { rawBytes in
             let bytes = rawBytes.bindMemory(to: UInt8.self)
@@ -408,7 +424,12 @@ final class VideoServer {
             var offset = 0
             while offset < count {
                 let received = Darwin.recv(fd, base.advanced(by: offset), count - offset, 0)
-                if received <= 0 { return false }
+                if received <= 0 {
+                    #if DEBUG
+                    transportLog.notice("TCP receive ended result=\(received) errno=\(received < 0 ? errno : 0) offset=\(offset) count=\(count)")
+                    #endif
+                    return false
+                }
                 offset += received
             }
             return true
@@ -443,7 +464,12 @@ final class VideoServer {
             var offset = 0
             while offset < bytes.count {
                 let sent = Darwin.send(fd, base.advanced(by: offset), bytes.count - offset, 0)
-                if sent <= 0 { return false }
+                if sent <= 0 {
+                    #if DEBUG
+                    transportLog.error("TCP send failed result=\(sent) errno=\(sent < 0 ? errno : 0) offset=\(offset) count=\(bytes.count)")
+                    #endif
+                    return false
+                }
                 offset += sent
             }
             return true
