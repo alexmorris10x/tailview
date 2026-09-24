@@ -5,6 +5,7 @@ import UIKit
 /// forwarded immediately, so no local text field or Send step is shown.
 struct RemoteKeyboardInput: UIViewRepresentable {
     let isActive: Bool
+    let useTailViewKeyboard: Bool
     let focusRequest: Int
     let onText: (String) -> Void
     let onDelete: () -> Void
@@ -26,6 +27,7 @@ struct RemoteKeyboardInput: UIViewRepresentable {
         field.smartDashesType = .no
         field.accessibilityElementsHidden = true
         field.accessibilityIdentifier = "tailview.remoteKeyboardInput"
+        field.setTailViewKeyboard(useTailViewKeyboard)
         field.onSoftwareKeyboardVisibilityChange = { [weak coordinator = context.coordinator] visible in
             coordinator?.parent.onSoftwareKeyboardVisibilityChange(visible)
         }
@@ -42,6 +44,7 @@ struct RemoteKeyboardInput: UIViewRepresentable {
         context.coordinator.lastFocusRequest = focusRequest
         context.coordinator.lastActive = isActive
         field.desiredActive = isActive
+        field.setTailViewKeyboard(useTailViewKeyboard)
         if shouldRefresh || activeChanged { field.refreshFocus(restart: shouldRefresh) }
     }
 
@@ -70,12 +73,21 @@ struct RemoteKeyboardInput: UIViewRepresentable {
 final class RemoteTextField: UITextField {
     var desiredActive = false
     var onSoftwareKeyboardVisibilityChange: ((Bool) -> Void)?
+    private let tailViewInputView = UIView(frame: .zero)
+    private var usesTailViewKeyboard = false
     private var focusGeneration = 0
     private var pendingRefocusGeneration: Int?
     private var softwareKeyboardVisible = false
     private var keyWindowObserver: NSObjectProtocol?
     private var keyboardShowObserver: NSObjectProtocol?
     private var keyboardHideObserver: NSObjectProtocol?
+
+    func setTailViewKeyboard(_ enabled: Bool) {
+        guard usesTailViewKeyboard != enabled else { return }
+        usesTailViewKeyboard = enabled
+        inputView = enabled ? tailViewInputView : nil
+        if isFirstResponder { reloadInputViews() }
+    }
 
     deinit {
         if let keyWindowObserver { NotificationCenter.default.removeObserver(keyWindowObserver) }
@@ -140,6 +152,7 @@ final class RemoteTextField: UITextField {
     }
 
     private func keyboardDidShow(_ notification: Notification) {
+        guard desiredActive, !usesTailViewKeyboard else { return }
         if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
            let window {
             let inWindow = window.convert(frame, from: window.screen.coordinateSpace)

@@ -23,8 +23,7 @@ struct RemoteFallbackKeyboard: View {
                 characterRow("1234567890")
                 characterRow(["@", "#", "$", "%", "&", "-", "+", "(", ")", "/"])
                 HStack(spacing: 5) {
-                    modeButton("ABC")
-                    ForEach(["*", "\"", "'", ":", ";", "!", "?", "_"], id: \.self) { value in
+                    ForEach(["=", "*", "\"", "'", ":", ";", "!", "?", "_"], id: \.self) { value in
                         characterButton(value)
                     }
                     deleteButton

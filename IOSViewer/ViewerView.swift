@@ -10,6 +10,7 @@ struct ViewerView: View {
     @AppStorage("reverseScrollDirection") private var reverseScrollDirection = false
     @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
     @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
+    @AppStorage("useTailViewTouchKeyboard") private var useTailViewTouchKeyboard = false
     @State private var code = ""
     @State private var profileName = "My Mac"
     @State private var showPairing = false
@@ -22,6 +23,7 @@ struct ViewerView: View {
     @State private var isTouchDraggingRemote = false
     @State private var isPanningView = false
     @State private var keyboardActive = false
+    @State private var keyboardUserHidden = false
     @State private var keyboardFocusRequest = 0
     @State private var keyboardOpenRequest = 0
     @State private var nativeKeyboardVisible = false
@@ -47,8 +49,8 @@ struct ViewerView: View {
                     connectionView
                 }
                 RemoteKeyboardInput(
-                    isActive: keyboardActive && !fallbackKeyboardVisible
-                        && viewer.isControlAllowed && !showSettings,
+                    isActive: keyboardActive && viewer.isControlAllowed && !showSettings,
+                    useTailViewKeyboard: useTailViewTouchKeyboard,
                     focusRequest: keyboardFocusRequest,
                     onText: sendText,
                     onDelete: { sendKey(.delete) },
@@ -69,7 +71,7 @@ struct ViewerView: View {
                                 onText: sendText,
                                 onDelete: { sendKey(.delete) },
                                 onReturn: { sendKey(.returnKey) },
-                                onDismiss: closeKeyboard
+                                onDismiss: hideKeyboard
                             )
                         }
                         controlBar
@@ -92,10 +94,7 @@ struct ViewerView: View {
                 }
             }
             .sheet(isPresented: $showSettings, onDismiss: {
-                if viewer.isControlAllowed {
-                    keyboardActive = true
-                    keyboardFocusRequest += 1
-                }
+                if viewer.isControlAllowed && !keyboardUserHidden { showKeyboard() }
             }) {
                 settingsView
             }
@@ -111,6 +110,7 @@ struct ViewerView: View {
             } else {
                 modifierSelection.reset()
                 closeKeyboard()
+                keyboardUserHidden = false
                 isDraggingRemote = false
                 isTouchDraggingRemote = false
                 isPanningView = false
@@ -119,9 +119,9 @@ struct ViewerView: View {
             }
         }
         .onChange(of: viewer.isControlAllowed) { _, allowed in
-            keyboardActive = allowed && !showSettings
-            if allowed { keyboardFocusRequest += 1 }
-            else {
+            if allowed {
+                if !showSettings && !keyboardUserHidden { showKeyboard() }
+            } else {
                 closeKeyboard()
                 modifierSelection.reset()
                 isDraggingRemote = false
@@ -143,7 +143,12 @@ struct ViewerView: View {
             else { viewer.stopMacAudio() }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { connectPreferredIfNeeded() }
+            if phase == .active {
+                connectPreferredIfNeeded()
+                if viewer.isControlAllowed && !showSettings && !keyboardUserHidden {
+                    showKeyboard()
+                }
+            }
             else {
                 closeKeyboard()
                 releaseHeldMouse()
@@ -256,11 +261,12 @@ struct ViewerView: View {
     private var controlBar: some View {
         HStack(spacing: 6) {
             Button {
-                showKeyboard()
+                toggleKeyboard()
             } label: {
                 Image(systemName: "keyboard")
             }
-            .accessibilityLabel("Keyboard")
+            .accessibilityLabel(nativeKeyboardVisible || fallbackKeyboardVisible
+                                ? "Hide keyboard" : "Show keyboard")
             .accessibilityIdentifier("tailview.keyboardButton")
             .disabled(!viewer.isControlAllowed)
             ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
@@ -415,7 +421,9 @@ struct ViewerView: View {
                     Toggle("Reverse two-finger scroll direction", isOn: $reverseScrollDirection)
                     Text("Tap to click, slide one finger to move the Mac pointer, or press and hold then move to drag. Swipe two fingers to scroll the Mac. Pinch to zoom; while zoomed, use Pan view in the control bar to move the screen with two fingers.")
                 }
-                Section("Keyboard modifiers") {
+                Section("Keyboard") {
+                    Toggle("Use TailView touch keyboard", isOn: $useTailViewTouchKeyboard)
+                    Text("The iOS keyboard is used by default. TailView shows touch keys if iPadOS hides it. Turn this on to use TailView's keys every time.")
                     Text("Tap Control, Option, or Command once for the next key or click. Tap twice quickly to hold it for multiple actions; tap a held modifier again to release it. Blue means next action and orange means held.")
                 }
                 #if DEBUG
@@ -475,13 +483,17 @@ struct ViewerView: View {
     }
 
     private func showKeyboard() {
-        if fallbackKeyboardVisible {
-            closeKeyboard()
+        keyboardUserHidden = false
+        keyboardOpenRequest += 1
+        if useTailViewTouchKeyboard {
+            keyboardActive = true
+            keyboardFocusRequest += 1
+            nativeKeyboardVisible = false
+            fallbackKeyboardVisible = true
             return
         }
         keyboardActive = true
         keyboardFocusRequest += 1
-        keyboardOpenRequest += 1
         let request = keyboardOpenRequest
         // An attached keyboard can give UIKit a first responder and a narrow
         // accessory strip without showing the software keys. Offer our own
@@ -498,6 +510,19 @@ struct ViewerView: View {
         fallbackKeyboardVisible = false
         nativeKeyboardVisible = false
         keyboardActive = false
+    }
+
+    private func toggleKeyboard() {
+        if nativeKeyboardVisible || fallbackKeyboardVisible {
+            hideKeyboard()
+        } else {
+            showKeyboard()
+        }
+    }
+
+    private func hideKeyboard() {
+        keyboardUserHidden = true
+        closeKeyboard()
     }
 
     private func sendText(_ text: String) {
