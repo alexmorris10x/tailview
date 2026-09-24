@@ -8,6 +8,7 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var microphoneStatus = "Microphone is off"
     @Published private(set) var inputLevelStatus = ""
     @Published private(set) var macAudioStatus = "Mac sound is off"
+    @Published private(set) var macAudioOutputStatus = "Output: off"
     #if DEBUG
     @Published private(set) var debugStatus = "No diagnostic run yet"
     @Published private(set) var speakerTestStatus = "No speaker test run yet"
@@ -67,6 +68,7 @@ final class ViewerModel: ObservableObject {
     private var queuedMacAudioFrames = 0
     private var macAudioGeneration: UInt64 = 0
     private var lastMacAudioLevelReport = 0.0
+    private var routeChangeObserver: NSObjectProtocol?
     private let macAudioFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
     #if DEBUG
     private var acousticTestPlayer: AVAudioPlayer?
@@ -83,6 +85,14 @@ final class ViewerModel: ObservableObject {
     init() {
         do { savedMacs = try SavedMacStore.load() }
         catch { status = "Could not load saved Macs: \(error.localizedDescription)" }
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(), queue: .main
+        ) { [weak self] _ in self?.refreshMacAudioOutput() }
+    }
+
+    deinit {
+        if let routeChangeObserver { NotificationCenter.default.removeObserver(routeChangeObserver) }
     }
 
     func pair(host: String, code: String, name: String, startMicrophoneOnConnect: Bool = true,
@@ -366,6 +376,7 @@ final class ViewerModel: ObservableObject {
             lastMacAudioLevelReport = 0
             isMacAudioOn = true
             macAudioStatus = "Waiting for Mac sound…"
+            refreshMacAudioOutput()
         } catch {
             macAudioStatus = "Could not play Mac sound: \(error.localizedDescription)"
         }
@@ -377,6 +388,7 @@ final class ViewerModel: ObservableObject {
         queuedMacAudioFrames = 0
         isMacAudioOn = false
         macAudioStatus = "Mac sound is off"
+        macAudioOutputStatus = "Output: off"
         if !isMicrophoneOn { stopAudioEngine() }
     }
 
@@ -425,7 +437,11 @@ final class ViewerModel: ObservableObject {
     private func ensureAudioEngine() throws -> AVAudioEngine {
         if let engine, engine.isRunning { return engine }
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
+        // The iPad must leave the output route free for AirPods. Keep the
+        // iPhone's existing speaker default until its route behavior is tested.
+        let options: AVAudioSession.CategoryOptions = UIDevice.current.userInterfaceIdiom == .pad
+            ? [.allowBluetoothA2DP] : [.defaultToSpeaker]
+        try session.setCategory(.playAndRecord, mode: .default, options: options)
         try session.setActive(true)
         if let engine {
             if !engine.isRunning { try engine.start() }
@@ -446,6 +462,16 @@ final class ViewerModel: ObservableObject {
         engine = nil
         macAudioPlayer = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    private func refreshMacAudioOutput() {
+        guard isMacAudioOn else { return }
+        let outputs = AVAudioSession.sharedInstance().currentRoute.outputs
+        let names = outputs.map(\.portName).joined(separator: ", ")
+        macAudioOutputStatus = "Output: \(names.isEmpty ? "unavailable" : names)"
+        #if DEBUG
+        print("TailView \(macAudioOutputStatus)")
+        #endif
     }
 
     func startMicrophone() {
@@ -513,6 +539,7 @@ final class ViewerModel: ObservableObject {
             inputTapInstalled = true
             if !engine.isRunning { try engine.start() }
             isMicrophoneOn = true
+            refreshMacAudioOutput()
             microphoneStatus = "Waiting for samples from \(inputRouteName)…"
             inputLevelStatus = "Input peak: waiting for samples"
         } catch {

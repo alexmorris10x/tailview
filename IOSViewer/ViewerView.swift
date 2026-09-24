@@ -303,6 +303,7 @@ struct ViewerView: View {
                 Section("Mac sound") {
                     Toggle("Hear Mac sound automatically", isOn: $macAudioOnConnect)
                     Text(viewer.macAudioStatus)
+                    Text(viewer.macAudioOutputStatus)
                 }
                 Section("Screen") {
                     Toggle("Align screen to top", isOn: $alignScreenToTop)
