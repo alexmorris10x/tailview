@@ -1,4 +1,5 @@
 import Combine
+import AVKit
 import SwiftUI
 
 struct ViewerView: View {
@@ -145,6 +146,7 @@ struct ViewerView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
                 connectPreferredIfNeeded()
+                viewer.resumeAudioAfterForeground()
                 if viewer.isControlAllowed && !showSettings && !keyboardUserHidden {
                     showKeyboard()
                 }
@@ -406,6 +408,14 @@ struct ViewerView: View {
                         showSettings = false
                     }
                 }
+                Section("Audio device") {
+                    if viewer.canTakeAudio {
+                        Button("Use audio on this device") { viewer.takeAudio() }
+                        Text("Moves both Mac sound and microphone input here. The other device keeps its screen and controls.")
+                    } else if viewer.isConnected {
+                        Text("This device has the audio route.")
+                    }
+                }
                 Section("Microphone") {
                     Toggle("Connect microphone automatically", isOn: $microphoneOnConnect)
                     Text(viewer.microphoneStatus)
@@ -415,6 +425,12 @@ struct ViewerView: View {
                     Toggle("Hear Mac sound automatically", isOn: $macAudioOnConnect)
                     Text(viewer.macAudioStatus)
                     Text(viewer.macAudioOutputStatus)
+                    HStack {
+                        Text("Choose audio output")
+                        Spacer()
+                        AudioOutputPicker()
+                            .frame(width: 44, height: 44)
+                    }
                 }
                 Section("Screen") {
                     Toggle("Align screen to top", isOn: $alignScreenToTop)
@@ -456,6 +472,11 @@ struct ViewerView: View {
     }
 
     private func connectPreferredIfNeeded() {
+        #if DEBUG
+        // A recorder-only launch must not let the periodic reconnect timer
+        // reactivate playback and interrupt the four-second microphone test.
+        guard !ProcessInfo.processInfo.arguments.contains("--tailview-test-isolated-recorder") else { return }
+        #endif
         guard scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
               !viewer.isConnected, !viewer.isConnecting, !viewer.savedCredentialRejected,
               let profile = preferredProfile else { return }
@@ -561,4 +582,16 @@ private extension ControlCommand.Modifier {
         case .command: "⌘"
         }
     }
+}
+
+private struct AudioOutputPicker: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let picker = AVRoutePickerView()
+        picker.tintColor = .systemBlue
+        picker.activeTintColor = .systemBlue
+        picker.prioritizesVideoDevices = false
+        return picker
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
 }

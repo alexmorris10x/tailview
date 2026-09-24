@@ -14,10 +14,15 @@ struct TransportSmoke {
         let saved = PairingRequest.authenticate(id: deviceID, token: token)
         let credentials = CredentialStore()
         let delivered = ControlRecorder()
+        let microphones = MicrophoneCounter()
+        let microphoneLevels = MicrophoneCounter()
         server.authenticateSaved = { credentials.authenticate($0, token: $1) }
+        server.isPreferredMicrophone = { $0 == deviceID }
         server.onPairingRequest = { credentials.add($0, token: $2); return true }
         server.authorizeTrustedControl = { true }
         server.onControlCommand = { delivered.append($0) }
+        server.onMicrophonePacket = { microphones.increment() }
+        server.onMicrophoneLevel = { _ in microphoneLevels.increment() }
         let connected = DispatchSemaphore(value: 0)
         server.onViewerStatus = { if $0 == "Connected" { connected.signal() } }
         server.start()
@@ -86,8 +91,9 @@ struct TransportSmoke {
             throw TestError.message("Screen frame was not delivered")
         }
         let microphone = Data([0x01, 0x00, 0x02, 0x00])
-        guard writeExactly(client, Packet.encode(.microphone, microphone)) else {
-            throw TestError.message("Microphone packet was not sent")
+        guard writeExactly(client, Packet.encode(.microphoneRequest, Data([1]))),
+              writeExactly(client, Packet.encode(.microphone, microphone)) else {
+            throw TestError.message("Session microphone packets could not be sent")
         }
         Darwin.shutdown(client, SHUT_RDWR)
         Darwin.close(client)
@@ -99,6 +105,7 @@ struct TransportSmoke {
             throw TestError.message("Pairing was not acknowledged")
         }
         try expectState(pairedClient, allowed: true, phase: "paired connect")
+        try expectMicrophoneState(pairedClient, allowed: true, phase: "paired connect")
         server.publishAudio(macAudio)
         var receivedMacAudio = false
         for _ in 0..<4 {
@@ -140,12 +147,172 @@ struct TransportSmoke {
             throw TestError.message("Saved device could not reconnect")
         }
         try expectState(savedClient, allowed: true, phase: "saved reconnect")
+        try expectMicrophoneState(savedClient, allowed: true, phase: "saved reconnect")
         guard writeExactly(savedClient, Packet.encode(.control, clickData)),
               delivered.waitForCount(2), delivered.count == 2 else {
             throw TestError.message("Saved device did not regain control automatically")
         }
+
+        // Pair a second device without disconnecting the first. Both must
+        // receive frames, while one device owns Mac sound and microphone.
+        let phoneID = UUID()
+        let phoneToken = String(repeating: "ef", count: 32)
+        let phonePair = PairingRequest.pair(code: code, id: phoneID, token: phoneToken,
+                                            deviceName: "Test iPhone")
+        server.enablePairing()
+        var phoneClient = try connect(to: address)
+        guard writeExactly(phoneClient, Data(phonePair.line.utf8)),
+              readExactly(phoneClient, 7) == Data("PAIRED\n".utf8),
+              server.viewerCount == 2 else {
+            throw TestError.message("Second paired viewer did not connect alongside first")
+        }
+        try expectState(phoneClient, allowed: true, phase: "second viewer")
+        try expectMicrophoneState(phoneClient, allowed: false, phase: "second viewer")
+        server.publish(jpeg)
+        try expectPayload(savedClient, kind: .jpeg, payload: jpeg, phase: "first viewer frame")
+        try expectPayload(phoneClient, kind: .jpeg, payload: jpeg, phase: "second viewer frame")
+        server.publishAudio(macAudio)
+        try expectPayload(savedClient, kind: .macAudio, payload: macAudio, phase: "first viewer sound")
+        try expectNoAudio(phoneClient, phase: "inactive phone sound")
+        guard writeExactly(phoneClient, Packet.encode(.control, clickData)),
+              delivered.waitForCount(3), delivered.count == 3 else {
+            throw TestError.message("Second paired viewer could not control Mac")
+        }
+        guard writeExactly(phoneClient, Packet.encode(.microphone, microphone)) else {
+            throw TestError.message("Second viewer microphone packet could not be sent")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard microphones.count == 0 else { throw TestError.message("Inactive viewer microphone reached Mac (count \(microphones.count))") }
+        guard writeExactly(savedClient, Packet.encode(.microphone, microphone)),
+              microphones.waitForCount(1) else {
+            throw TestError.message("First viewer microphone did not reach Mac")
+        }
+        guard writeExactly(phoneClient, Packet.encode(.microphoneRequest, Data([1]))) else {
+            throw TestError.message("Phone could not request microphone")
+        }
+        try expectMicrophoneState(phoneClient, allowed: true, phase: "phone microphone takeover")
+        try expectMicrophoneState(savedClient, allowed: false, phase: "iPad microphone demotion")
+        server.publishAudio(macAudio)
+        try expectPayload(phoneClient, kind: .macAudio, payload: macAudio, phase: "phone sound after takeover")
+        try expectNoAudio(savedClient, phase: "inactive iPad sound after takeover")
+        guard writeExactly(phoneClient, Packet.encode(.microphone, microphone)),
+              microphones.waitForCount(2) else {
+            throw TestError.message("Phone microphone did not reach Mac after takeover")
+        }
+        guard writeExactly(savedClient, Packet.encode(.microphone, microphone)) else {
+            throw TestError.message("Demoted iPad could not send microphone packet")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard microphones.count == 2 else { throw TestError.message("Demoted iPad microphone reached Mac") }
+
+        // A short phone disconnect falls back to the iPad, but reconnecting
+        // the same trusted phone restores the user's explicit mic selection.
+        Darwin.shutdown(phoneClient, SHUT_RDWR)
+        Darwin.close(phoneClient)
+        guard waitForViewerCount(server, 1) else {
+            throw TestError.message("Phone did not disconnect before microphone reconnect")
+        }
+        try expectMicrophoneState(savedClient, allowed: true, phase: "iPad fallback during phone disconnect")
+        let phoneSaved = PairingRequest.authenticate(id: phoneID, token: phoneToken)
+        phoneClient = try connect(to: address)
+        guard writeExactly(phoneClient, Data(phoneSaved.line.utf8)),
+              readExactly(phoneClient, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Selected phone could not reconnect")
+        }
+        try expectState(phoneClient, allowed: true, phase: "selected phone reconnect")
+        try expectMicrophoneState(phoneClient, allowed: true, phase: "selected phone microphone restored")
+        try expectMicrophoneState(savedClient, allowed: false, phase: "iPad microphone demoted on phone return")
+        guard writeExactly(savedClient, Packet.encode(.microphoneRequest, Data([1]))) else {
+            throw TestError.message("iPad could not reclaim microphone")
+        }
+        try expectMicrophoneState(savedClient, allowed: true, phase: "iPad microphone reclaim")
+        try expectMicrophoneState(phoneClient, allowed: false, phase: "phone microphone demotion")
+
+        // Replacing an authenticated device must work even with both slots full.
+        let replacement = try connect(to: address)
+        guard writeExactly(replacement, Data(saved.line.utf8)),
+              readExactly(replacement, 3) == Data("OK\n".utf8),
+              server.viewerCount == 2 else {
+            throw TestError.message("Saved iPad could not replace its stale connection")
+        }
+        try expectState(replacement, allowed: true, phase: "iPad replacement")
+        try expectMicrophoneState(replacement, allowed: true, phase: "iPad microphone after replacement")
+        var oldConnectionClosed = false
+        for _ in 0..<8 {
+            if readPacket(savedClient) == nil { oldConnectionClosed = true; break }
+        }
+        guard oldConnectionClosed else { throw TestError.message("Replaced iPad connection remained open") }
+        try expectRejected(address, line: code + "\n", reason: "third simultaneous viewer")
+        server.disconnectPairedDevice(deviceID)
+        try expectMicrophoneState(phoneClient, allowed: true, phase: "microphone handoff")
+        Thread.sleep(forTimeInterval: 0.3)
+        let levelsBeforeHandoff = microphoneLevels.count
+        guard server.viewerCount == 1,
+              writeExactly(phoneClient, Packet.encode(.microphone, microphone)),
+              microphoneLevels.waitForCount(levelsBeforeHandoff + 1) else {
+            throw TestError.message("Microphone did not transfer to remaining viewer")
+        }
         Darwin.shutdown(savedClient, SHUT_RDWR)
         Darwin.close(savedClient)
+        Darwin.shutdown(replacement, SHUT_RDWR)
+        Darwin.close(replacement)
+        Darwin.shutdown(phoneClient, SHUT_RDWR)
+        Darwin.close(phoneClient)
+        guard waitForViewerCount(server, 0) else {
+            throw TestError.message("Viewers did not disconnect before reconnect order test")
+        }
+
+        // A host restart can reconnect the phone first. The iPad must become
+        // microphone owner once it joins, independent of socket arrival order.
+        let phoneFirst = try connect(to: address)
+        guard writeExactly(phoneFirst, Data(phoneSaved.line.utf8)),
+              readExactly(phoneFirst, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Phone could not reconnect first")
+        }
+        try expectState(phoneFirst, allowed: true, phase: "phone-first reconnect")
+        try expectMicrophoneState(phoneFirst, allowed: true, phase: "phone-first reconnect")
+        let ipadSecond = try connect(to: address)
+        guard writeExactly(ipadSecond, Data(saved.line.utf8)),
+              readExactly(ipadSecond, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("iPad could not reconnect second")
+        }
+        try expectState(ipadSecond, allowed: true, phase: "iPad-second reconnect")
+        try expectMicrophoneState(ipadSecond, allowed: true, phase: "iPad-second reconnect")
+        try expectMicrophoneState(phoneFirst, allowed: false, phase: "iPad priority")
+        guard writeExactly(phoneFirst, Packet.encode(.microphoneRequest, Data([1]))) else {
+            throw TestError.message("Phone could not take audio before both viewers disconnect")
+        }
+        try expectMicrophoneState(phoneFirst, allowed: true, phase: "phone audio selection")
+        try expectMicrophoneState(ipadSecond, allowed: false, phase: "iPad audio handoff")
+        Darwin.shutdown(phoneFirst, SHUT_RDWR)
+        Darwin.close(phoneFirst)
+        Darwin.shutdown(ipadSecond, SHUT_RDWR)
+        Darwin.close(ipadSecond)
+        guard waitForViewerCount(server, 0) else {
+            throw TestError.message("Reconnect order viewers did not disconnect")
+        }
+        let ipadAfterGap = try connect(to: address)
+        guard writeExactly(ipadAfterGap, Data(saved.line.utf8)),
+              readExactly(ipadAfterGap, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("iPad could not reconnect after both viewers left")
+        }
+        try expectState(ipadAfterGap, allowed: true, phase: "iPad after gap")
+        try expectMicrophoneState(ipadAfterGap, allowed: true, phase: "iPad temporary audio fallback")
+        let phoneAfterGap = try connect(to: address)
+        guard writeExactly(phoneAfterGap, Data(phoneSaved.line.utf8)),
+              readExactly(phoneAfterGap, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Selected phone could not reconnect after both viewers left")
+        }
+        try expectState(phoneAfterGap, allowed: true, phase: "phone after gap")
+        try expectMicrophoneState(phoneAfterGap, allowed: true, phase: "phone audio restored after gap")
+        try expectMicrophoneState(ipadAfterGap, allowed: false, phase: "iPad yields after gap")
+        Darwin.shutdown(ipadAfterGap, SHUT_RDWR)
+        Darwin.close(ipadAfterGap)
+        Darwin.shutdown(phoneAfterGap, SHUT_RDWR)
+        Darwin.close(phoneAfterGap)
+        guard waitForViewerCount(server, 0) else {
+            throw TestError.message("Final viewers did not disconnect")
+        }
         try expectRejected(address,
                            line: PairingRequest.authenticate(id: deviceID, token: String(repeating: "cd", count: 32)).line,
                            reason: "wrong saved token")
@@ -156,7 +323,7 @@ struct TransportSmoke {
             Darwin.close(unexpected)
             throw TestError.message("Stopped server still accepted a viewer")
         }
-        print("Transport smoke passed: pairing consent, trusted auto-control, saved reconnect, revocation, stopped listener, frame, two-way audio, session access denial")
+        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, stopped listener, session access denial")
     }
 
     private static func expectState(_ fd: Int32, allowed: Bool, phase: String) throws {
@@ -167,6 +334,46 @@ struct TransportSmoke {
             break
         }
         throw TestError.message("Incorrect remote-control state at \(phase)")
+    }
+
+    private static func expectMicrophoneState(_ fd: Int32, allowed: Bool, phase: String) throws {
+        for _ in 0..<8 {
+            guard let packet = readPacket(fd) else { break }
+            if packet.kind == .microphoneState,
+               packet.payload == Data([allowed ? 1 : 0]) { return }
+            if packet.kind == .jpeg || packet.kind == .macAudio { continue }
+            break
+        }
+        throw TestError.message("Incorrect microphone owner at \(phase)")
+    }
+
+    private static func expectPayload(_ fd: Int32, kind: PacketKind, payload: Data,
+                                      phase: String) throws {
+        for _ in 0..<8 {
+            guard let packet = readPacket(fd) else { break }
+            if packet.kind == kind, packet.payload == payload { return }
+        }
+        throw TestError.message("Missing \(phase)")
+    }
+
+    private static func expectNoAudio(_ fd: Int32, phase: String) throws {
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.25
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            var descriptor = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            let ready = Darwin.poll(&descriptor, 1, 25)
+            guard ready >= 0 else { throw TestError.message("Could not poll \(phase)") }
+            if ready == 0 { continue }
+            guard let packet = readPacket(fd) else { throw TestError.message("Viewer disconnected at \(phase)") }
+            if packet.kind == .macAudio { throw TestError.message("Inactive viewer received Mac sound at \(phase)") }
+        }
+    }
+
+    private static func waitForViewerCount(_ server: VideoServer, _ wanted: Int) -> Bool {
+        for _ in 0..<40 {
+            if server.viewerCount == wanted { return true }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        return false
     }
 
     private static func readPacket(_ fd: Int32) -> (kind: PacketKind, payload: Data)? {
@@ -264,6 +471,21 @@ private final class ControlRecorder {
         signal.signal()
     }
 
+    func waitForCount(_ wanted: Int) -> Bool {
+        while count < wanted {
+            if signal.wait(timeout: .now() + 2) != .success { return false }
+        }
+        return true
+    }
+}
+
+private final class MicrophoneCounter {
+    private let lock = NSLock()
+    private let signal = DispatchSemaphore(value: 0)
+    private var value = 0
+
+    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
+    func increment() { lock.lock(); value += 1; lock.unlock(); signal.signal() }
     func waitForCount(_ wanted: Int) -> Bool {
         while count < wanted {
             if signal.wait(timeout: .now() + 2) != .success { return false }

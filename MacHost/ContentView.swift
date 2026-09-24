@@ -42,7 +42,6 @@ struct ContentView: View {
                         Button("Close pairing") { host.disablePairing() }
                     } else {
                         Button("Pair a new device") { host.enablePairing() }
-                            .disabled(host.viewerStatus == "Connected")
                     }
                     Text(host.isPairingOpen ? "Enter this code once on your new device." : "Trusted devices connect automatically when TailView opens.")
                         .font(.caption)
@@ -50,7 +49,7 @@ struct ContentView: View {
                 }
                 GroupBox("Trusted device control") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Paired devices can use the screen, Mac sound, microphone, mouse, and keyboard while access is on. Pause Access from the menu bar to disconnect immediately.")
+                        Text("Up to two paired devices can view the screen and control the mouse and keyboard. One device at a time hears Mac sound and sends its microphone to this Mac. Choose Use audio on this device in iOS Settings to switch both audio directions. Pause Access from the menu bar to disconnect both immediately.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(host.controlStatus)

@@ -6,6 +6,8 @@ enum PacketKind: UInt8 {
     case control = 3
     case controlState = 4
     case macAudio = 5
+    case microphoneState = 6
+    case microphoneRequest = 7
 }
 
 enum Packet {
@@ -37,6 +39,8 @@ final class PacketParser {
             case .control: limit = 1_024
             case .controlState: limit = 1
             case .macAudio: limit = 65_536
+            case .microphoneState: limit = 1
+            case .microphoneRequest: limit = 1
             }
             guard length > 0, length <= limit else { throw PacketError.invalidLength }
             let total = 5 + Int(length)

@@ -56,6 +56,10 @@ final class HostModel: ObservableObject {
                 let store = pairedStore
                 let injector = controlInjector
                 server.authenticateSaved = { id, token in store.authenticate(id: id, token: token) }
+                server.isPreferredMicrophone = { id in
+                    (try? store.list().first { $0.id == id })?.name
+                        .localizedCaseInsensitiveContains("iPad") == true
+                }
                 server.authorizeTrustedControl = { [weak injector] in
                     guard ControlInjector.hasPermission(), let injector else { return false }
                     injector.setEnabled(true)
@@ -78,17 +82,19 @@ final class HostModel: ObservableObject {
                         self?.pairingStatus = "Paired \(name)"
                     }
                 }
-                server.onViewerStatus = { [weak self] message in
+                server.onViewerStatus = { [weak self] _ in
                     Task { @MainActor in
                         guard self?.isSharing == true else { return }
-                        self?.viewerStatus = message
-                        self?.updateSystemAudioCapture(message == "Connected" && server.hasPairedViewer,
+                        let count = server.viewerCount
+                        self?.viewerStatus = count == 0 ? "Disconnected" :
+                            "\(count) viewer\(count == 1 ? "" : "s") connected"
+                        self?.updateSystemAudioCapture(server.hasPairedViewer,
                                                        on: capture)
                         self?.isControlEnabled = server.isControlEnabled
-                        self?.controlStatus = message == "Connected"
+                        self?.controlStatus = count > 0
                             ? (server.isControlEnabled ? "Trusted device can control this Mac" : "Grant macOS control permission in TailView settings")
                             : "Control is off"
-                        if message == "Disconnected" {
+                        if count == 0 {
                             self?.peakMicrophoneLevel = 0
                             self?.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
                         }
@@ -186,7 +192,7 @@ final class HostModel: ObservableObject {
         controlInjector.setEnabled(true)
         server.setControlEnabled(true)
         isControlEnabled = true
-        controlStatus = "Control allowed for this connected device until you turn it off or sharing ends"
+        controlStatus = "Control allowed for connected trusted devices until you turn it off or sharing ends"
     }
 
     func requestControlPermission() {
@@ -207,7 +213,7 @@ final class HostModel: ObservableObject {
     }
 
     func enablePairing() {
-        guard isSharing, viewerStatus != "Connected", let server else { return }
+        guard isSharing, let server else { return }
         server.enablePairing()
         pairingWindowID = UUID()
         let windowID = pairingWindowID
@@ -252,7 +258,7 @@ final class HostModel: ObservableObject {
             do {
                 try await capture.setSystemAudioEnabled(enabled)
                 if self.capture === capture {
-                    self.systemAudioStatus = enabled ? "Sending Mac sound to iPad" : "Waiting for a trusted viewer"
+                    self.systemAudioStatus = enabled ? "Sending Mac sound to the selected audio device" : "Waiting for a trusted viewer"
                 }
             } catch {
                 if self.capture === capture {

@@ -38,7 +38,7 @@ private struct TailViewMenu: View {
                 host.enablePairing()
                 openSettings()
             }
-            .disabled(!host.isSharing || host.viewerStatus == "Connected")
+            .disabled(!host.isSharing)
         }
         Button("Settings…") { openSettings() }
         Divider()
