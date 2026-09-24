@@ -157,6 +157,13 @@ struct ViewerView: View {
                             }
                             .scrollIndicators(.hidden)
                             HStack {
+                                Button {
+                                    remoteTextFocused = true
+                                } label: {
+                                    Label("Keyboard", systemImage: "keyboard")
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .accessibilityIdentifier("tailview.keyboardButton")
                                 TextField("Type text on Mac", text: $remoteText)
                                     .textFieldStyle(.roundedBorder)
                                     .textInputAutocapitalization(.never)
@@ -168,7 +175,7 @@ struct ViewerView: View {
                                 Button("Send text", action: sendRemoteText)
                                     .disabled(remoteText.isEmpty)
                             }
-                            Text("Tap to click, drag one finger to move the pointer, or use two fingers to pan and pinch to zoom.")
+                            Text("Tap to click, or tap Keyboard to type into the focused Mac app. Drag one finger to move the pointer; use two fingers to pan and pinch to zoom.")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
