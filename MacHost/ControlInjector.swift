@@ -66,9 +66,11 @@ final class ControlInjector {
                 mouseIsDown = false
             }
         case .scroll:
-            if let amount = command.amount,
-               let event = CGEvent(scrollWheelEvent2Source: nil, units: .line,
-                                   wheelCount: 1, wheel1: Int32(amount), wheel2: 0, wheel3: 0) {
+            let vertical = command.amount ?? 0
+            let horizontal = command.horizontalAmount ?? 0
+            if let event = CGEvent(scrollWheelEvent2Source: nil, units: .line,
+                                   wheelCount: horizontal == 0 ? 1 : 2,
+                                   wheel1: Int32(vertical), wheel2: Int32(horizontal), wheel3: 0) {
                 event.post(tap: .cghidEventTap)
             }
         case .text:

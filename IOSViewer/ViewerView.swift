@@ -17,6 +17,8 @@ struct ViewerView: View {
     @State private var diagnosticLaunch = false
     @State private var pointer = CGPoint(x: 0.5, y: 0.5)
     @State private var isDraggingRemote = false
+    @State private var isTouchDraggingRemote = false
+    @State private var isPanningView = false
     @State private var keyboardActive = false
     @State private var keyboardFocusRequest = 0
     @State private var screenZoom: CGFloat = 1
@@ -30,6 +32,8 @@ struct ViewerView: View {
                     RemoteScreenView(image: image, alignTop: alignScreenToTop,
                                      controlAllowed: viewer.isControlAllowed,
                                      isDraggingRemote: isDraggingRemote,
+                                     panView: isPanningView,
+                                     isTouchDraggingRemote: $isTouchDraggingRemote,
                                      pointer: $pointer, zoom: $screenZoom, offset: $screenOffset,
                                      onCommand: viewer.sendControl)
                 } else {
@@ -53,6 +57,7 @@ struct ViewerView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        releaseHeldMouse()
                         keyboardActive = false
                         showSettings = true
                     } label: {
@@ -81,6 +86,8 @@ struct ViewerView: View {
             } else {
                 keyboardActive = false
                 isDraggingRemote = false
+                isTouchDraggingRemote = false
+                isPanningView = false
                 screenZoom = 1
                 screenOffset = .zero
             }
@@ -88,7 +95,14 @@ struct ViewerView: View {
         .onChange(of: viewer.isControlAllowed) { _, allowed in
             keyboardActive = allowed && !showSettings
             if allowed { keyboardFocusRequest += 1 }
-            else { isDraggingRemote = false }
+            else {
+                isDraggingRemote = false
+                isTouchDraggingRemote = false
+                isPanningView = false
+            }
+        }
+        .onChange(of: screenZoom) { _, value in
+            if value <= 1.01 { isPanningView = false }
         }
         .onChange(of: microphoneOnConnect) { _, enabled in
             guard viewer.isConnected else { return }
@@ -102,6 +116,7 @@ struct ViewerView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { connectPreferredIfNeeded() }
+            else { releaseHeldMouse() }
         }
         .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
             connectPreferredIfNeeded()
@@ -221,12 +236,12 @@ struct ViewerView: View {
                 Image(systemName: "cursorarrow.click")
             }
             .accessibilityLabel("Left click")
-            .disabled(!viewer.isControlAllowed || isDraggingRemote)
+            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
             Button { sendPointer(.rightClick) } label: {
                 Image(systemName: "cursorarrow.click.2")
             }
             .accessibilityLabel("Right click")
-            .disabled(!viewer.isControlAllowed || isDraggingRemote)
+            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
             Button {
                 isDraggingRemote.toggle()
                 sendPointer(isDraggingRemote ? .leftDown : .leftUp)
@@ -234,7 +249,14 @@ struct ViewerView: View {
                 Image(systemName: isDraggingRemote ? "hand.raised.fill" : "hand.draw")
             }
             .accessibilityLabel(isDraggingRemote ? "Release drag" : "Start drag")
-            .disabled(!viewer.isControlAllowed)
+            .disabled(!viewer.isControlAllowed || isTouchDraggingRemote)
+            if screenZoom > 1.01 {
+                Button { isPanningView.toggle() } label: {
+                    Image(systemName: isPanningView ? "hand.point.up.left.fill" : "hand.point.up.left")
+                }
+                .accessibilityLabel(isPanningView ? "Stop panning view" : "Pan view")
+                .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+            }
             Spacer(minLength: 0)
             Menu {
                 Button("Scroll up") { viewer.sendControl(ControlCommand(kind: .scroll, amount: -3)) }
@@ -307,7 +329,7 @@ struct ViewerView: View {
                 }
                 Section("Screen") {
                     Toggle("Align screen to top", isOn: $alignScreenToTop)
-                    Text("Pinch to zoom. Drag one finger to move the Mac pointer, or two fingers to pan the screen.")
+                    Text("Tap to click, slide one finger to move the Mac pointer, or press and hold then move to drag. Swipe two fingers to scroll the Mac. Pinch to zoom; while zoomed, use Pan view in the control bar to move the screen with two fingers.")
                 }
                 #if DEBUG
                 Section("Microphone input test") {
@@ -348,6 +370,12 @@ struct ViewerView: View {
 
     private func sendPointer(_ kind: ControlCommand.Kind) {
         viewer.sendControl(ControlCommand(kind: kind, x: Double(pointer.x), y: Double(pointer.y)))
+    }
+
+    private func releaseHeldMouse() {
+        if isDraggingRemote || isTouchDraggingRemote { sendPointer(.leftUp) }
+        isDraggingRemote = false
+        isTouchDraggingRemote = false
     }
 
     private func sendKey(_ key: ControlCommand.Key) {

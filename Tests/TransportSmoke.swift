@@ -42,9 +42,17 @@ struct TransportSmoke {
         }
         guard ControlCommand(kind: .leftClick, x: -0.01, y: 0.5).encoded() == nil,
               ControlCommand(kind: .scroll, amount: 100).encoded() == nil,
+              ControlCommand(kind: .scroll, amount: 0, horizontalAmount: 0).encoded() == nil,
+              ControlCommand(kind: .scroll, horizontalAmount: 21).encoded() == nil,
+              ControlCommand(kind: .leftClick, x: 0.5, y: 0.5, horizontalAmount: 1).encoded() == nil,
               ControlCommand(kind: .text, text: "\u{0000}").encoded() == nil,
               ControlCommand.decode(Data("bad JSON".utf8)) == nil else {
             throw TestError.message("Invalid control command was accepted")
+        }
+        let diagonalScroll = ControlCommand(kind: .scroll, amount: 2, horizontalAmount: -3)
+        guard let scrollData = diagonalScroll.encoded(),
+              ControlCommand.decode(scrollData) == diagonalScroll else {
+            throw TestError.message("Two-axis scroll command did not round trip")
         }
         server.setControlEnabled(true)
         try expectState(client, allowed: false, phase: "session enable attempt")

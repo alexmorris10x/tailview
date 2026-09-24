@@ -14,6 +14,7 @@ struct ControlCommand: Codable, Equatable {
     var x: Double? = nil
     var y: Double? = nil
     var amount: Int? = nil
+    var horizontalAmount: Int? = nil
     var text: String? = nil
     var key: Key? = nil
 
@@ -40,16 +41,19 @@ struct ControlCommand: Codable, Equatable {
     private var isValid: Bool {
         switch kind {
         case .move, .leftClick, .rightClick, .leftDown, .leftDrag, .leftUp:
-            return hasPoint && amount == nil && text == nil && key == nil
+            return hasPoint && amount == nil && horizontalAmount == nil && text == nil && key == nil
         case .scroll:
-            return x == nil && y == nil && amount.map { (-20...20).contains($0) && $0 != 0 } == true
-                && text == nil && key == nil
+            let vertical = amount ?? 0
+            let horizontal = horizontalAmount ?? 0
+            return x == nil && y == nil && text == nil && key == nil
+                && (-20...20).contains(vertical) && (-20...20).contains(horizontal)
+                && (vertical != 0 || horizontal != 0)
         case .text:
-            return x == nil && y == nil && amount == nil && key == nil
+            return x == nil && y == nil && amount == nil && horizontalAmount == nil && key == nil
                 && text.map { !$0.isEmpty && $0.utf16.count <= 64
                     && !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) } == true
         case .key:
-            return x == nil && y == nil && amount == nil && text == nil && key != nil
+            return x == nil && y == nil && amount == nil && horizontalAmount == nil && text == nil && key != nil
         }
     }
 }
