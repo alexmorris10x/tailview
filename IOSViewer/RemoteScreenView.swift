@@ -7,6 +7,7 @@ struct RemoteScreenView: View {
     let controlAllowed: Bool
     let isDraggingRemote: Bool
     let panView: Bool
+    let reverseScrollDirection: Bool
     @Binding var isTouchDraggingRemote: Bool
     @Binding var pointer: CGPoint
     @Binding var zoom: CGFloat
@@ -34,6 +35,7 @@ struct RemoteScreenView: View {
                 }
                 ScreenGestures(controlAllowed: controlAllowed,
                                panView: panView,
+                               reverseScrollDirection: reverseScrollDirection,
                                onTap: { point, secondary in
                                    guard controlAllowed, !isDraggingRemote, !isTouchDraggingRemote,
                                          let normalized = viewport.normalizedPoint(point) else { return }
@@ -129,6 +131,7 @@ private struct ScreenGestures: UIViewRepresentable {
 
     let controlAllowed: Bool
     let panView: Bool
+    let reverseScrollDirection: Bool
     let onTap: (CGPoint, Bool) -> Void
     let onPointerMove: (CGPoint) -> Void
     let onHoldDrag: (HoldDragPhase, CGPoint) -> Bool
@@ -244,9 +247,10 @@ private struct ScreenGestures: UIViewRepresentable {
             if twoPanPansView || pinchActive {
                 parent.onPan(CGSize(width: delta.x, height: delta.y))
             } else {
-                // Finger movement is opposite the direction the page should travel.
-                scrollRemainder.x -= delta.x
-                scrollRemainder.y -= delta.y
+                // The saved setting reverses both axes without changing viewport panning.
+                let direction: CGFloat = parent.reverseScrollDirection ? 1 : -1
+                scrollRemainder.x += delta.x * direction
+                scrollRemainder.y += delta.y * direction
                 let horizontal = max(-8, min(8, Int(scrollRemainder.x / pixelsPerScrollLine)))
                 let vertical = max(-8, min(8, Int(scrollRemainder.y / pixelsPerScrollLine)))
                 scrollRemainder.x -= CGFloat(horizontal) * pixelsPerScrollLine

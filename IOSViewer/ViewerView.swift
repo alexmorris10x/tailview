@@ -6,6 +6,7 @@ struct ViewerView: View {
     @AppStorage("macAddress") private var macAddress = ""
     @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
+    @AppStorage("reverseScrollDirection") private var reverseScrollDirection = false
     @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
     @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
     @State private var code = ""
@@ -33,6 +34,7 @@ struct ViewerView: View {
                                      controlAllowed: viewer.isControlAllowed,
                                      isDraggingRemote: isDraggingRemote,
                                      panView: isPanningView,
+                                     reverseScrollDirection: reverseScrollDirection,
                                      isTouchDraggingRemote: $isTouchDraggingRemote,
                                      pointer: $pointer, zoom: $screenZoom, offset: $screenOffset,
                                      onCommand: viewer.sendControl)
@@ -329,6 +331,7 @@ struct ViewerView: View {
                 }
                 Section("Screen") {
                     Toggle("Align screen to top", isOn: $alignScreenToTop)
+                    Toggle("Reverse two-finger scroll direction", isOn: $reverseScrollDirection)
                     Text("Tap to click, slide one finger to move the Mac pointer, or press and hold then move to drag. Swipe two fingers to scroll the Mac. Pinch to zoom; while zoomed, use Pan view in the control bar to move the screen with two fingers.")
                 }
                 #if DEBUG
