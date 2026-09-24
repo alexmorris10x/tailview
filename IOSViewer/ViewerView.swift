@@ -29,6 +29,8 @@ struct ViewerView: View {
     @State private var keyboardOpenRequest = 0
     @State private var nativeKeyboardVisible = false
     @State private var fallbackKeyboardVisible = false
+    @State private var microphoneSessionEnabled = true
+    @State private var macAudioSessionEnabled = true
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
     @State private var modifierSelection = ModifierSelection()
@@ -102,6 +104,8 @@ struct ViewerView: View {
         }
         .onChange(of: viewer.isConnected) { _, connected in
             if connected {
+                microphoneSessionEnabled = microphoneOnConnect
+                macAudioSessionEnabled = macAudioOnConnect
                 showPairing = false
                 automaticConnection = true
                 code = ""
@@ -135,11 +139,13 @@ struct ViewerView: View {
         }
         .onChange(of: microphoneOnConnect) { _, enabled in
             guard viewer.isConnected else { return }
+            microphoneSessionEnabled = enabled
             if enabled { viewer.startMicrophone() }
             else { viewer.stopMicrophone() }
         }
         .onChange(of: macAudioOnConnect) { _, enabled in
             guard viewer.isConnected else { return }
+            macAudioSessionEnabled = enabled
             if enabled { viewer.startMacAudio() }
             else { viewer.stopMacAudio() }
         }
@@ -274,6 +280,32 @@ struct ViewerView: View {
             ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
                 modifierButton(modifier)
             }
+            Button {
+                microphoneSessionEnabled.toggle()
+                if microphoneSessionEnabled { viewer.startMicrophone() }
+                else { viewer.stopMicrophone() }
+            } label: {
+                Image(systemName: microphoneSessionEnabled ? "mic.fill" : "mic.slash.fill")
+                    .frame(minWidth: 34, minHeight: 32)
+            }
+            .tint(microphoneSessionEnabled ? .primary : .red)
+            .accessibilityLabel(microphoneSessionEnabled ? "Mute microphone" : "Unmute microphone")
+            .accessibilityValue(microphoneSessionEnabled ? "On" : "Muted")
+            .accessibilityHint("Controls voice sent to the Mac when this device owns audio")
+            .accessibilityIdentifier("tailview.microphoneMuteButton")
+            Button {
+                macAudioSessionEnabled.toggle()
+                if macAudioSessionEnabled { viewer.startMacAudio() }
+                else { viewer.stopMacAudio() }
+            } label: {
+                Image(systemName: macAudioSessionEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                    .frame(minWidth: 34, minHeight: 32)
+            }
+            .tint(macAudioSessionEnabled ? .primary : .red)
+            .accessibilityLabel(macAudioSessionEnabled ? "Mute Mac sound" : "Unmute Mac sound")
+            .accessibilityValue(macAudioSessionEnabled ? "On" : "Muted")
+            .accessibilityHint("Controls Mac sound played on this device when it owns audio")
+            .accessibilityIdentifier("tailview.speakerMuteButton")
             if horizontalSizeClass != .compact {
                 pointerButtons
                 if screenZoom > 1.01 {
@@ -415,6 +447,7 @@ struct ViewerView: View {
                     } else if viewer.isConnected {
                         Text("This device has the audio route.")
                     }
+                    Text("Use Mic and Speaker in the floating bar to mute either direction for this connection.")
                 }
                 Section("Microphone") {
                     Toggle("Connect microphone automatically", isOn: $microphoneOnConnect)
