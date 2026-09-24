@@ -14,6 +14,7 @@ final class HostModel: ObservableObject {
     @Published private(set) var pairingStatus = ""
     @Published private(set) var isControlEnabled = false
     @Published private(set) var controlStatus = "Control is off"
+    @Published private(set) var isPaused = false
 
     private let pairedStore = PairedDeviceStore()
     private let controlInjector = ControlInjector()
@@ -21,11 +22,22 @@ final class HostModel: ObservableObject {
     private var server: VideoServer?
     private var peakMicrophoneLevel = 0.0
     private var pairingWindowID = UUID()
+    private var launchGeneration: UInt64 = 0
 
-    init() { reloadPairedDevices() }
+    init() {
+        isPaused = UserDefaults.standard.bool(forKey: "tailview.accessPaused")
+        reloadPairedDevices()
+        if isPaused {
+            status = "Access paused"
+        } else {
+            Task { @MainActor [weak self] in self?.start() }
+        }
+    }
 
     func start() {
-        guard !isSharing, !isStarting else { return }
+        guard !isPaused, !isSharing, !isStarting else { return }
+        launchGeneration &+= 1
+        let generation = launchGeneration
         isStarting = true
         peakMicrophoneLevel = 0
         status = "Starting screen capture…"
@@ -40,7 +52,14 @@ final class HostModel: ObservableObject {
                 let sink = try? AudioSink.blackHole()
                 let server = try VideoServer(address: ip, code: code, audioSink: sink)
                 let store = pairedStore
+                let injector = controlInjector
                 server.authenticateSaved = { id, token in store.authenticate(id: id, token: token) }
+                server.authorizeTrustedControl = { [weak injector] in
+                    guard ControlInjector.hasPermission(), let injector else { return false }
+                    injector.setEnabled(true)
+                    return true
+                }
+                server.onControlSessionEnded = { [weak injector] in injector?.setEnabled(false) }
                 server.onPairingRequest = { [weak self] id, name, token in
                     do {
                         try store.add(id: id, name: name, token: token)
@@ -61,14 +80,16 @@ final class HostModel: ObservableObject {
                     Task { @MainActor in
                         guard self?.isSharing == true else { return }
                         self?.viewerStatus = message
+                        self?.isControlEnabled = server.isControlEnabled
+                        self?.controlStatus = message == "Connected"
+                            ? (server.isControlEnabled ? "Trusted device can control this Mac" : "Grant macOS control permission in TailView settings")
+                            : "Control is off"
                         if message == "Disconnected" {
-                            self?.disableControl()
                             self?.peakMicrophoneLevel = 0
                             self?.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
                         }
                     }
                 }
-                let injector = controlInjector
                 server.onControlCommand = { command in injector.submit(command) }
                 server.onMicrophonePacket = { [weak self] in
                     Task { @MainActor in
@@ -89,24 +110,29 @@ final class HostModel: ObservableObject {
                     Task { @MainActor in self?.stop(); self?.status = message }
                 }
                 try await capture.start { frame in server.publish(frame) }
-                server.start()
-                self.capture = capture
-                self.server = server
-                address = ip
-                sessionCode = code
-                microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
-                viewerStatus = "Waiting for a viewer"
-                status = "Sharing main display"
-                isSharing = true
+                if generation != launchGeneration || isPaused {
+                    await capture.stop()
+                } else {
+                    server.start()
+                    self.capture = capture
+                    self.server = server
+                    address = ip
+                    sessionCode = code
+                    microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
+                    viewerStatus = "Waiting for a viewer"
+                    status = "Sharing main display"
+                    isSharing = true
+                }
             } catch {
-                status = "Could not start: \(error.localizedDescription)"
+                if generation == launchGeneration { status = "Could not start: \(error.localizedDescription)" }
             }
-            isStarting = false
+            if generation == launchGeneration { isStarting = false }
         }
     }
 
     func stop() {
         guard isSharing || isStarting else { return }
+        launchGeneration &+= 1
         disableControl()
         server?.disablePairing()
         server?.stop()
@@ -116,12 +142,27 @@ final class HostModel: ObservableObject {
         Task { await capture?.stop() }
         isSharing = false
         isStarting = false
-        status = "Stopped"
+        status = isPaused ? "Access paused" : "Stopped"
         viewerStatus = "Disconnected"
         microphoneStatus = "Start sharing to receive the device microphone"
         peakMicrophoneLevel = 0
         sessionCode = ""
         isPairingOpen = false
+    }
+
+    func pauseAccess() {
+        guard !isPaused else { return }
+        isPaused = true
+        UserDefaults.standard.set(true, forKey: "tailview.accessPaused")
+        stop()
+        status = "Access paused"
+    }
+
+    func resumeAccess() {
+        guard isPaused else { return }
+        isPaused = false
+        UserDefaults.standard.set(false, forKey: "tailview.accessPaused")
+        start()
     }
 
     func enableControl() {
@@ -138,6 +179,16 @@ final class HostModel: ObservableObject {
         server.setControlEnabled(true)
         isControlEnabled = true
         controlStatus = "Control allowed for this connected device until you turn it off or sharing ends"
+    }
+
+    func requestControlPermission() {
+        guard ControlInjector.hasPermission() else {
+            _ = ControlInjector.requestPermission()
+            controlStatus = "Allow TailView Mac in macOS Privacy & Security, then relaunch TailView Mac"
+            return
+        }
+        if server?.hasPairedViewer == true { enableControl() }
+        else { controlStatus = "Control permission is ready for trusted devices" }
     }
 
     func disableControl() {

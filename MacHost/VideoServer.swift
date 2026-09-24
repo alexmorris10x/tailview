@@ -10,6 +10,10 @@ final class VideoServer {
     var onPairingRequest: ((UUID, String, String) -> Bool)?
     var onPairingSuccess: ((UUID, String) -> Void)?
     var onControlCommand: ((ControlCommand) -> Void)?
+    /// Called under the server lock only after a saved credential or a new pairing succeeds.
+    /// The host enables its input injector here so the first control packet is safe to accept.
+    var authorizeTrustedControl: (() -> Bool)?
+    var onControlSessionEnded: (() -> Void)?
 
     private let lock = NSLock()
     private let sendQueue = DispatchQueue(label: "TailView.frameSend")
@@ -81,6 +85,11 @@ final class VideoServer {
         return running && activeFD >= 0 && activePairedID != nil
     }
 
+    var isControlEnabled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return controlEnabled
+    }
+
     func setControlEnabled(_ enabled: Bool) {
         lock.lock()
         controlEnabled = enabled && running && activeFD >= 0 && activePairedID != nil
@@ -100,6 +109,7 @@ final class VideoServer {
         activeFD = -1
         activePairedID = nil
         controlEnabled = false
+        onControlSessionEnded?()
         sendPending = false
         latestFrame = nil
         lock.unlock()
@@ -176,13 +186,14 @@ final class VideoServer {
             guard running else { lock.unlock(); Darwin.close(client); return }
             activeFD = client
             activePairedID = pairedID
-            controlEnabled = false
+            controlEnabled = pairedID != nil && (authorizeTrustedControl?() == true)
+            let allowControl = controlEnabled
             let frame = latestFrame
             lock.unlock()
             didReportMicrophone = false
             lastLevelReport = 0
             onViewerStatus?("Connected")
-            sendControlState(false, to: client)
+            sendControlState(allowControl, to: client)
             if let frame { publish(frame) }
             receiveViewerPackets(client)
             finish(client)
@@ -249,6 +260,7 @@ final class VideoServer {
         activeFD = -1
         activePairedID = nil
         controlEnabled = false
+        onControlSessionEnded?()
         sendPending = false
         lock.unlock()
         sendQueue.async { Darwin.shutdown(fd, SHUT_RDWR); Darwin.close(fd) }

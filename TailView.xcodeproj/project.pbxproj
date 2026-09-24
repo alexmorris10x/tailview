@@ -26,6 +26,7 @@
 		C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */; };
 		CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
+		E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */; };
 		E787339A2352E81E1A2BF5C5 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
 		F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
 /* End PBXBuildFile section */
@@ -42,6 +43,7 @@
 		4BD5CCB624B37839736A66A9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenViewport.swift; sourceTree = "<group>"; };
 		5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewIOSApp.swift; sourceTree = "<group>"; };
+		747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteKeyboardInput.swift; sourceTree = "<group>"; };
 		89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlInjector.swift; sourceTree = "<group>"; };
 		8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
 		B2FB29C814C93650C267420E /* HostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostModel.swift; sourceTree = "<group>"; };
@@ -95,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
+				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
 				FF5F28AE665343293EA19C0A /* SavedMacStore.swift */,
 				5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */,
@@ -198,6 +201,7 @@
 				3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */,
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,
+				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,
 				7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */,
 				DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */,

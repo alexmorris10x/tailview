@@ -4,7 +4,7 @@ import SwiftUI
 
 final class ViewerModel: ObservableObject {
     @Published private(set) var image: UIImage?
-    @Published private(set) var status = "Start sharing on the Mac, then connect here."
+    @Published private(set) var status = "Looking for your Mac…"
     @Published private(set) var microphoneStatus = "Microphone is off"
     @Published private(set) var inputLevelStatus = ""
     #if DEBUG
@@ -17,6 +17,7 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var isPairedSession = false
     @Published private(set) var isControlAllowed = false
     @Published private(set) var savedMacs = [SavedMac]()
+    @Published private(set) var savedCredentialRejected = false
 
     private enum Credential {
         case session(String)
@@ -75,7 +76,7 @@ final class ViewerModel: ObservableObject {
         catch { status = "Could not load saved Macs: \(error.localizedDescription)" }
     }
 
-    func pair(host: String, code: String, name: String) {
+    func pair(host: String, code: String, name: String, startMicrophoneOnConnect: Bool = true) {
         guard PairingRequest.validCode(code) else {
             status = "Enter the current session code shown on the Mac"
             return
@@ -84,13 +85,15 @@ final class ViewerModel: ObservableObject {
             let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
             let profile = SavedMac(id: UUID(), name: title.isEmpty ? "My Mac" : String(title.prefix(40)),
                                    address: host, token: try SavedMacStore.newToken())
-            beginConnection(host: host, credential: .pair(profile, code: code))
+            beginConnection(host: host, credential: .pair(profile, code: code),
+                            startMicrophoneOnConnect: startMicrophoneOnConnect)
         } catch {
             status = "Could not create a pairing credential: \(error.localizedDescription)"
         }
     }
 
-    func connect(profile: SavedMac, startMicrophoneOnConnect: Bool = false) {
+    func connect(profile: SavedMac, startMicrophoneOnConnect: Bool = true) {
+        savedCredentialRejected = false
         beginConnection(host: profile.address, credential: .saved(profile),
                         startMicrophoneOnConnect: startMicrophoneOnConnect)
     }
@@ -100,6 +103,7 @@ final class ViewerModel: ObservableObject {
             let remaining = savedMacs.filter { $0.id != profile.id }
             try SavedMacStore.save(remaining)
             savedMacs = remaining
+            savedCredentialRejected = false
             status = "Profile removed from this device; revoke it on the Mac to remove access there"
         } catch {
             status = "Could not remove profile: \(error.localizedDescription)"
@@ -189,7 +193,11 @@ final class ViewerModel: ObservableObject {
         connection.receive(minimumIncompleteLength: 1, maximumLength: expected.count - partial.count) { [weak self, weak connection] data, _, complete, error in
             guard let self, let connection, self.connection === connection else { return }
             guard error == nil, !complete, let data, !data.isEmpty else {
-                DispatchQueue.main.async { self.disconnect(); self.status = credential.rejectionMessage }
+                DispatchQueue.main.async {
+                    self.disconnect()
+                    if case .saved = credential { self.savedCredentialRejected = true }
+                    self.status = credential.rejectionMessage
+                }
                 return
             }
             var partial = partial
@@ -200,7 +208,11 @@ final class ViewerModel: ObservableObject {
             }
             if partial.count == expected.count {
                 guard partial == expected else {
-                    DispatchQueue.main.async { self.disconnect(); self.status = credential.rejectionMessage }
+                    DispatchQueue.main.async {
+                        self.disconnect()
+                        if case .saved = credential { self.savedCredentialRejected = true }
+                        self.status = credential.rejectionMessage
+                    }
                     return
                 }
                 DispatchQueue.main.async {

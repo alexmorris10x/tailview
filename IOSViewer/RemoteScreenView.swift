@@ -1,15 +1,10 @@
 import SwiftUI
 import UIKit
 
-enum ViewerInteractionMode: String, CaseIterable {
-    case view = "View"
-    case control = "Control"
-}
-
 struct RemoteScreenView: View {
     let image: UIImage
     let alignTop: Bool
-    let mode: ViewerInteractionMode
+    let controlAllowed: Bool
     let isDraggingRemote: Bool
     @Binding var pointer: CGPoint
     @Binding var zoom: CGFloat
@@ -27,16 +22,16 @@ struct RemoteScreenView: View {
                     .resizable()
                     .frame(width: rect.width, height: rect.height)
                     .position(x: rect.midX, y: rect.midY)
-                ScreenGestures(mode: mode,
+                ScreenGestures(controlAllowed: controlAllowed,
                                onTap: { point, secondary in
-                                   guard mode == .control, !isDraggingRemote,
+                                   guard controlAllowed, !isDraggingRemote,
                                          let normalized = viewport.normalizedPoint(point) else { return }
                                    pointer = normalized
                                    onCommand(ControlCommand(kind: secondary ? .rightClick : .leftClick,
                                                             x: Double(normalized.x), y: Double(normalized.y)))
                                },
                                onPointerMove: { point in
-                                   guard mode == .control, let normalized = viewport.normalizedPoint(point) else { return }
+                                   guard controlAllowed, let normalized = viewport.normalizedPoint(point) else { return }
                                    pointer = normalized
                                    onCommand(ControlCommand(kind: isDraggingRemote ? .leftDrag : .move,
                                                             x: Double(normalized.x), y: Double(normalized.y)))
@@ -70,7 +65,7 @@ struct RemoteScreenView: View {
 }
 
 private struct ScreenGestures: UIViewRepresentable {
-    let mode: ViewerInteractionMode
+    let controlAllowed: Bool
     let onTap: (CGPoint, Bool) -> Void
     let onPointerMove: (CGPoint) -> Void
     let onPan: (CGSize) -> Void
@@ -120,7 +115,7 @@ private struct ScreenGestures: UIViewRepresentable {
 
         @objc func onePan(_ sender: UIPanGestureRecognizer) {
             guard let view = sender.view, sender.state == .began || sender.state == .changed else { return }
-            if parent.mode == .control {
+            if parent.controlAllowed {
                 parent.onPointerMove(sender.location(in: view))
             } else {
                 let delta = sender.translation(in: view)

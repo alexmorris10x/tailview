@@ -1,292 +1,333 @@
+import Combine
 import SwiftUI
 
 struct ViewerView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("macAddress") private var macAddress = ""
+    @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
+    @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
     @State private var code = ""
     @State private var profileName = "My Mac"
     @State private var showPairing = false
+    @State private var showSettings = false
+    @State private var automaticConnection = true
     @State private var didRunDebugLaunch = false
-    @State private var interactionMode: ViewerInteractionMode = .view
+    @State private var diagnosticLaunch = false
     @State private var pointer = CGPoint(x: 0.5, y: 0.5)
     @State private var isDraggingRemote = false
-    @State private var remoteText = ""
+    @State private var keyboardActive = false
+    @State private var keyboardFocusRequest = 0
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
-    @FocusState private var remoteTextFocused: Bool
     @StateObject private var viewer = ViewerModel()
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
                 if let image = viewer.image {
                     RemoteScreenView(image: image, alignTop: alignScreenToTop,
-                                     mode: interactionMode, isDraggingRemote: isDraggingRemote,
+                                     controlAllowed: viewer.isControlAllowed,
+                                     isDraggingRemote: isDraggingRemote,
                                      pointer: $pointer, zoom: $screenZoom, offset: $screenOffset,
                                      onCommand: viewer.sendControl)
                 } else {
-                    ContentUnavailableView("No screen yet", systemImage: "display",
-                                           description: Text(viewer.status))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    connectionView
                 }
-
-                VStack(spacing: 10) {
-                    if !viewer.isConnected {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 10) {
-                                if !viewer.savedMacs.isEmpty {
-                                    Text("Saved Macs").font(.headline)
-                                    ForEach(viewer.savedMacs) { profile in
-                                        HStack {
-                                            Button {
-                                                viewer.connect(profile: profile)
-                                            } label: {
-                                                Label {
-                                                    VStack(alignment: .leading) {
-                                                        Text(profile.name)
-                                                        Text(profile.address).font(.caption).foregroundStyle(.secondary)
-                                                    }
-                                                } icon: { Image(systemName: "desktopcomputer") }
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                            }
-                                            .buttonStyle(.borderedProminent)
-                                            .disabled(viewer.isConnecting)
-                                            Menu {
-                                                Button("Forget on this device", role: .destructive) {
-                                                    viewer.forget(profile: profile)
-                                                }
-                                            } label: { Image(systemName: "ellipsis.circle") }
-                                        }
-                                    }
-                                    Button(showPairing ? "Hide pairing" : "Pair another Mac") {
-                                        showPairing.toggle()
-                                    }
-                                    .disabled(viewer.isConnecting)
-                                }
-                                if viewer.savedMacs.isEmpty || showPairing {
-                                    Text("Pair once").font(.headline)
-                                    Text("Start sharing and choose Pair a new device on the Mac.")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    TextField("Profile name", text: $profileName)
-                                        .textFieldStyle(.roundedBorder)
-                                    TextField("Mac Tailscale address (100.x.x.x)", text: $macAddress)
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        .keyboardType(.numbersAndPunctuation)
-                                        .textFieldStyle(.roundedBorder)
-                                    SecureField("Session code shown on Mac", text: $code)
-                                        .textInputAutocapitalization(.never)
-                                        .autocorrectionDisabled()
-                                        .textFieldStyle(.roundedBorder)
-                                    HStack {
-                                        Button("Pair and connect") {
-                                            viewer.pair(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                        code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                                                        name: profileName)
-                                        }
-                                        .buttonStyle(.borderedProminent)
-                                        Button("Connect once") {
-                                            viewer.connect(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
-                                                           code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
-                                        }
-                                    }
-                                    .disabled(viewer.isConnecting || macAddress.isEmpty || code.isEmpty)
-                                }
-                                if viewer.isConnecting {
-                                    Button("Cancel connection") { viewer.disconnect() }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxHeight: 330)
-                    } else {
-                        if viewer.isControlAllowed {
-                            Picker("Screen interaction", selection: $interactionMode) {
-                                ForEach(ViewerInteractionMode.allCases, id: \.self) { mode in
-                                    Text(mode.rawValue).tag(mode)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                            .accessibilityIdentifier("tailview.interactionMode")
-                        } else {
-                            Text(viewer.isPairedSession
-                                 ? "View only · press Allow Control in TailView Mac to use mouse and keyboard"
-                                 : "View only · pair this device to enable Mac control")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        HStack {
-                            Button("Zoom out") { screenZoom = max(1, screenZoom / 1.5); screenOffset = .zero }
-                                .disabled(screenZoom <= 1)
-                            Button("Zoom in") { screenZoom = min(4, screenZoom * 1.5); screenOffset = .zero }
-                                .disabled(screenZoom >= 4)
-                            Button("Reset") { screenZoom = 1; screenOffset = .zero }
-                                .disabled(screenZoom == 1)
-                            Spacer()
-                            Text(String(format: "%.1f×", Double(screenZoom)))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.bordered)
-                        if interactionMode == .control && viewer.isControlAllowed {
-                            ScrollView(.horizontal) {
-                                HStack {
-                                    Button("Left click") { sendPointer(.leftClick) }
-                                        .disabled(isDraggingRemote)
-                                    Button("Right click") { sendPointer(.rightClick) }
-                                        .disabled(isDraggingRemote)
-                                    Button(isDraggingRemote ? "Release drag" : "Start drag") {
-                                        isDraggingRemote.toggle()
-                                        sendPointer(isDraggingRemote ? .leftDown : .leftUp)
-                                    }
-                                    Button("Scroll ↑") { viewer.sendControl(ControlCommand(kind: .scroll, amount: -3)) }
-                                    Button("Scroll ↓") { viewer.sendControl(ControlCommand(kind: .scroll, amount: 3)) }
-                                    Menu("Keys") {
-                                        Button("Return") { sendKey(.returnKey) }
-                                        Button("Tab") { sendKey(.tab) }
-                                        Button("Delete") { sendKey(.delete) }
-                                        Button("Escape") { sendKey(.escape) }
-                                        Button("←") { sendKey(.left) }
-                                        Button("→") { sendKey(.right) }
-                                        Button("↑") { sendKey(.up) }
-                                        Button("↓") { sendKey(.down) }
-                                    }
-                                }
-                                .buttonStyle(.bordered)
-                            }
-                            .scrollIndicators(.hidden)
-                            HStack {
-                                Button {
-                                    remoteTextFocused = true
-                                } label: {
-                                    Label("Keyboard", systemImage: "keyboard")
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .accessibilityIdentifier("tailview.keyboardButton")
-                                TextField("Type text on Mac", text: $remoteText)
-                                    .textFieldStyle(.roundedBorder)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                    .submitLabel(.send)
-                                    .focused($remoteTextFocused)
-                                    .onSubmit(sendRemoteText)
-                                    .accessibilityIdentifier("tailview.remoteText")
-                                Button("Send text", action: sendRemoteText)
-                                    .disabled(remoteText.isEmpty)
-                            }
-                            Text("Tap to click, or tap Keyboard to type into the focused Mac app. Drag one finger to move the pointer; use two fingers to pan and pinch to zoom.")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                        HStack {
-                            Button(viewer.isMicrophoneOn ? "Stop microphone" : "Start microphone") {
-                                viewer.isMicrophoneOn ? viewer.stopMicrophone() : viewer.startMicrophone()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            Spacer()
-                            Button("Disconnect", role: .destructive) { viewer.disconnect() }
-                        }
-                        Text(viewer.microphoneStatus)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(viewer.inputLevelStatus)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        #if DEBUG
-                        Text(viewer.debugStatus)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        #endif
-                    }
-                    Text(viewer.status)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding()
-                .background(.regularMaterial)
+                RemoteKeyboardInput(
+                    isActive: keyboardActive && viewer.isControlAllowed && !showSettings,
+                    focusRequest: keyboardFocusRequest,
+                    onText: viewer.sendText,
+                    onDelete: { sendKey(.delete) },
+                    onReturn: { sendKey(.returnKey) }
+                )
+                .frame(width: 1, height: 1)
+            }
+            .background(.black)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if viewer.isConnected { controlBar }
             }
             .navigationTitle("TailView")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        Form {
-                            Section("Screen") {
-                                Toggle("Align screen to top", isOn: $alignScreenToTop)
-                                Text("Pinch to zoom. Pan with one finger in View mode or two fingers in Control mode.")
-                            }
-                            #if DEBUG
-                            Section("Microphone input") {
-                                Text("Stops streaming and records four seconds with the same record-only audio session used for live microphone capture. The temporary audio is deleted after measuring it.")
-                                Button("Record-only microphone check") { viewer.runRecorderTest(isolated: true) }
-                                Text(viewer.debugStatus)
-                                Text(viewer.inputLevelStatus)
-                                Text(viewer.microphoneStatus)
-                            }
-                            Section("Speaker output") {
-                                Text("Plays a tone through this device's speaker. This does not test microphone capture.")
-                                Button("Play speaker test tone") { viewer.runSpeakerTest() }
-                                    .disabled(viewer.isMicrophoneOn)
-                                Text(viewer.speakerTestStatus)
-                            }
-                            Section("Transport test") {
-                                Text("Sends generated PCM to the Mac without using the microphone. This verifies the connection and receiver only.")
-                                Button("Send generated audio") { viewer.sendSyntheticAudioTest() }
-                                    .disabled(!viewer.isConnected)
-                            }
-                            #endif
-                        }
-                        .navigationTitle("Settings")
+                    Button {
+                        keyboardActive = false
+                        showSettings = true
                     } label: {
                         Label("Settings", systemImage: "gearshape")
                     }
+                    .accessibilityIdentifier("tailview.settings")
                 }
+            }
+            .sheet(isPresented: $showSettings, onDismiss: {
+                if viewer.isControlAllowed {
+                    keyboardActive = true
+                    keyboardFocusRequest += 1
+                }
+            }) {
+                settingsView
             }
         }
         .onChange(of: viewer.isConnected) { _, connected in
-            if connected { showPairing = false; code = "" }
-            else {
-                interactionMode = .view
+            if connected {
+                showPairing = false
+                automaticConnection = true
+                code = ""
+                if preferredMacID.isEmpty, let profile = viewer.savedMacs.last {
+                    preferredMacID = profile.id.uuidString
+                }
+            } else {
+                keyboardActive = false
                 isDraggingRemote = false
-                remoteTextFocused = false
                 screenZoom = 1
                 screenOffset = .zero
             }
         }
         .onChange(of: viewer.isControlAllowed) { _, allowed in
-            if !allowed { interactionMode = .view; isDraggingRemote = false; remoteTextFocused = false }
+            keyboardActive = allowed && !showSettings
+            if allowed { keyboardFocusRequest += 1 }
+            else { isDraggingRemote = false }
         }
-        .onChange(of: interactionMode) { _, mode in
-            if mode == .view, isDraggingRemote {
-                sendPointer(.leftUp)
-                isDraggingRemote = false
-            }
+        .onChange(of: microphoneOnConnect) { _, enabled in
+            guard viewer.isConnected else { return }
+            if enabled { viewer.startMicrophone() }
+            else { viewer.stopMicrophone() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { connectPreferredIfNeeded() }
+        }
+        .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
+            connectPreferredIfNeeded()
         }
         .task {
             #if DEBUG
-            guard !didRunDebugLaunch else { return }
-            didRunDebugLaunch = true
-            let arguments = ProcessInfo.processInfo.arguments
-            if arguments.contains("--tailview-test-isolated-recorder") {
-                viewer.runRecorderTest(isolated: true)
-                return
-            }
-            if arguments.contains("--tailview-test-saved-microphone"),
-               let profile = viewer.savedMacs.first {
-                viewer.connect(profile: profile, startMicrophoneOnConnect: true)
-                return
-            }
-            if let index = arguments.firstIndex(of: "--tailview-test-connect"),
-               arguments.count > index + 2 {
-                macAddress = arguments[index + 1]
-                code = arguments[index + 2]
-                viewer.connect(host: macAddress, code: code, startMicrophoneOnConnect: true,
-                               runRecorderTestOnConnect: arguments.contains("--tailview-test-recorder"),
-                               runSyntheticTestOnConnect: arguments.contains("--tailview-test-synthetic"))
+            if !didRunDebugLaunch {
+                didRunDebugLaunch = true
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("--tailview-test-isolated-recorder") {
+                    diagnosticLaunch = true
+                    viewer.runRecorderTest(isolated: true)
+                    return
+                }
+                if arguments.contains("--tailview-test-saved-microphone"),
+                   let profile = viewer.savedMacs.first {
+                    diagnosticLaunch = true
+                    viewer.connect(profile: profile, startMicrophoneOnConnect: true)
+                    return
+                }
+                if let index = arguments.firstIndex(of: "--tailview-test-connect"),
+                   arguments.count > index + 2 {
+                    diagnosticLaunch = true
+                    macAddress = arguments[index + 1]
+                    code = arguments[index + 2]
+                    viewer.connect(host: macAddress, code: code, startMicrophoneOnConnect: true,
+                                   runRecorderTestOnConnect: arguments.contains("--tailview-test-recorder"),
+                                   runSyntheticTestOnConnect: arguments.contains("--tailview-test-synthetic"))
+                    return
+                }
             }
             #endif
+            connectPreferredIfNeeded()
         }
+    }
+
+    private var connectionView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ContentUnavailableView("Waiting for Mac", systemImage: "display",
+                                       description: Text(viewer.status))
+                    .frame(maxWidth: .infinity)
+                if viewer.isConnecting {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                    Button("Cancel connection") {
+                        automaticConnection = false
+                        viewer.disconnect()
+                    }
+                } else if !viewer.savedMacs.isEmpty && !showPairing {
+                    Button("Reconnect to \(preferredProfile?.name ?? "Mac")") {
+                        automaticConnection = true
+                        if let profile = preferredProfile {
+                            viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                    Button("Pair another Mac") {
+                        automaticConnection = false
+                        showPairing = true
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                if viewer.savedMacs.isEmpty || showPairing {
+                    pairingForm
+                }
+            }
+            .padding()
+        }
+        .background(Color(uiColor: .systemBackground))
+    }
+
+    private var pairingForm: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Pair a new Mac").font(.headline)
+            Text("Choose Pair a New Device in the Mac menu bar once, then enter its address and code here.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Profile name", text: $profileName)
+                .textFieldStyle(.roundedBorder)
+            TextField("Mac Tailscale address (100.x.x.x)", text: $macAddress)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.numbersAndPunctuation)
+                .textFieldStyle(.roundedBorder)
+            SecureField("Pairing code shown on Mac", text: $code)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textFieldStyle(.roundedBorder)
+            Button("Pair and connect") {
+                viewer.pair(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
+                            code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                            name: profileName,
+                            startMicrophoneOnConnect: microphoneOnConnect)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(viewer.isConnecting || macAddress.isEmpty || code.isEmpty)
+        }
+    }
+
+    private var controlBar: some View {
+        HStack(spacing: 8) {
+            Button {
+                keyboardActive = true
+                keyboardFocusRequest += 1
+            } label: {
+                Image(systemName: "keyboard")
+            }
+            .accessibilityLabel("Keyboard")
+            .accessibilityIdentifier("tailview.keyboardButton")
+            .disabled(!viewer.isControlAllowed)
+            Button { sendPointer(.leftClick) } label: {
+                Image(systemName: "cursorarrow.click")
+            }
+            .accessibilityLabel("Left click")
+            .disabled(!viewer.isControlAllowed || isDraggingRemote)
+            Button { sendPointer(.rightClick) } label: {
+                Image(systemName: "cursorarrow.click.2")
+            }
+            .accessibilityLabel("Right click")
+            .disabled(!viewer.isControlAllowed || isDraggingRemote)
+            Button {
+                isDraggingRemote.toggle()
+                sendPointer(isDraggingRemote ? .leftDown : .leftUp)
+            } label: {
+                Image(systemName: isDraggingRemote ? "hand.raised.fill" : "hand.draw")
+            }
+            .accessibilityLabel(isDraggingRemote ? "Release drag" : "Start drag")
+            .disabled(!viewer.isControlAllowed)
+            Spacer(minLength: 0)
+            Menu {
+                Button("Scroll up") { viewer.sendControl(ControlCommand(kind: .scroll, amount: -3)) }
+                Button("Scroll down") { viewer.sendControl(ControlCommand(kind: .scroll, amount: 3)) }
+                Divider()
+                Button("Return") { sendKey(.returnKey) }
+                Button("Tab") { sendKey(.tab) }
+                Button("Delete") { sendKey(.delete) }
+                Button("Escape") { sendKey(.escape) }
+                Button("Left arrow") { sendKey(.left) }
+                Button("Right arrow") { sendKey(.right) }
+                Button("Up arrow") { sendKey(.up) }
+                Button("Down arrow") { sendKey(.down) }
+                Divider()
+                Button("Reset zoom") { screenZoom = 1; screenOffset = .zero }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .accessibilityLabel("More controls")
+        }
+        .buttonStyle(.bordered)
+        .padding(8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
+    }
+
+    private var settingsView: some View {
+        NavigationStack {
+            Form {
+                Section("Connection") {
+                    Text(viewer.status)
+                    if viewer.isConnected {
+                        Button("Disconnect") {
+                            automaticConnection = false
+                            viewer.disconnect()
+                            showSettings = false
+                        }
+                    }
+                    ForEach(viewer.savedMacs) { profile in
+                        HStack {
+                            Button(profile.name) {
+                                preferredMacID = profile.id.uuidString
+                                automaticConnection = true
+                                viewer.disconnect()
+                                viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect)
+                                showSettings = false
+                            }
+                            Spacer()
+                            Button("Forget", role: .destructive) { viewer.forget(profile: profile) }
+                        }
+                    }
+                    Button("Pair another Mac") {
+                        automaticConnection = false
+                        viewer.disconnect()
+                        showPairing = true
+                        showSettings = false
+                    }
+                }
+                Section("Microphone") {
+                    Toggle("Connect microphone automatically", isOn: $microphoneOnConnect)
+                    Text(viewer.microphoneStatus)
+                    Text(viewer.inputLevelStatus)
+                }
+                Section("Screen") {
+                    Toggle("Align screen to top", isOn: $alignScreenToTop)
+                    Text("Pinch to zoom. Drag one finger to move the Mac pointer, or two fingers to pan the screen.")
+                }
+                #if DEBUG
+                Section("Microphone input test") {
+                    Button("Record-only microphone check") { viewer.runRecorderTest(isolated: true) }
+                    Text(viewer.debugStatus)
+                }
+                Section("Speaker output test") {
+                    Button("Play speaker test tone") { viewer.runSpeakerTest() }
+                        .disabled(viewer.isMicrophoneOn)
+                    Text(viewer.speakerTestStatus)
+                }
+                Section("Transport test") {
+                    Button("Send generated audio") { viewer.sendSyntheticAudioTest() }
+                        .disabled(!viewer.isConnected)
+                }
+                #endif
+            }
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showSettings = false }
+                }
+            }
+        }
+    }
+
+    private var preferredProfile: SavedMac? {
+        viewer.savedMacs.first { $0.id.uuidString == preferredMacID } ?? viewer.savedMacs.first
+    }
+
+    private func connectPreferredIfNeeded() {
+        guard scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
+              !viewer.isConnected, !viewer.isConnecting, !viewer.savedCredentialRejected,
+              let profile = preferredProfile else { return }
+        viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect)
     }
 
     private func sendPointer(_ kind: ControlCommand.Kind) {
@@ -295,11 +336,5 @@ struct ViewerView: View {
 
     private func sendKey(_ key: ControlCommand.Key) {
         viewer.sendControl(ControlCommand(kind: .key, key: key))
-    }
-
-    private func sendRemoteText() {
-        guard !remoteText.isEmpty else { return }
-        viewer.sendText(remoteText)
-        remoteText = ""
     }
 }

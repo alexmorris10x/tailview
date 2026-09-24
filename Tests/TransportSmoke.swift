@@ -16,6 +16,7 @@ struct TransportSmoke {
         let delivered = ControlRecorder()
         server.authenticateSaved = { credentials.authenticate($0, token: $1) }
         server.onPairingRequest = { credentials.add($0, token: $2); return true }
+        server.authorizeTrustedControl = { true }
         server.onControlCommand = { delivered.append($0) }
         let connected = DispatchSemaphore(value: 0)
         server.onViewerStatus = { if $0 == "Connected" { connected.signal() } }
@@ -71,17 +72,12 @@ struct TransportSmoke {
               readExactly(pairedClient, 7) == Data("PAIRED\n".utf8) else {
             throw TestError.message("Pairing was not acknowledged")
         }
-        try expectState(pairedClient, allowed: false, phase: "paired connect")
+        try expectState(pairedClient, allowed: true, phase: "paired connect")
         guard writeExactly(pairedClient, Packet.encode(.control, clickData)) else {
             throw TestError.message("Paired control packet could not be sent")
         }
-        Thread.sleep(forTimeInterval: 0.1)
-        guard delivered.count == 0 else { throw TestError.message("Paired viewer controlled the Mac without approval") }
-        server.setControlEnabled(true)
-        try expectState(pairedClient, allowed: true, phase: "paired enable")
-        guard writeExactly(pairedClient, Packet.encode(.control, clickData)),
-              delivered.waitForCount(1), delivered.count == 1 else {
-            throw TestError.message("Approved paired control did not reach the Mac")
+        guard delivered.waitForCount(1), delivered.count == 1 else {
+            throw TestError.message("Trusted paired control did not reach the Mac automatically")
         }
         server.setControlEnabled(false)
         try expectState(pairedClient, allowed: false, phase: "paired disable")
@@ -93,13 +89,29 @@ struct TransportSmoke {
         Darwin.shutdown(pairedClient, SHUT_RDWR)
         Darwin.close(pairedClient)
         try expectRejected(address, line: pair.line, reason: "pairing window reused")
-        try expectAccepted(address, line: saved.line, acknowledgment: "OK\n")
+        let savedClient = try connect(to: address)
+        guard writeExactly(savedClient, Data(saved.line.utf8)),
+              readExactly(savedClient, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Saved device could not reconnect")
+        }
+        try expectState(savedClient, allowed: true, phase: "saved reconnect")
+        guard writeExactly(savedClient, Packet.encode(.control, clickData)),
+              delivered.waitForCount(2), delivered.count == 2 else {
+            throw TestError.message("Saved device did not regain control automatically")
+        }
+        Darwin.shutdown(savedClient, SHUT_RDWR)
+        Darwin.close(savedClient)
         try expectRejected(address,
                            line: PairingRequest.authenticate(id: deviceID, token: String(repeating: "cd", count: 32)).line,
                            reason: "wrong saved token")
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
-        print("Transport smoke passed: session code, pairing consent, saved reconnect, revocation, frame, microphone, gated control")
+        server.stop()
+        if let unexpected = try? connect(to: address) {
+            Darwin.close(unexpected)
+            throw TestError.message("Stopped server still accepted a viewer")
+        }
+        print("Transport smoke passed: pairing consent, trusted auto-control, saved reconnect, revocation, stopped listener, frame, microphone, session control denial")
     }
 
     private static func expectState(_ fd: Int32, allowed: Bool, phase: String) throws {
