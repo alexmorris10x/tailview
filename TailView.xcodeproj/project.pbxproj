@@ -15,6 +15,7 @@
 		4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E90C7F0AF464E7238A871F0 /* ContentView.swift */; };
 		5B1BC0F9D158C872A6F8C1C9 /* HostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FB29C814C93650C267420E /* HostModel.swift */; };
 		5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */; };
+		750DF88B49955570BD944C02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2ED200EAE69D0972F6653D93 /* Assets.xcassets */; };
 		7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5F28AE665343293EA19C0A /* SavedMacStore.swift */; };
 		860CEB4A5170A59574801741 /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
 		8BB8A9D5564AA07A9A3EC708 /* ViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */; };
@@ -36,6 +37,7 @@
 		1E90C7F0AF464E7238A871F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		20D2B8181E5E82E5B6433F69 /* Packet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packet.swift; sourceTree = "<group>"; };
 		2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerView.swift; sourceTree = "<group>"; };
+		2ED200EAE69D0972F6653D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3D10F8991B1089241B3E66D5 /* ViewerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerModel.swift; sourceTree = "<group>"; };
 		47838951CB82DF0FD1EA557B /* VideoServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoServer.swift; sourceTree = "<group>"; };
 		491848EAC2F810F07C3FA7B9 /* PairedDeviceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedDeviceStore.swift; sourceTree = "<group>"; };
@@ -96,6 +98,7 @@
 		E9D69E6F5506366887948727 /* IOSViewer */ = {
 			isa = PBXGroup;
 			children = (
+				2ED200EAE69D0972F6653D93 /* Assets.xcassets */,
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
 				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
@@ -142,6 +145,7 @@
 			buildConfigurationList = 981ADACAEF12A74B7B1821E8 /* Build configuration list for PBXNativeTarget "TailViewIOS" */;
 			buildPhases = (
 				77978292BA754EAA4AAE5D06 /* Sources */,
+				8302493F4403F7C49E4EEB7D /* Resources */,
 			);
 			buildRules = (
 			);
@@ -192,6 +196,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		8302493F4403F7C49E4EEB7D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				750DF88B49955570BD944C02 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		77978292BA754EAA4AAE5D06 /* Sources */ = {
