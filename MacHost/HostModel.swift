@@ -5,6 +5,7 @@ final class HostModel: ObservableObject {
     @Published private(set) var status = "Stopped"
     @Published private(set) var viewerStatus = "Disconnected"
     @Published private(set) var microphoneStatus = "Start sharing to receive the device microphone"
+    @Published private(set) var systemAudioStatus = "Waiting for a trusted viewer"
     @Published private(set) var address = ""
     @Published private(set) var sessionCode = ""
     @Published private(set) var isSharing = false
@@ -23,6 +24,7 @@ final class HostModel: ObservableObject {
     private var peakMicrophoneLevel = 0.0
     private var pairingWindowID = UUID()
     private var launchGeneration: UInt64 = 0
+    private var audioCaptureUpdate: Task<Void, Never>?
 
     init() {
         isPaused = UserDefaults.standard.bool(forKey: "tailview.accessPaused")
@@ -80,6 +82,8 @@ final class HostModel: ObservableObject {
                     Task { @MainActor in
                         guard self?.isSharing == true else { return }
                         self?.viewerStatus = message
+                        self?.updateSystemAudioCapture(message == "Connected" && server.hasPairedViewer,
+                                                       on: capture)
                         self?.isControlEnabled = server.isControlEnabled
                         self?.controlStatus = message == "Connected"
                             ? (server.isControlEnabled ? "Trusted device can control this Mac" : "Grant macOS control permission in TailView settings")
@@ -109,11 +113,11 @@ final class HostModel: ObservableObject {
                 server.onError = { [weak self] message in
                     Task { @MainActor in self?.stop(); self?.status = message }
                 }
-                try await capture.start { frame in server.publish(frame) }
+                try await capture.start(onFrame: { frame in server.publish(frame) },
+                                        onAudio: { pcm in server.publishAudio(pcm) })
                 if generation != launchGeneration || isPaused {
                     await capture.stop()
                 } else {
-                    server.start()
                     self.capture = capture
                     self.server = server
                     address = ip
@@ -122,6 +126,7 @@ final class HostModel: ObservableObject {
                     viewerStatus = "Waiting for a viewer"
                     status = "Sharing main display"
                     isSharing = true
+                    server.start()
                 }
             } catch {
                 if generation == launchGeneration { status = "Could not start: \(error.localizedDescription)" }
@@ -139,12 +144,15 @@ final class HostModel: ObservableObject {
         server = nil
         let capture = self.capture
         self.capture = nil
-        Task { await capture?.stop() }
+        let audioCaptureUpdate = self.audioCaptureUpdate
+        self.audioCaptureUpdate = nil
+        Task { await audioCaptureUpdate?.value; await capture?.stop() }
         isSharing = false
         isStarting = false
         status = isPaused ? "Access paused" : "Stopped"
         viewerStatus = "Disconnected"
         microphoneStatus = "Start sharing to receive the device microphone"
+        systemAudioStatus = "Waiting for a trusted viewer"
         peakMicrophoneLevel = 0
         sessionCode = ""
         isPairingOpen = false
@@ -233,6 +241,25 @@ final class HostModel: ObservableObject {
     private func reloadPairedDevices() {
         do { pairedDevices = try pairedStore.list() }
         catch { pairingStatus = "Could not read paired devices: \(error.localizedDescription)" }
+    }
+
+    private func updateSystemAudioCapture(_ enabled: Bool, on capture: ScreenCapture) {
+        systemAudioStatus = enabled ? "Starting Mac sound capture…" : "Waiting for a trusted viewer"
+        let previous = audioCaptureUpdate
+        audioCaptureUpdate = Task { [weak self, weak capture] in
+            await previous?.value
+            guard let self, let capture, self.capture === capture, self.isSharing else { return }
+            do {
+                try await capture.setSystemAudioEnabled(enabled)
+                if self.capture === capture {
+                    self.systemAudioStatus = enabled ? "Sending Mac sound to iPad" : "Waiting for a trusted viewer"
+                }
+            } catch {
+                if self.capture === capture {
+                    self.systemAudioStatus = "Mac sound capture failed: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 
     private static func tailscaleIPv4() throws -> String {

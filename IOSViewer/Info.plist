@@ -6,8 +6,8 @@
 <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.3.0</string>
-<key>CFBundleVersion</key><string>6</string>
+<key>CFBundleShortVersionString</key><string>0.4.0</string>
+<key>CFBundleVersion</key><string>8</string>
 <key>LSRequiresIPhoneOS</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>Send your voice to the Mac while viewing its screen.</string>
 <key>NSLocalNetworkUsageDescription</key><string>Connect directly to your Mac over Tailscale.</string>

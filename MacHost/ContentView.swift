@@ -21,6 +21,7 @@ struct ContentView: View {
             LabeledContent("Access", value: host.status)
             LabeledContent("Viewer", value: host.viewerStatus)
             LabeledContent("Microphone", value: host.microphoneStatus)
+            LabeledContent("Mac sound", value: host.systemAudioStatus)
             LabeledContent("Remote control", value: host.isControlEnabled ? "Allowed" : host.controlStatus)
 
             if host.isSharing {
@@ -49,7 +50,7 @@ struct ContentView: View {
                 }
                 GroupBox("Trusted device control") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Paired devices can use the screen, microphone, mouse, and keyboard while access is on. Pause Access from the menu bar to disconnect immediately.")
+                        Text("Paired devices can use the screen, Mac sound, microphone, mouse, and keyboard while access is on. Pause Access from the menu bar to disconnect immediately.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(host.controlStatus)

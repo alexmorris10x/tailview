@@ -48,6 +48,12 @@ struct TransportSmoke {
         }
         server.setControlEnabled(true)
         try expectState(client, allowed: false, phase: "session enable attempt")
+        let macAudio = Data(repeating: 0x5a, count: 3_840)
+        server.publishAudio(macAudio)
+        var ready = pollfd(fd: client, events: Int16(POLLIN), revents: 0)
+        guard Darwin.poll(&ready, 1, 100) == 0 else {
+            throw TestError.message("Session-code viewer received trusted Mac audio")
+        }
         guard writeExactly(client, Packet.encode(.control, clickData)) else {
             throw TestError.message("Session-only control packet could not be sent")
         }
@@ -73,6 +79,25 @@ struct TransportSmoke {
             throw TestError.message("Pairing was not acknowledged")
         }
         try expectState(pairedClient, allowed: true, phase: "paired connect")
+        server.publishAudio(macAudio)
+        var receivedMacAudio = false
+        for _ in 0..<4 {
+            guard let packet = readPacket(pairedClient) else { break }
+            if packet.kind == .jpeg { continue }
+            receivedMacAudio = packet.kind == .macAudio && packet.payload == macAudio
+            break
+        }
+        guard receivedMacAudio else { throw TestError.message("Trusted viewer did not receive Mac audio") }
+        let parser = PacketParser()
+        let wireAudio = Packet.encode(.macAudio, macAudio)
+        var parsedAudio = Data()
+        var parsedEarly = false
+        try parser.append(Data(wireAudio.prefix(7))) { _, _ in parsedEarly = true }
+        guard !parsedEarly else { throw TestError.message("Partial Mac audio packet parsed early") }
+        try parser.append(Data(wireAudio.dropFirst(7))) { kind, payload in
+            if kind == .macAudio { parsedAudio = payload }
+        }
+        guard parsedAudio == macAudio else { throw TestError.message("Mac audio parser failed") }
         guard writeExactly(pairedClient, Packet.encode(.control, clickData)) else {
             throw TestError.message("Paired control packet could not be sent")
         }
@@ -111,7 +136,7 @@ struct TransportSmoke {
             Darwin.close(unexpected)
             throw TestError.message("Stopped server still accepted a viewer")
         }
-        print("Transport smoke passed: pairing consent, trusted auto-control, saved reconnect, revocation, stopped listener, frame, microphone, session control denial")
+        print("Transport smoke passed: pairing consent, trusted auto-control, saved reconnect, revocation, stopped listener, frame, two-way audio, session access denial")
     }
 
     private static func expectState(_ fd: Int32, allowed: Bool, phase: String) throws {

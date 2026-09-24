@@ -21,11 +21,13 @@ final class VideoServer {
     private let audioSink: AudioSink?
     private var listenerFD: Int32
     private var activeFD: Int32 = -1
+    private var connectionEpoch: UInt64 = 0
     private var activePairedID: UUID?
     private var controlEnabled = false
     private var running = false
     private var pairingDeadline = 0.0
     private var sendPending = false
+    private var pendingAudioPackets = 0
     private var latestFrame: Data?
     private var didReportMicrophone = false
     private var lastLevelReport = 0.0
@@ -107,10 +109,12 @@ final class VideoServer {
         let client = activeFD
         listenerFD = -1
         activeFD = -1
+        connectionEpoch &+= 1
         activePairedID = nil
         controlEnabled = false
         onControlSessionEnded?()
         sendPending = false
+        pendingAudioPackets = 0
         latestFrame = nil
         lock.unlock()
         if client >= 0 {
@@ -125,18 +129,47 @@ final class VideoServer {
         guard !jpeg.isEmpty, jpeg.count <= 2_000_000 else { return }
         lock.lock()
         latestFrame = jpeg
-        guard running, activeFD >= 0, !sendPending else { lock.unlock(); return }
+        guard running, activeFD >= 0, !sendPending, pendingAudioPackets < 6 else { lock.unlock(); return }
         sendPending = true
         let fd = activeFD
+        let epoch = connectionEpoch
         lock.unlock()
         sendQueue.async { [weak self] in
             guard let self else { return }
-            let packet = Packet.encode(.jpeg, jpeg)
-            let sent = Self.writeExactly(fd, packet)
             self.lock.lock()
-            self.sendPending = false
+            let current = self.running && self.activeFD == fd && self.connectionEpoch == epoch
             self.lock.unlock()
-            if !sent { self.finish(fd) }
+            let sent = !current || Self.writeExactly(fd, Packet.encode(.jpeg, jpeg))
+            self.lock.lock()
+            if self.connectionEpoch == epoch { self.sendPending = false }
+            self.lock.unlock()
+            if !sent { self.finish(fd, epoch: epoch) }
+        }
+    }
+
+    /// Sends stereo 48 kHz signed 16-bit PCM only to a currently trusted viewer.
+    /// A bounded queue prevents a slow viewer from accumulating seconds of stale sound.
+    func publishAudio(_ pcm: Data) {
+        guard !pcm.isEmpty, pcm.count <= 65_536, pcm.count.isMultiple(of: 4) else { return }
+        lock.lock()
+        guard running, activeFD >= 0, activePairedID != nil,
+              pendingAudioPackets < 12 else { lock.unlock(); return }
+        pendingAudioPackets += 1
+        let fd = activeFD
+        let epoch = connectionEpoch
+        lock.unlock()
+        sendQueue.async { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            let current = self.running && self.activeFD == fd && self.connectionEpoch == epoch
+            self.lock.unlock()
+            let sent = !current || Self.writeExactly(fd, Packet.encode(.macAudio, pcm))
+            self.lock.lock()
+            if self.connectionEpoch == epoch {
+                self.pendingAudioPackets = max(0, self.pendingAudioPackets - 1)
+            }
+            self.lock.unlock()
+            if !sent { self.finish(fd, epoch: epoch) }
         }
     }
 
@@ -185,6 +218,7 @@ final class VideoServer {
             lock.lock()
             guard running else { lock.unlock(); Darwin.close(client); return }
             activeFD = client
+            connectionEpoch &+= 1
             activePairedID = pairedID
             controlEnabled = pairedID != nil && (authorizeTrustedControl?() == true)
             let allowControl = controlEnabled
@@ -226,17 +260,24 @@ final class VideoServer {
                 let allowed = running && activeFD == fd && activePairedID != nil && controlEnabled
                 lock.unlock()
                 if allowed { onControlCommand?(command) }
-            case .jpeg, .controlState:
+            case .jpeg, .controlState, .macAudio:
                 return
             }
         }
     }
 
     private func sendControlState(_ enabled: Bool, to fd: Int32) {
+        lock.lock()
+        let epoch = connectionEpoch
+        lock.unlock()
         sendQueue.async { [weak self] in
             guard let self else { return }
+            self.lock.lock()
+            let current = self.running && self.activeFD == fd && self.connectionEpoch == epoch
+            self.lock.unlock()
+            guard current else { return }
             let sent = Self.writeExactly(fd, Packet.encode(.controlState, Data([enabled ? 1 : 0])))
-            if !sent { self.finish(fd) }
+            if !sent { self.finish(fd, epoch: epoch) }
         }
     }
 
@@ -254,14 +295,16 @@ final class VideoServer {
         }
     }
 
-    private func finish(_ fd: Int32) {
+    private func finish(_ fd: Int32, epoch: UInt64? = nil) {
         lock.lock()
-        guard activeFD == fd else { lock.unlock(); return }
+        guard activeFD == fd, epoch == nil || connectionEpoch == epoch else { lock.unlock(); return }
         activeFD = -1
+        connectionEpoch &+= 1
         activePairedID = nil
         controlEnabled = false
         onControlSessionEnded?()
         sendPending = false
+        pendingAudioPackets = 0
         lock.unlock()
         sendQueue.async { Darwin.shutdown(fd, SHUT_RDWR); Darwin.close(fd) }
         audioSink?.clear()

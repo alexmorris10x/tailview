@@ -7,6 +7,7 @@ struct ViewerView: View {
     @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
     @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
+    @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
     @State private var code = ""
     @State private var profileName = "My Mac"
     @State private var showPairing = false
@@ -94,6 +95,11 @@ struct ViewerView: View {
             if enabled { viewer.startMicrophone() }
             else { viewer.stopMicrophone() }
         }
+        .onChange(of: macAudioOnConnect) { _, enabled in
+            guard viewer.isConnected else { return }
+            if enabled { viewer.startMacAudio() }
+            else { viewer.stopMacAudio() }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { connectPreferredIfNeeded() }
         }
@@ -113,7 +119,8 @@ struct ViewerView: View {
                 if arguments.contains("--tailview-test-saved-microphone"),
                    let profile = viewer.savedMacs.first {
                     diagnosticLaunch = true
-                    viewer.connect(profile: profile, startMicrophoneOnConnect: true)
+                    viewer.connect(profile: profile, startMicrophoneOnConnect: true,
+                                   startMacAudioOnConnect: false)
                     return
                 }
                 if let index = arguments.firstIndex(of: "--tailview-test-connect"),
@@ -149,7 +156,8 @@ struct ViewerView: View {
                     Button("Reconnect to \(preferredProfile?.name ?? "Mac")") {
                         automaticConnection = true
                         if let profile = preferredProfile {
-                            viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect)
+                            viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
+                                           startMacAudioOnConnect: macAudioOnConnect)
                         }
                     }
                     .buttonStyle(.borderedProminent)
@@ -190,7 +198,8 @@ struct ViewerView: View {
                 viewer.pair(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
                             code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
                             name: profileName,
-                            startMicrophoneOnConnect: microphoneOnConnect)
+                            startMicrophoneOnConnect: microphoneOnConnect,
+                            startMacAudioOnConnect: macAudioOnConnect)
             }
             .buttonStyle(.borderedProminent)
             .disabled(viewer.isConnecting || macAddress.isEmpty || code.isEmpty)
@@ -271,7 +280,8 @@ struct ViewerView: View {
                                 preferredMacID = profile.id.uuidString
                                 automaticConnection = true
                                 viewer.disconnect()
-                                viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect)
+                                viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
+                                               startMacAudioOnConnect: macAudioOnConnect)
                                 showSettings = false
                             }
                             Spacer()
@@ -290,6 +300,10 @@ struct ViewerView: View {
                     Text(viewer.microphoneStatus)
                     Text(viewer.inputLevelStatus)
                 }
+                Section("Mac sound") {
+                    Toggle("Hear Mac sound automatically", isOn: $macAudioOnConnect)
+                    Text(viewer.macAudioStatus)
+                }
                 Section("Screen") {
                     Toggle("Align screen to top", isOn: $alignScreenToTop)
                     Text("Pinch to zoom. Drag one finger to move the Mac pointer, or two fingers to pan the screen.")
@@ -301,7 +315,7 @@ struct ViewerView: View {
                 }
                 Section("Speaker output test") {
                     Button("Play speaker test tone") { viewer.runSpeakerTest() }
-                        .disabled(viewer.isMicrophoneOn)
+                        .disabled(viewer.isMicrophoneOn || viewer.isMacAudioOn)
                     Text(viewer.speakerTestStatus)
                 }
                 Section("Transport test") {
@@ -327,7 +341,8 @@ struct ViewerView: View {
         guard scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
               !viewer.isConnected, !viewer.isConnecting, !viewer.savedCredentialRejected,
               let profile = preferredProfile else { return }
-        viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect)
+        viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
+                       startMacAudioOnConnect: macAudioOnConnect)
     }
 
     private func sendPointer(_ kind: ControlCommand.Kind) {
