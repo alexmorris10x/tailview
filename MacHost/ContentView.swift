@@ -5,6 +5,16 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
+            ScrollView {
+                details
+            }
+            footer
+        }
+        .padding(24)
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 18) {
             HStack {
                 Image(systemName: "display")
                     .font(.largeTitle)
@@ -90,23 +100,78 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Spacer(minLength: 0)
+            DisplayPrivacySection()
+        }
+    }
 
-            HStack {
-                if host.isPaused {
-                    Button("Resume Access") { host.resumeAccess() }
-                } else {
-                    Button("Pause Access") { host.pauseAccess() }
-                    if !host.isSharing && !host.isStarting {
-                        Button("Retry sharing") { host.start() }
-                    }
+    private var footer: some View {
+        HStack {
+            if host.isPaused {
+                Button("Resume Access") { host.resumeAccess() }
+            } else {
+                Button("Pause Access") { host.pauseAccess() }
+                if !host.isSharing && !host.isStarting {
+                    Button("Retry sharing") { host.start() }
                 }
-                Spacer()
-                Text("Main display • up to 8 fps")
+            }
+            Spacer()
+            Text("Main display • up to 8 fps")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+/// Built-in display blackout and local-input shield, formerly Display Control.
+private struct DisplayPrivacySection: View {
+    @EnvironmentObject private var display: DisplayControlModel
+
+    var body: some View {
+        GroupBox("Display privacy") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Keep this Mac’s built-in screen dark during a remote session without sleeping or locking it. TailView keeps sharing the screen while the backlight is off.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                LabeledContent("Backlight", value: backlightStatus)
+                HStack {
+                    Button(display.isBlackoutActive ? "Restore Display Backlight" : "Blackout Display") {
+                        display.toggleBlackout()
+                    }
+                    .disabled(!display.isBlackoutSupported)
+                    if display.isBuiltInDisconnected {
+                        Button("Reconnect Built-In Display") { display.reconnectBuiltIn() }
+                    } else {
+                        Button("Disconnect Built-In Display…") { display.disconnectBuiltIn() }
+                            .disabled(!display.isDisconnectSupported)
+                    }
+                    if display.isRecoveryCountdownActive {
+                        Button("Keep Disconnected (\(display.recoverySecondsRemaining)s)") { display.keepDisconnected() }
+                    }
+                }
+                Toggle("Block local keyboard & mouse when blacked out", isOn: Binding(
+                    get: { display.blocksLocalInputWhenBlackedOut },
+                    set: { display.setBlocksLocalInputWhenBlackedOut($0) }
+                ))
+                Text("Physical keyboard, brightness keys, mouse, and trackpad stop working; TailView remote control keeps working. Restoring the backlight releases local input. There is no physical keyboard escape.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Toggle(display.launchAtLoginStatus == .requiresApproval ? "Launch at login (approval required in System Settings)" : "Launch at login",
+                       isOn: Binding(get: { display.launchAtLoginStatus == .enabled },
+                                     set: { _ in display.toggleLaunchAtLogin() }))
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(4)
         }
-        .padding(24)
+    }
+
+    private var backlightStatus: String {
+        if !display.isBlackoutSupported { return "Unavailable on this Mac" }
+        if display.isBuiltInDisconnected { return "Built-in display disconnected" }
+        if display.isBlackoutActive {
+            return display.isInputShieldActive ? "Off · local input blocked" : "Off"
+        }
+        return "On"
     }
 }

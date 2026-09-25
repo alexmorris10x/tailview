@@ -9,19 +9,22 @@ struct TailViewMacApp: App {
         WindowGroup("TailView", id: "main") {
             ContentView()
                 .environmentObject(host)
+                .environmentObject(host.display)
                 .frame(minWidth: 560, minHeight: 700)
         }
-        .defaultSize(width: 680, height: 760)
+        .defaultSize(width: 680, height: 880)
 
         MenuBarExtra("TailView", systemImage: "display") {
             TailViewMenu()
                 .environmentObject(host)
+                .environmentObject(host.display)
         }
     }
 }
 
 private struct TailViewMenu: View {
     @EnvironmentObject private var host: HostModel
+    @EnvironmentObject private var display: DisplayControlModel
     @Environment(\.openWindow) private var openWindow
 
     private func showMainWindow() {
@@ -51,6 +54,31 @@ private struct TailViewMenu: View {
             }
             .disabled(!host.isSharing)
         }
+        Divider()
+        Button(display.isBlackoutActive ? "Restore Display Backlight" : "Blackout Display (Backlight Off)") {
+            display.toggleBlackout()
+        }
+        .disabled(!display.isBlackoutSupported)
+        Menu("Advanced") {
+            if display.isBuiltInDisconnected {
+                Button("Reconnect Built-In Display") { display.reconnectBuiltIn() }
+            } else {
+                Button("Disconnect Built-In Display…") { display.disconnectBuiltIn() }
+                    .disabled(!display.isDisconnectSupported)
+            }
+            if display.isRecoveryCountdownActive {
+                Button("Keep Disconnected (\(display.recoverySecondsRemaining)s)") { display.keepDisconnected() }
+            }
+            Divider()
+            Toggle("Block Local Keyboard & Mouse When Blacked Out", isOn: Binding(
+                get: { display.blocksLocalInputWhenBlackedOut },
+                set: { display.setBlocksLocalInputWhenBlackedOut($0) }
+            ))
+        }
+        Divider()
+        Toggle(display.launchAtLoginStatus == .requiresApproval ? "Launch at Login (Approval Required)" : "Launch at Login",
+               isOn: Binding(get: { display.launchAtLoginStatus == .enabled },
+                             set: { _ in display.toggleLaunchAtLogin() }))
         Divider()
         Button("Quit TailView") { NSApplication.shared.terminate(nil) }
     }

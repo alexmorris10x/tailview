@@ -8,3 +8,5 @@ swiftc Shared/ScreenViewport.swift Tests/ViewportSmoke.swift -o DerivedData/Test
 DerivedData/Tests/ViewportSmoke
 swiftc Shared/ControlCommand.swift IOSViewer/ModifierSelection.swift Tests/ModifierSmoke.swift -o DerivedData/Tests/ModifierSmoke
 DerivedData/Tests/ModifierSmoke
+swiftc -parse-as-library MacHost/DisplayControl/BacklightController.swift MacHost/DisplayControl/LocalInputController.swift Tests/DisplayControlSmoke.swift -o DerivedData/Tests/DisplayControlSmoke
+DerivedData/Tests/DisplayControlSmoke

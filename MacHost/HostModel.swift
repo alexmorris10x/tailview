@@ -17,6 +17,8 @@ final class HostModel: ObservableObject {
     @Published private(set) var controlStatus = "Control is off"
     @Published private(set) var isPaused = false
 
+    let display = DisplayControlModel()
+
     private let pairedStore = PairedDeviceStore()
     private let controlInjector = ControlInjector()
     private var capture: ScreenCapture?
@@ -25,8 +27,11 @@ final class HostModel: ObservableObject {
     private var pairingWindowID = UUID()
     private var launchGeneration: UInt64 = 0
     private var audioCaptureUpdate: Task<Void, Never>?
+    private var isReplacingCapture = false
+    private var lastCaptureRecovery = Date.distantPast
 
     init() {
+        display.onDisplayConfigurationChange = { [weak self] in self?.replaceCapture(reason: nil) }
         isPaused = UserDefaults.standard.bool(forKey: "tailview.accessPaused")
         reloadPairedDevices()
         if isPaused {
@@ -47,10 +52,6 @@ final class HostModel: ObservableObject {
             do {
                 let ip = try Self.tailscaleIPv4()
                 let code = UUID().uuidString.lowercased()
-                let capture = ScreenCapture()
-                capture.onError = { [weak self] error in
-                    Task { @MainActor in self?.stop(); self?.status = "Screen capture stopped: \(error.localizedDescription)" }
-                }
                 let sink = try? AudioSink.blackHole()
                 let server = try VideoServer(address: ip, code: code, audioSink: sink)
                 let store = pairedStore
@@ -88,8 +89,9 @@ final class HostModel: ObservableObject {
                         let count = server.viewerCount
                         self?.viewerStatus = count == 0 ? "Disconnected" :
                             "\(count) viewer\(count == 1 ? "" : "s") connected"
-                        self?.updateSystemAudioCapture(server.hasPairedViewer,
-                                                       on: capture)
+                        if let capture = self?.capture {
+                            self?.updateSystemAudioCapture(server.hasPairedViewer, on: capture)
+                        }
                         self?.isControlEnabled = server.isControlEnabled
                         self?.controlStatus = count > 0
                             ? (server.isControlEnabled ? "Trusted device can control this Mac" : "Grant macOS control permission in TailView settings")
@@ -119,8 +121,7 @@ final class HostModel: ObservableObject {
                 server.onError = { [weak self] message in
                     Task { @MainActor in self?.stop(); self?.status = message }
                 }
-                try await capture.start(onFrame: { frame in server.publish(frame) },
-                                        onAudio: { pcm in server.publishAudio(pcm) })
+                let capture = try await startCapture(for: server)
                 if generation != launchGeneration || isPaused {
                     await capture.stop()
                 } else {
@@ -162,6 +163,56 @@ final class HostModel: ObservableObject {
         peakMicrophoneLevel = 0
         sessionCode = ""
         isPairingOpen = false
+    }
+
+    /// Starts a stream on the current main display. A stream that fails
+    /// (for example, because its display disconnected) is replaced once.
+    private func startCapture(for server: VideoServer) async throws -> ScreenCapture {
+        let capture = ScreenCapture()
+        capture.onError = { [weak self, weak capture] error in
+            Task { @MainActor in
+                guard let self, let capture, self.capture === capture else { return }
+                self.replaceCapture(reason: error)
+            }
+        }
+        try await capture.start(onFrame: { frame in server.publish(frame) },
+                                onAudio: { pcm in server.publishAudio(pcm) })
+        return capture
+    }
+
+    /// Moves sharing to the current main display while viewers stay connected.
+    private func replaceCapture(reason: Error?) {
+        guard isSharing, let server, let previous = capture, !isReplacingCapture else { return }
+        if let reason, Date().timeIntervalSince(lastCaptureRecovery) < 5 {
+            stop()
+            status = "Screen capture stopped: \(reason.localizedDescription)"
+            return
+        }
+        if reason != nil { lastCaptureRecovery = Date() }
+        isReplacingCapture = true
+        status = "Switching to the current main display…"
+        Task { [self] in
+            defer { isReplacingCapture = false }
+            // Let macOS finish reconfiguring displays before choosing one.
+            try? await Task.sleep(for: .seconds(1))
+            await audioCaptureUpdate?.value
+            guard isSharing, self.server === server, capture === previous else { return }
+            capture = nil
+            await previous.stop()
+            do {
+                let replacement = try await startCapture(for: server)
+                guard isSharing, self.server === server else {
+                    await replacement.stop()
+                    return
+                }
+                capture = replacement
+                status = "Sharing main display"
+                updateSystemAudioCapture(server.hasPairedViewer, on: replacement)
+            } catch {
+                stop()
+                status = "Screen capture stopped: \(error.localizedDescription)"
+            }
+        }
     }
 
     func pauseAccess() {

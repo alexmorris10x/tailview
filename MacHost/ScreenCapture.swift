@@ -24,8 +24,9 @@ final class ScreenCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         guard let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() }) ?? content.displays.first else {
             throw CaptureError.noDisplay
         }
-        let excluded = content.applications.filter { $0.bundleIdentifier == Bundle.main.bundleIdentifier }
-        let filter = SCContentFilter(display: display, excludingApplications: excluded, exceptingWindows: [])
+        // Include TailView's own windows so viewers can use its menu bar menu,
+        // which holds the display blackout controls.
+        let filter = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
         let scale = min(1.0, 1280.0 / Double(display.width))
         captureWidth = max(1, Int(Double(display.width) * scale))
         captureHeight = max(1, Int(Double(display.height) * scale))
