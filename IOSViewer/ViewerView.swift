@@ -307,6 +307,7 @@ struct ViewerView: View {
             .accessibilityHint("Controls Mac sound played on this device when it owns audio")
             .accessibilityIdentifier("tailview.speakerMuteButton")
             if horizontalSizeClass != .compact {
+                spaceButtons
                 pointerButtons
                 if screenZoom > 1.01 {
                     Button { isPanningView.toggle() } label: {
@@ -333,6 +334,11 @@ struct ViewerView: View {
                             .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
                     }
                     Divider()
+                    ForEach(MacNavigation.allCases, id: \.self) { action in
+                        Button(action.title, systemImage: action.systemImage) { sendNavigation(action) }
+                            .disabled(!viewer.isControlAllowed)
+                    }
+                    Divider()
                 }
                 Button("Scroll up") { sendControl(ControlCommand(kind: .scroll, amount: -3)) }
                 Button("Scroll down") { sendControl(ControlCommand(kind: .scroll, amount: 3)) }
@@ -357,6 +363,17 @@ struct ViewerView: View {
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
+    }
+
+    /// Control-arrow shortcuts for Spaces, Mission Control, and App windows.
+    private var spaceButtons: some View {
+        ForEach(MacNavigation.allCases, id: \.self) { action in
+            Button { sendNavigation(action) } label: {
+                Image(systemName: action.systemImage)
+            }
+            .accessibilityLabel(action.title)
+            .disabled(!viewer.isControlAllowed)
+        }
     }
 
     private var pointerButtons: some View {
@@ -536,6 +553,12 @@ struct ViewerView: View {
         sendControl(ControlCommand(kind: .key, key: key))
     }
 
+    /// Sends Control plus an arrow, independent of the bar's modifier buttons.
+    private func sendNavigation(_ action: MacNavigation) {
+        guard viewer.isControlAllowed else { return }
+        viewer.sendControl(ControlCommand(kind: .key, key: action.key, modifiers: [.control]))
+    }
+
     private func showKeyboard() {
         keyboardUserHidden = false
         keyboardOpenRequest += 1
@@ -595,6 +618,38 @@ struct ViewerView: View {
             modifierSelection.consumeNext()
         case .move, .leftDown, .leftDrag:
             break
+        }
+    }
+}
+
+/// macOS's default Control-arrow shortcuts.
+private enum MacNavigation: CaseIterable {
+    case previousSpace, nextSpace, missionControl, appWindows
+
+    var key: ControlCommand.Key {
+        switch self {
+        case .previousSpace: .left
+        case .nextSpace: .right
+        case .missionControl: .up
+        case .appWindows: .down
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .previousSpace: "Previous Space"
+        case .nextSpace: "Next Space"
+        case .missionControl: "Mission Control"
+        case .appWindows: "App windows"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .previousSpace: "rectangle.lefthalf.inset.filled.arrow.left"
+        case .nextSpace: "rectangle.righthalf.inset.filled.arrow.right"
+        case .missionControl: "rectangle.3.group"
+        case .appWindows: "macwindow.on.rectangle"
         }
     }
 }

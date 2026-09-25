@@ -178,9 +178,13 @@ final class ControlInjector {
         case .down: code = 125
         case .up: code = 126
         }
+        // Physical arrow keys carry the function and keypad flags. macOS
+        // system shortcuts such as Control-arrow for Spaces require them.
+        let isArrow = [123, 124, 125, 126].contains(code)
+        let keyFlags = isArrow ? flags.union([.maskSecondaryFn, .maskNumericPad]) : flags
         for isDown in [true, false] {
             guard let event = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: isDown) else { continue }
-            event.flags = flags
+            event.flags = keyFlags
             event.post(tap: .cghidEventTap)
         }
     }
