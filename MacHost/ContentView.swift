@@ -11,7 +11,9 @@ struct ContentView: View {
                 VStack(alignment: .leading) {
                     Text("TailView")
                         .font(.largeTitle.bold())
-                    Text("Ready for trusted devices while this app is running")
+                    Text(host.isPaused
+                         ? "Access is paused. Resume Access to connect from a paired device."
+                         : "Ready for trusted devices while this app is running")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -49,9 +51,10 @@ struct ContentView: View {
                 }
                 GroupBox("Trusted device control") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Up to two paired devices can view the screen and control the mouse and keyboard. One device at a time hears Mac sound and sends its microphone to this Mac. Choose Use audio on this device in iOS Settings to switch both audio directions. Pause Access from the menu bar to disconnect both immediately.")
+                        Text("Paired devices can view and control this Mac. One device at a time handles sound and microphone. Use Audio device in iOS Settings to switch it. Pause Access to disconnect both immediately.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(host.controlStatus)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -70,18 +73,15 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            ForEach(host.pairedDevices) { device in
-                                HStack {
-                                    Text(device.name)
-                                    Spacer()
-                                    Button("Revoke", role: .destructive) { host.revoke(device.id) }
-                                }
+                    VStack(spacing: 8) {
+                        ForEach(host.pairedDevices) { device in
+                            HStack {
+                                Text(device.name)
+                                Spacer()
+                                Button("Revoke", role: .destructive) { host.revoke(device.id) }
                             }
                         }
                     }
-                    .frame(maxHeight: 140)
                 }
             }
             if !host.pairingStatus.isEmpty {
@@ -90,7 +90,7 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Spacer(minLength: 0)
 
             HStack {
                 if host.isPaused {

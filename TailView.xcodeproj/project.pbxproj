@@ -27,6 +27,7 @@
 		AF62EE973A7949C2F309F1EB /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
 		BF2F93D2904B5C1F4D415953 /* ControlInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */; };
 		C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */; };
+		C4FFE508A3EDFA633B05317F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 228BA387B565D9B98B1F35FA /* Assets.xcassets */; };
 		CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
 		E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */; };
@@ -39,6 +40,7 @@
 		10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewMacApp.swift; sourceTree = "<group>"; };
 		1E90C7F0AF464E7238A871F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		20D2B8181E5E82E5B6433F69 /* Packet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packet.swift; sourceTree = "<group>"; };
+		228BA387B565D9B98B1F35FA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerView.swift; sourceTree = "<group>"; };
 		2ED200EAE69D0972F6653D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3D10F8991B1089241B3E66D5 /* ViewerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerModel.swift; sourceTree = "<group>"; };
@@ -66,6 +68,7 @@
 		77A8FEB6220A7E844073C981 /* MacHost */ = {
 			isa = PBXGroup;
 			children = (
+				228BA387B565D9B98B1F35FA /* Assets.xcassets */,
 				BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */,
 				1E90C7F0AF464E7238A871F0 /* ContentView.swift */,
 				89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */,
@@ -134,6 +137,7 @@
 			buildConfigurationList = 75F7FB7B932A760D6C5C6687 /* Build configuration list for PBXNativeTarget "TailViewMac" */;
 			buildPhases = (
 				C6663958C7ACCDD870450ED1 /* Sources */,
+				B7300DF200C6A29910F9ECAC /* Resources */,
 			);
 			buildRules = (
 			);
@@ -209,6 +213,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				750DF88B49955570BD944C02 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B7300DF200C6A29910F9ECAC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C4FFE508A3EDFA633B05317F /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

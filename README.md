@@ -1,6 +1,6 @@
 # TailView
 
-TailView is a private, experimental Mac screen and audio bridge for up to two paired iPhones or iPads at once. The Mac app runs in the menu bar. An already paired device connects when its iOS app opens, shows the main Mac display, and can use the Mac mouse and keyboard. One connected device at a time plays Mac app and media sound and sends its microphone to BlackHole 2ch. TailView sends data directly over the existing Tailscale connection; it has no account service or Jump Desktop dependency.
+TailView is a private, experimental Mac screen and audio bridge for up to two paired iPhones or iPads at once. The Mac app opens a window and also stays available in the menu bar when that window is closed. An already paired device connects when its iOS app opens, shows the main Mac display, and can use the Mac mouse and keyboard. One connected device at a time plays Mac app and media sound and sends its microphone to BlackHole 2ch. TailView sends data directly over the existing Tailscale connection; it has no account service or Jump Desktop dependency.
 
 ## Build and install
 
@@ -8,12 +8,12 @@ Run `xcodegen generate`, then build the **TailViewMac** and **TailViewIOS** sche
 
 ## First connection
 
-1. Open TailView Mac. It starts sharing automatically and stays in the menu bar while running.
-2. From its menu bar item, choose **Pair a New Device**. The settings window shows the Mac's Tailscale address and a temporary pairing code. Pairing closes after five minutes or after a successful pairing.
+1. Open TailView Mac from Applications or the Dock. Its window shows the current access state. It starts sharing automatically unless access was previously paused; choose **Resume Access** if needed. The app stays in the menu bar while running, and **Open TailView** in that menu brings its window back.
+2. Choose **Pair a new device** in the window or **Pair a New Device** in the menu bar. The window shows the Mac's Tailscale address and a temporary pairing code. Pairing closes after five minutes or after a successful pairing.
 3. Open TailView on the iPhone or iPad, enter that address and code, and tap **Pair and connect**. This saves a random credential in the iOS Keychain. The Mac stores a digest in its Keychain.
 4. Grant the initial system permissions. If macOS asks you to restart TailView after granting Screen Recording or Accessibility permission, relaunch it.
 
-On later launches, each saved device connects without a code or a Mac approval click. A second device can pair while the first is connected. The iOS app retries while it is foregrounded if the Mac host is temporarily unavailable. If a saved credential is rejected, pair again. The Mac menu bar item has **Pause Access**, which disconnects both viewers and stops screen capture, microphone return, and remote input. Pause remains in effect after relaunch until **Resume Access** is chosen. The Mac settings window can revoke a paired device.
+On later launches, each saved device connects without a code or a Mac approval click. A second device can pair while the first is connected. The iOS app retries while it is foregrounded if the Mac host is temporarily unavailable. If a saved credential is rejected, pair again. The Mac window and menu bar item have **Pause Access**, which disconnects both viewers and stops screen capture, microphone return, and remote input. Pause remains in effect after relaunch until **Resume Access** is chosen. The Mac window can revoke a paired device.
 
 ## iPad and iPhone controls
 
