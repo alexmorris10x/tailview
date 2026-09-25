@@ -8,7 +8,7 @@ Run `xcodegen generate`, then build the **TailViewMac** and **TailViewIOS** sche
 
 ## First connection
 
-1. Open TailView Mac from Applications or the Dock. Its window shows the current access state. It starts sharing automatically unless access was previously paused; choose **Resume Access** if needed. The app stays in the menu bar while running, and **Open TailView** in that menu brings its window back.
+1. Open TailView Mac from Applications or the Dock. Its window shows the current access state. It starts sharing automatically unless access was previously paused; choose **Resume Access** if needed. The app stays in the menu bar while running, and **Open TailView** in that menu brings its window back. To keep TailView out of the Dock, turn off **Show in Dock** in the window's **App** section or in the menu bar menu; TailView then runs only from the menu bar.
 2. Choose **Pair a new device** in the window or **Pair a New Device** in the menu bar. The window shows the Mac's Tailscale address and a temporary pairing code. Pairing closes after five minutes or after a successful pairing.
 3. Open TailView on the iPhone or iPad, enter that address and code, and tap **Pair and connect**. This saves a random credential in the iOS Keychain. The Mac stores a digest in its Keychain.
 4. Grant the initial system permissions. If macOS asks you to restart TailView after granting Screen Recording or Accessibility permission, relaunch it.

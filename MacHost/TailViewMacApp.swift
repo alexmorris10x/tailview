@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct TailViewMacApp: App {
+    @NSApplicationDelegateAdaptor(TailViewAppDelegate.self) private var appDelegate
     @StateObject private var host = HostModel()
 
     var body: some Scene {
@@ -22,10 +23,32 @@ struct TailViewMacApp: App {
     }
 }
 
+/// Whether TailView shows a Dock icon or lives only in the menu bar.
+enum DockVisibility {
+    static let key = "tailview.showInDock"
+
+    static var isShown: Bool {
+        UserDefaults.standard.object(forKey: key) as? Bool ?? true
+    }
+
+    static func apply(_ shown: Bool) {
+        NSApplication.shared.setActivationPolicy(shown ? .regular : .accessory)
+        // Changing the policy deactivates the app; keep its window in front.
+        DispatchQueue.main.async { NSApplication.shared.activate(ignoringOtherApps: true) }
+    }
+}
+
+final class TailViewAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSApplication.shared.setActivationPolicy(DockVisibility.isShown ? .regular : .accessory)
+    }
+}
+
 private struct TailViewMenu: View {
     @EnvironmentObject private var host: HostModel
     @EnvironmentObject private var display: DisplayControlModel
     @Environment(\.openWindow) private var openWindow
+    @AppStorage(DockVisibility.key) private var showInDock = true
 
     private func showMainWindow() {
         if let window = NSApplication.shared.windows.first(where: { $0.title == "TailView" }) {
@@ -79,6 +102,8 @@ private struct TailViewMenu: View {
         Toggle(display.launchAtLoginStatus == .requiresApproval ? "Launch at Login (Approval Required)" : "Launch at Login",
                isOn: Binding(get: { display.launchAtLoginStatus == .enabled },
                              set: { _ in display.toggleLaunchAtLogin() }))
+        Toggle("Show in Dock", isOn: $showInDock)
+            .onChange(of: showInDock) { _, shown in DockVisibility.apply(shown) }
         Divider()
         Button("Quit TailView") { NSApplication.shared.terminate(nil) }
     }

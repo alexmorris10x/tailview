@@ -122,9 +122,10 @@ struct ContentView: View {
     }
 }
 
-/// Built-in display blackout and local-input shield, formerly Display Control.
+/// Built-in display blackout and local-input shield (formerly Display Control), plus app settings.
 private struct DisplayPrivacySection: View {
     @EnvironmentObject private var display: DisplayControlModel
+    @AppStorage(DockVisibility.key) private var showInDock = true
 
     var body: some View {
         GroupBox("Display privacy") {
@@ -157,9 +158,20 @@ private struct DisplayPrivacySection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(4)
+        }
+        GroupBox("App") {
+            VStack(alignment: .leading, spacing: 10) {
                 Toggle(display.launchAtLoginStatus == .requiresApproval ? "Launch at login (approval required in System Settings)" : "Launch at login",
                        isOn: Binding(get: { display.launchAtLoginStatus == .enabled },
                                      set: { _ in display.toggleLaunchAtLogin() }))
+                Toggle("Show in Dock", isOn: $showInDock)
+                    .onChange(of: showInDock) { _, shown in DockVisibility.apply(shown) }
+                Text("When hidden, open TailView from its menu bar item.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(4)
