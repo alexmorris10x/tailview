@@ -15,6 +15,7 @@
 		3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
 		48E9D18EFF50F2B35287C264 /* ViewerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D10F8991B1089241B3E66D5 /* ViewerModel.swift */; };
 		4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E90C7F0AF464E7238A871F0 /* ContentView.swift */; };
+		4CB79A26FA3BA693C2D48847 /* WindowArranger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1677B424CBD84C8CA05935 /* WindowArranger.swift */; };
 		5B1BC0F9D158C872A6F8C1C9 /* HostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FB29C814C93650C267420E /* HostModel.swift */; };
 		5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */; };
 		66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */; };
@@ -59,6 +60,7 @@
 		5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewIOSApp.swift; sourceTree = "<group>"; };
 		7120797B5BA592ECF917EBD6 /* LocalInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalInputController.swift; sourceTree = "<group>"; };
 		747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteKeyboardInput.swift; sourceTree = "<group>"; };
+		7C1677B424CBD84C8CA05935 /* WindowArranger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowArranger.swift; sourceTree = "<group>"; };
 		89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlInjector.swift; sourceTree = "<group>"; };
 		8A18A3313347868348999728 /* BacklightController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklightController.swift; sourceTree = "<group>"; };
 		8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
@@ -100,6 +102,7 @@
 				8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */,
 				10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */,
 				47838951CB82DF0FD1EA557B /* VideoServer.swift */,
+				7C1677B424CBD84C8CA05935 /* WindowArranger.swift */,
 				504DF70E66AD2D385DB41508 /* DisplayControl */,
 			);
 			path = MacHost;
@@ -290,6 +293,7 @@
 				9C1EA10C101CA225C3C3895E /* SessionLockController.swift in Sources */,
 				3490C489727F9C7FBE54BECF /* TailViewMacApp.swift in Sources */,
 				8E1085C0AFE0F75FE3C9AF14 /* VideoServer.swift in Sources */,
+				4CB79A26FA3BA693C2D48847 /* WindowArranger.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

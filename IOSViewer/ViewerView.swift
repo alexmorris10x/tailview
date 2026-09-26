@@ -4,7 +4,6 @@ import SwiftUI
 
 struct ViewerView: View {
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @AppStorage("macAddress") private var macAddress = ""
     @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
@@ -266,101 +265,75 @@ struct ViewerView: View {
         }
     }
 
+    /// Every control in one row that scrolls sideways when it is wider
+    /// than the screen, instead of hiding some behind an overflow menu.
     private var controlBar: some View {
-        HStack(spacing: 6) {
-            Button {
-                toggleKeyboard()
-            } label: {
-                Image(systemName: "keyboard")
-            }
-            .accessibilityLabel(nativeKeyboardVisible || fallbackKeyboardVisible
-                                ? "Hide keyboard" : "Show keyboard")
-            .accessibilityIdentifier("tailview.keyboardButton")
-            .disabled(!viewer.isControlAllowed)
-            ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
-                modifierButton(modifier)
-            }
-            Button {
-                microphoneSessionEnabled.toggle()
-                if microphoneSessionEnabled { viewer.startMicrophone() }
-                else { viewer.stopMicrophone() }
-            } label: {
-                Image(systemName: microphoneSessionEnabled ? "mic.fill" : "mic.slash.fill")
-                    .frame(minWidth: 34, minHeight: 32)
-            }
-            .tint(microphoneSessionEnabled ? .primary : .red)
-            .accessibilityLabel(microphoneSessionEnabled ? "Mute microphone" : "Unmute microphone")
-            .accessibilityValue(microphoneSessionEnabled ? "On" : "Muted")
-            .accessibilityHint("Controls voice sent to the Mac when this device owns audio")
-            .accessibilityIdentifier("tailview.microphoneMuteButton")
-            Button {
-                macAudioSessionEnabled.toggle()
-                if macAudioSessionEnabled { viewer.startMacAudio() }
-                else { viewer.stopMacAudio() }
-            } label: {
-                Image(systemName: macAudioSessionEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                    .frame(minWidth: 34, minHeight: 32)
-            }
-            .tint(macAudioSessionEnabled ? .primary : .red)
-            .accessibilityLabel(macAudioSessionEnabled ? "Mute Mac sound" : "Unmute Mac sound")
-            .accessibilityValue(macAudioSessionEnabled ? "On" : "Muted")
-            .accessibilityHint("Controls Mac sound played on this device when it owns audio")
-            .accessibilityIdentifier("tailview.speakerMuteButton")
-            if horizontalSizeClass != .compact {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Button {
+                    toggleKeyboard()
+                } label: {
+                    BarIcon("keyboard")
+                }
+                .accessibilityLabel(nativeKeyboardVisible || fallbackKeyboardVisible
+                                    ? "Hide keyboard" : "Show keyboard")
+                .accessibilityIdentifier("tailview.keyboardButton")
+                .disabled(!viewer.isControlAllowed)
+                ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
+                    modifierButton(modifier)
+                }
+                Button {
+                    microphoneSessionEnabled.toggle()
+                    if microphoneSessionEnabled { viewer.startMicrophone() }
+                    else { viewer.stopMicrophone() }
+                } label: {
+                    BarIcon(microphoneSessionEnabled ? "mic.fill" : "mic.slash.fill")
+                }
+                .tint(microphoneSessionEnabled ? nil : Color.red)
+                .accessibilityLabel(microphoneSessionEnabled ? "Mute microphone" : "Unmute microphone")
+                .accessibilityValue(microphoneSessionEnabled ? "On" : "Muted")
+                .accessibilityHint("Controls voice sent to the Mac when this device owns audio")
+                .accessibilityIdentifier("tailview.microphoneMuteButton")
+                Button {
+                    macAudioSessionEnabled.toggle()
+                    if macAudioSessionEnabled { viewer.startMacAudio() }
+                    else { viewer.stopMacAudio() }
+                } label: {
+                    BarIcon(macAudioSessionEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                }
+                .tint(macAudioSessionEnabled ? nil : Color.red)
+                .accessibilityLabel(macAudioSessionEnabled ? "Mute Mac sound" : "Unmute Mac sound")
+                .accessibilityValue(macAudioSessionEnabled ? "On" : "Muted")
+                .accessibilityHint("Controls Mac sound played on this device when it owns audio")
+                .accessibilityIdentifier("tailview.speakerMuteButton")
                 spaceButtons
+                windowButtons
                 pointerButtons
                 if screenZoom > 1.01 {
                     Button { isPanningView.toggle() } label: {
-                        Image(systemName: isPanningView ? "hand.point.up.left.fill" : "hand.point.up.left")
+                        BarIcon(isPanningView ? "hand.point.up.left.fill" : "hand.point.up.left")
                     }
+                    .barButtonStyle(prominent: isPanningView)
                     .accessibilityLabel(isPanningView ? "Stop panning view" : "Pan view")
                     .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
+                    Button { screenZoom = 1; screenOffset = .zero } label: {
+                        BarIcon("1.magnifyingglass")
+                    }
+                    .accessibilityLabel("Reset zoom")
+                }
+                ForEach(BarKey.allCases, id: \.self) { key in
+                    Button { sendBarKey(key) } label: {
+                        BarIcon(key.systemImage)
+                    }
+                    .accessibilityLabel(key.title)
+                    .disabled(!viewer.isControlAllowed)
                 }
             }
-            Spacer(minLength: 0)
-            Menu {
-                if horizontalSizeClass == .compact {
-                    Button("Left click", systemImage: "cursorarrow.click") { sendPointer(.leftClick) }
-                        .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
-                    Button("Right click", systemImage: "cursorarrow.click.2") { sendPointer(.rightClick) }
-                        .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
-                    Button(isDraggingRemote ? "Release drag" : "Start drag",
-                           systemImage: isDraggingRemote ? "hand.raised.fill" : "hand.draw") {
-                        toggleDrag()
-                    }
-                    .disabled(!viewer.isControlAllowed || isTouchDraggingRemote)
-                    if screenZoom > 1.01 {
-                        Button(isPanningView ? "Stop panning view" : "Pan view") { isPanningView.toggle() }
-                            .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
-                    }
-                    Divider()
-                    ForEach(MacNavigation.allCases, id: \.self) { action in
-                        Button(action.title, systemImage: action.systemImage) { sendNavigation(action) }
-                            .disabled(!viewer.isControlAllowed)
-                    }
-                    Divider()
-                }
-                Button("Scroll up") { sendControl(ControlCommand(kind: .scroll, amount: -3)) }
-                Button("Scroll down") { sendControl(ControlCommand(kind: .scroll, amount: 3)) }
-                Divider()
-                Button("Return") { sendKey(.returnKey) }
-                Button("Tab") { sendKey(.tab) }
-                Button("Delete") { sendKey(.delete) }
-                Button("Escape") { sendKey(.escape) }
-                Button("Left arrow") { sendKey(.left) }
-                Button("Right arrow") { sendKey(.right) }
-                Button("Up arrow") { sendKey(.up) }
-                Button("Down arrow") { sendKey(.down) }
-                Divider()
-                Button("Reset zoom") { screenZoom = 1; screenOffset = .zero }
-            } label: {
-                Image(systemName: "ellipsis.circle")
-            }
-            .accessibilityLabel("More controls")
+            .padding(8)
         }
         .buttonStyle(.bordered)
-        .padding(8)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
     }
@@ -369,9 +342,23 @@ struct ViewerView: View {
     private var spaceButtons: some View {
         ForEach(MacNavigation.allCases, id: \.self) { action in
             Button { sendNavigation(action) } label: {
-                Image(systemName: action.systemImage)
+                BarIcon(action.systemImage)
             }
             .accessibilityLabel(action.title)
+            .disabled(!viewer.isControlAllowed)
+        }
+    }
+
+    /// Tiles the Mac's frontmost window on its screen.
+    private var windowButtons: some View {
+        ForEach(ControlCommand.WindowLayout.allCases, id: \.self) { layout in
+            Button {
+                guard viewer.isControlAllowed else { return }
+                viewer.sendControl(ControlCommand(kind: .window, window: layout))
+            } label: {
+                BarIcon(layout.systemImage)
+            }
+            .accessibilityLabel(layout.title)
             .disabled(!viewer.isControlAllowed)
         }
     }
@@ -379,18 +366,19 @@ struct ViewerView: View {
     private var pointerButtons: some View {
         Group {
             Button { sendPointer(.leftClick) } label: {
-                Image(systemName: "cursorarrow.click")
+                BarIcon("cursorarrow.click")
             }
             .accessibilityLabel("Left click")
             .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
             Button { sendPointer(.rightClick) } label: {
-                Image(systemName: "cursorarrow.click.2")
+                BarIcon("cursorarrow.click.2")
             }
             .accessibilityLabel("Right click")
             .disabled(!viewer.isControlAllowed || isDraggingRemote || isTouchDraggingRemote)
             Button { toggleDrag() } label: {
-                Image(systemName: isDraggingRemote ? "hand.raised.fill" : "hand.draw")
+                BarIcon(isDraggingRemote ? "hand.raised.fill" : "hand.draw")
             }
+            .barButtonStyle(prominent: isDraggingRemote)
             .accessibilityLabel(isDraggingRemote ? "Release drag" : "Start drag")
             .disabled(!viewer.isControlAllowed || isTouchDraggingRemote)
         }
@@ -398,24 +386,23 @@ struct ViewerView: View {
 
     private func modifierButton(_ modifier: ControlCommand.Modifier) -> some View {
         let mode = modifierSelection.mode(for: modifier)
+        let tint: Color? = mode == .held ? .orange : nil
+        let value = mode == .held ? "Held" : mode == .next ? "Next action" : "Off"
         return Button {
             modifierSelection.tap(modifier)
         } label: {
             HStack(spacing: 2) {
-                Text(modifier.symbol).font(.system(size: 18, weight: .semibold))
+                Text(modifier.symbol).font(.body.weight(.semibold))
                 if mode == .held {
                     Image(systemName: "lock.fill").font(.system(size: 8))
                 }
             }
-            .frame(minWidth: 34, minHeight: 32)
-            .foregroundStyle(mode == .off ? Color.primary : Color.white)
-            .background(mode == .held ? Color.orange :
-                        mode == .next ? Color.accentColor : Color(uiColor: .tertiarySystemFill),
-                        in: RoundedRectangle(cornerRadius: 8))
+            .frame(minWidth: BarIcon.size, minHeight: BarIcon.size)
         }
-        .buttonStyle(.plain)
+        .barButtonStyle(prominent: mode != .off)
+        .tint(tint)
         .accessibilityLabel("\(modifier.title) modifier")
-        .accessibilityValue(mode == .held ? "Held" : mode == .next ? "Next action" : "Off")
+        .accessibilityValue(value)
         .accessibilityHint("Tap once for the next action. Double tap to hold. Tap a held modifier to release it.")
         .accessibilityAction(named: "Hold \(modifier.title)") {
             modifierSelection.hold(modifier)
@@ -553,6 +540,21 @@ struct ViewerView: View {
         sendControl(ControlCommand(kind: .key, key: key))
     }
 
+    private func sendBarKey(_ key: BarKey) {
+        switch key {
+        case .scrollUp: sendControl(ControlCommand(kind: .scroll, amount: -3))
+        case .scrollDown: sendControl(ControlCommand(kind: .scroll, amount: 3))
+        case .returnKey: sendKey(.returnKey)
+        case .tab: sendKey(.tab)
+        case .delete: sendKey(.delete)
+        case .escape: sendKey(.escape)
+        case .left: sendKey(.left)
+        case .right: sendKey(.right)
+        case .up: sendKey(.up)
+        case .down: sendKey(.down)
+        }
+    }
+
     /// Sends Control plus an arrow, independent of the bar's modifier buttons.
     private func sendNavigation(_ action: MacNavigation) {
         guard viewer.isControlAllowed else { return }
@@ -616,8 +618,44 @@ struct ViewerView: View {
         switch command.kind {
         case .leftClick, .rightClick, .leftUp, .scroll, .text, .key:
             modifierSelection.consumeNext()
-        case .move, .leftDown, .leftDrag:
+        case .move, .leftDown, .leftDrag, .window:
             break
+        }
+    }
+}
+
+/// Keys and scrolling that were in the former overflow menu. These use
+/// the bar's modifier buttons, like typed keys.
+private enum BarKey: CaseIterable {
+    case scrollUp, scrollDown, returnKey, tab, delete, escape, left, right, up, down
+
+    var title: String {
+        switch self {
+        case .scrollUp: "Scroll up"
+        case .scrollDown: "Scroll down"
+        case .returnKey: "Return"
+        case .tab: "Tab"
+        case .delete: "Delete"
+        case .escape: "Escape"
+        case .left: "Left arrow"
+        case .right: "Right arrow"
+        case .up: "Up arrow"
+        case .down: "Down arrow"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .scrollUp: "chevron.up.circle"
+        case .scrollDown: "chevron.down.circle"
+        case .returnKey: "return"
+        case .tab: "arrow.right.to.line"
+        case .delete: "delete.left"
+        case .escape: "escape"
+        case .left: "arrow.left"
+        case .right: "arrow.right"
+        case .up: "arrow.up"
+        case .down: "arrow.down"
         }
     }
 }
@@ -650,6 +688,44 @@ private enum MacNavigation: CaseIterable {
         case .nextSpace: "rectangle.righthalf.inset.filled.arrow.right"
         case .missionControl: "rectangle.3.group"
         case .appWindows: "macwindow.on.rectangle"
+        }
+    }
+}
+
+/// A control-bar icon sized so every bar button has the same shape.
+private struct BarIcon: View {
+    static let size: CGFloat = 26
+    let name: String
+
+    init(_ name: String) { self.name = name }
+
+    var body: some View {
+        Image(systemName: name)
+            .frame(minWidth: Self.size, minHeight: Self.size)
+    }
+}
+
+private extension View {
+    /// Bordered like every bar button; filled while a state is active.
+    @ViewBuilder func barButtonStyle(prominent: Bool) -> some View {
+        if prominent { buttonStyle(.borderedProminent) } else { buttonStyle(.bordered) }
+    }
+}
+
+private extension ControlCommand.WindowLayout {
+    var title: String {
+        switch self {
+        case .leftHalf: "Move window to left half"
+        case .rightHalf: "Move window to right half"
+        case .fill: "Fill screen with window"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .leftHalf: "rectangle.lefthalf.filled"
+        case .rightHalf: "rectangle.righthalf.filled"
+        case .fill: "rectangle.inset.filled"
         }
     }
 }

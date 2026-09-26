@@ -63,8 +63,18 @@ struct TransportSmoke {
               ControlCommand(kind: .text, text: "a", modifiers: []).encoded() == nil,
               ControlCommand(kind: .text, text: "a", modifiers: [.command, .command]).encoded() == nil,
               ControlCommand.decode(Data(#"{"kind":"text","text":"a","modifiers":["superuser"]}"#.utf8)) == nil,
+              ControlCommand(kind: .window).encoded() == nil,
+              ControlCommand(kind: .window, modifiers: [.control], window: .leftHalf).encoded() == nil,
+              ControlCommand(kind: .key, key: .left, window: .fill).encoded() == nil,
+              ControlCommand.decode(Data(#"{"kind":"window","window":"minimize"}"#.utf8)) == nil,
               ControlCommand.decode(Data("bad JSON".utf8)) == nil else {
             throw TestError.message("Invalid control command was accepted")
+        }
+        for layout in ControlCommand.WindowLayout.allCases {
+            let command = ControlCommand(kind: .window, window: layout)
+            guard let data = command.encoded(), ControlCommand.decode(data) == command else {
+                throw TestError.message("Window command did not round trip")
+            }
         }
         let diagonalScroll = ControlCommand(kind: .scroll, amount: 2, horizontalAmount: -3)
         guard let scrollData = diagonalScroll.encoded(),

@@ -79,6 +79,10 @@ final class ControlInjector {
             if let text = command.text { postText(text, flags: flags) }
         case .key:
             if let key = command.key { postKey(key, flags: flags) }
+        case .window:
+            if let layout = command.window {
+                Task { @MainActor in WindowArranger.arrange(layout) }
+            }
         }
     }
 

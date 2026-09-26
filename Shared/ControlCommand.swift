@@ -3,7 +3,7 @@ import Foundation
 /// A deliberately small allowlist of actions a paired viewer can ask the Mac to perform.
 struct ControlCommand: Codable, Equatable {
     enum Kind: String, Codable {
-        case move, leftClick, rightClick, leftDown, leftDrag, leftUp, scroll, text, key
+        case move, leftClick, rightClick, leftDown, leftDrag, leftUp, scroll, text, key, window
     }
 
     enum Key: String, Codable {
@@ -14,6 +14,11 @@ struct ControlCommand: Codable, Equatable {
         case control, option, command
     }
 
+    /// Where the Mac's frontmost window is moved on its screen.
+    enum WindowLayout: String, Codable, CaseIterable {
+        case leftHalf, rightHalf, fill
+    }
+
     let kind: Kind
     var x: Double? = nil
     var y: Double? = nil
@@ -22,6 +27,7 @@ struct ControlCommand: Codable, Equatable {
     var text: String? = nil
     var key: Key? = nil
     var modifiers: [Modifier]? = nil
+    var window: WindowLayout? = nil
 
     static let maximumBytes = 1_024
 
@@ -47,6 +53,7 @@ struct ControlCommand: Codable, Equatable {
         if let modifiers,
            modifiers.isEmpty || modifiers.count > Modifier.allCases.count
             || Set(modifiers).count != modifiers.count { return false }
+        if kind != .window && window != nil { return false }
         switch kind {
         case .move, .leftClick, .rightClick, .leftDown, .leftDrag, .leftUp:
             return hasPoint && amount == nil && horizontalAmount == nil && text == nil && key == nil
@@ -62,6 +69,9 @@ struct ControlCommand: Codable, Equatable {
                     && !$0.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) } == true
         case .key:
             return x == nil && y == nil && amount == nil && horizontalAmount == nil && text == nil && key != nil
+        case .window:
+            return x == nil && y == nil && amount == nil && horizontalAmount == nil && text == nil
+                && key == nil && modifiers == nil && window != nil
         }
     }
 }
