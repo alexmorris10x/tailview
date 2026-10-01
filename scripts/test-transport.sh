@@ -10,3 +10,5 @@ swiftc Shared/ControlCommand.swift IOSViewer/ModifierSelection.swift Tests/Modif
 DerivedData/Tests/ModifierSmoke
 swiftc -parse-as-library MacHost/DisplayControl/BacklightController.swift MacHost/DisplayControl/LocalInputController.swift Tests/DisplayControlSmoke.swift -o DerivedData/Tests/DisplayControlSmoke
 DerivedData/Tests/DisplayControlSmoke
+swiftc -parse-as-library MacHost/AudioRoutingController.swift Tests/AudioRoutingSmoke.swift -o DerivedData/Tests/AudioRoutingSmoke
+DerivedData/Tests/AudioRoutingSmoke

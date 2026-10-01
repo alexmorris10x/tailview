@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D1687EF80D4F4B4FA9AA1401 /* AudioRoutingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1687EF80D4F4B4FA9AA1402 /* AudioRoutingController.swift */; };
 		083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
 		12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */; };
 		1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
@@ -42,6 +43,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		D1687EF80D4F4B4FA9AA1402 /* AudioRoutingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRoutingController.swift; sourceTree = "<group>"; };
 		0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierSelection.swift; sourceTree = "<group>"; };
 		10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewMacApp.swift; sourceTree = "<group>"; };
 		1E90C7F0AF464E7238A871F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -93,6 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				228BA387B565D9B98B1F35FA /* Assets.xcassets */,
+				D1687EF80D4F4B4FA9AA1402 /* AudioRoutingController.swift */,
 				BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */,
 				1E90C7F0AF464E7238A871F0 /* ContentView.swift */,
 				89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */,
@@ -276,6 +279,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1687EF80D4F4B4FA9AA1401 /* AudioRoutingController.swift in Sources */,
 				CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */,
 				E373B23CD90E4A0C6264A55F /* BacklightController.swift in Sources */,
 				4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */,

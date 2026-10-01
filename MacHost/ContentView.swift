@@ -34,6 +34,7 @@ struct ContentView: View {
             LabeledContent("Viewer", value: host.viewerStatus)
             LabeledContent("Microphone", value: host.microphoneStatus)
             LabeledContent("Mac sound", value: host.systemAudioStatus)
+            LabeledContent("Mac audio routing", value: host.audioRoutingStatus)
             LabeledContent("Remote control", value: host.isControlEnabled ? "Allowed" : host.controlStatus)
 
             if host.isSharing {

@@ -6,6 +6,7 @@ final class HostModel: ObservableObject {
     @Published private(set) var viewerStatus = "Disconnected"
     @Published private(set) var microphoneStatus = "Start sharing to receive the device microphone"
     @Published private(set) var systemAudioStatus = "Waiting for a trusted viewer"
+    @Published private(set) var audioRoutingStatus = "Waiting for a paired viewer"
     @Published private(set) var address = ""
     @Published private(set) var sessionCode = ""
     @Published private(set) var isSharing = false
@@ -21,6 +22,7 @@ final class HostModel: ObservableObject {
 
     private let pairedStore = PairedDeviceStore()
     private let controlInjector = ControlInjector()
+    private let audioRouting = AudioRoutingController()
     private var capture: ScreenCapture?
     private var server: VideoServer?
     private var peakMicrophoneLevel = 0.0
@@ -31,6 +33,8 @@ final class HostModel: ObservableObject {
     private var lastCaptureRecovery = Date.distantPast
 
     init() {
+        audioRoutingStatus = audioRouting.status
+        audioRouting.onStatus = { [weak self] in self?.audioRoutingStatus = $0 }
         display.onDisplayConfigurationChange = { [weak self] in self?.replaceCapture(reason: nil) }
         isPaused = UserDefaults.standard.bool(forKey: "tailview.accessPaused")
         reloadPairedDevices()
@@ -85,20 +89,21 @@ final class HostModel: ObservableObject {
                 }
                 server.onViewerStatus = { [weak self] _ in
                     Task { @MainActor in
-                        guard self?.isSharing == true else { return }
+                        guard let self, self.isSharing, self.server === server else { return }
                         let count = server.viewerCount
-                        self?.viewerStatus = count == 0 ? "Disconnected" :
+                        self.viewerStatus = count == 0 ? "Disconnected" :
                             "\(count) viewer\(count == 1 ? "" : "s") connected"
-                        if let capture = self?.capture {
-                            self?.updateSystemAudioCapture(server.hasPairedViewer, on: capture)
+                        self.audioRouting.setConnected(server.hasPairedViewer)
+                        if let capture = self.capture {
+                            self.updateSystemAudioCapture(server.hasPairedViewer, on: capture)
                         }
-                        self?.isControlEnabled = server.isControlEnabled
-                        self?.controlStatus = count > 0
+                        self.isControlEnabled = server.isControlEnabled
+                        self.controlStatus = count > 0
                             ? (server.isControlEnabled ? "Trusted device can control this Mac" : "Grant macOS control permission in TailView settings")
                             : "Control is off"
                         if count == 0 {
-                            self?.peakMicrophoneLevel = 0
-                            self?.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
+                            self.peakMicrophoneLevel = 0
+                            self.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
                         }
                     }
                 }
@@ -149,6 +154,7 @@ final class HostModel: ObservableObject {
         server?.disablePairing()
         server?.stop()
         server = nil
+        audioRouting.setConnected(false)
         let capture = self.capture
         self.capture = nil
         let audioCaptureUpdate = self.audioCaptureUpdate
