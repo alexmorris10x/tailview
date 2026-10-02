@@ -11,6 +11,7 @@
 		12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */; };
 		17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */; };
 		1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
+		2178E26CCCB3A482B962C4E8 /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
 		23CC289FC1E2FCAAF5E1D344 /* DisplayControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49ACCAC73BE7A1A3BD8190B4 /* DisplayControlModel.swift */; };
 		2C3138630F878A33B50EA70F /* AudioRoutingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */; };
 		3490C489727F9C7FBE54BECF /* TailViewMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */; };
@@ -27,6 +28,7 @@
 		829F0A82AC53DB09A2BA7403 /* AudioJitterBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */; };
 		860CEB4A5170A59574801741 /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
 		8BB8A9D5564AA07A9A3EC708 /* ViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */; };
+		8BBE9A9B25D7BE58A16B7F6F /* AudioConnectionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */; };
 		8E1085C0AFE0F75FE3C9AF14 /* VideoServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47838951CB82DF0FD1EA557B /* VideoServer.swift */; };
 		9955681A18E76FEF8CA49A69 /* PairedDeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491848EAC2F810F07C3FA7B9 /* PairedDeviceStore.swift */; };
 		9C1EA10C101CA225C3C3895E /* SessionLockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC989BE803A21C343E9BFBCD /* SessionLockController.swift */; };
@@ -36,16 +38,16 @@
 		AF62EE973A7949C2F309F1EB /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
 		BF2F93D2904B5C1F4D415953 /* ControlInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */; };
 		C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */; };
+		C0DEFAEBDD2EBE85678E9CD1 /* AudioConnectionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */; };
 		C4FFE508A3EDFA633B05317F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 228BA387B565D9B98B1F35FA /* Assets.xcassets */; };
 		CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
 		E373B23CD90E4A0C6264A55F /* BacklightController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A18A3313347868348999728 /* BacklightController.swift */; };
 		E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */; };
-		E567D42DA71BC25284F36D35 /* AudioSendBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC94A71752F30590C1EA15AE /* AudioSendBudget.swift */; };
 		E787339A2352E81E1A2BF5C5 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
 		F0AC032D5A673D0FD6936CC5 /* LocalInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7120797B5BA592ECF917EBD6 /* LocalInputController.swift */; };
-		F7690C3B24D23E9021C50946 /* AudioSendBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC94A71752F30590C1EA15AE /* AudioSendBudget.swift */; };
 		F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
+		FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +58,7 @@
 		228BA387B565D9B98B1F35FA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerView.swift; sourceTree = "<group>"; };
 		2ED200EAE69D0972F6653D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconnectBackoff.swift; sourceTree = "<group>"; };
 		3D10F8991B1089241B3E66D5 /* ViewerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerModel.swift; sourceTree = "<group>"; };
 		47838951CB82DF0FD1EA557B /* VideoServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoServer.swift; sourceTree = "<group>"; };
 		491848EAC2F810F07C3FA7B9 /* PairedDeviceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedDeviceStore.swift; sourceTree = "<group>"; };
@@ -65,6 +68,7 @@
 		56F7A4A2A9085AF68C5BB785 /* PhysicalDisplayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicalDisplayController.swift; sourceTree = "<group>"; };
 		5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenViewport.swift; sourceTree = "<group>"; };
 		5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewIOSApp.swift; sourceTree = "<group>"; };
+		635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioConnectionGate.swift; sourceTree = "<group>"; };
 		7120797B5BA592ECF917EBD6 /* LocalInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalInputController.swift; sourceTree = "<group>"; };
 		747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteKeyboardInput.swift; sourceTree = "<group>"; };
 		7C1677B424CBD84C8CA05935 /* WindowArranger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowArranger.swift; sourceTree = "<group>"; };
@@ -74,7 +78,6 @@
 		93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRoutingController.swift; sourceTree = "<group>"; };
 		97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationReply.swift; sourceTree = "<group>"; };
 		B2FB29C814C93650C267420E /* HostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostModel.swift; sourceTree = "<group>"; };
-		BC94A71752F30590C1EA15AE /* AudioSendBudget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSendBudget.swift; sourceTree = "<group>"; };
 		BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSink.swift; sourceTree = "<group>"; };
 		C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioJitterBuffer.swift; sourceTree = "<group>"; };
 		E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRequest.swift; sourceTree = "<group>"; };
@@ -123,12 +126,13 @@
 		8C10591072A0B1C8A842CE2C /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */,
 				C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */,
-				BC94A71752F30590C1EA15AE /* AudioSendBudget.swift */,
 				97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */,
 				F54C4272B69B3D917AFDF90B /* ControlCommand.swift */,
 				20D2B8181E5E82E5B6433F69 /* Packet.swift */,
 				E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */,
+				3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */,
 				5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */,
 			);
 			path = Shared;
@@ -272,13 +276,14 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8BBE9A9B25D7BE58A16B7F6F /* AudioConnectionGate.swift in Sources */,
 				A783C36DF12F342C9E17E7BC /* AudioJitterBuffer.swift in Sources */,
-				E567D42DA71BC25284F36D35 /* AudioSendBudget.swift in Sources */,
 				17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */,
 				3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */,
 				66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */,
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,
+				FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */,
 				12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */,
 				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,
@@ -294,9 +299,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C0DEFAEBDD2EBE85678E9CD1 /* AudioConnectionGate.swift in Sources */,
 				829F0A82AC53DB09A2BA7403 /* AudioJitterBuffer.swift in Sources */,
 				2C3138630F878A33B50EA70F /* AudioRoutingController.swift in Sources */,
-				F7690C3B24D23E9021C50946 /* AudioSendBudget.swift in Sources */,
 				CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */,
 				9FA1FA127D670CC057400BB8 /* AuthenticationReply.swift in Sources */,
 				E373B23CD90E4A0C6264A55F /* BacklightController.swift in Sources */,
@@ -310,6 +315,7 @@
 				9955681A18E76FEF8CA49A69 /* PairedDeviceStore.swift in Sources */,
 				F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */,
 				7E134BA54E230E19089BC23D /* PhysicalDisplayController.swift in Sources */,
+				2178E26CCCB3A482B962C4E8 /* ReconnectBackoff.swift in Sources */,
 				5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */,
 				083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */,
 				9C1EA10C101CA225C3C3895E /* SessionLockController.swift in Sources */,

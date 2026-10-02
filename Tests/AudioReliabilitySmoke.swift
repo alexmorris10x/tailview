@@ -49,17 +49,37 @@ struct AudioReliabilitySmoke {
         buffer.append(Data([1]))
         precondition(buffer.count == 0, "Malformed PCM must be ignored")
 
-        let budget = AudioSendBudget()
-        let generation = budget.reset()
-        for _ in 0..<100 { precondition(budget.reserve(frames: 960, generation: generation)) }
-        precondition(!budget.reserve(frames: 1, generation: generation), "Pending voice must be duration-bounded")
-        budget.complete(frames: 19_200, generation: generation)
-        precondition(budget.reserve(frames: 19_200, generation: generation))
-        let next = budget.reset()
-        precondition(budget.reserve(frames: 96_000, generation: next))
-        budget.complete(frames: 96_000, generation: generation)
-        precondition(!budget.reserve(frames: 1, generation: next), "Old completions cannot release new capture capacity")
-        precondition(!budget.reserve(frames: 960, generation: generation), "Old taps cannot send after reset")
+        let firstConnection = NSObject()
+        let secondConnection = NSObject()
+        let gate = AudioConnectionGate<NSObject>()
+        let capture = gate.resetCapture()
+        precondition(gate.reserve(frames: 960, capture: capture) == nil,
+                     "No microphone samples may queue before audio authorization")
+        gate.setConnection(firstConnection)
+        var tickets = [AudioConnectionGate<NSObject>.Ticket]()
+        for _ in 0..<100 { tickets.append(gate.reserve(frames: 960, capture: capture)!) }
+        precondition(gate.reserve(frames: 1, capture: capture) == nil, "Pending voice must be duration-bounded")
+        gate.complete(tickets[0])
+        precondition(gate.reserve(frames: 960, capture: capture) != nil)
+        gate.setConnection(nil)
+        precondition(gate.reserve(frames: 960, capture: capture) == nil,
+                     "An ongoing microphone must discard samples throughout the outage")
+        gate.setConnection(secondConnection)
+        let resumed = gate.reserve(frames: 96_000, capture: capture)!
+        precondition(resumed.connection === secondConnection, "The same tap must send to the reauthorized connection")
+        tickets.forEach { gate.complete($0) }
+        precondition(gate.reserve(frames: 1, capture: capture) == nil, "Old network completions cannot release the new route's budget")
+        let nextCapture = gate.resetCapture()
+        precondition(gate.reserve(frames: 960, capture: capture) == nil, "A stopped tap cannot send into a new capture")
+        precondition(gate.reserve(frames: 96_000, capture: nextCapture) != nil)
+        gate.complete(resumed)
+        precondition(gate.reserve(frames: 1, capture: nextCapture) == nil)
+        gate.setConnection(nil)
+        precondition(gate.reserve(frames: 960, capture: nextCapture) == nil, "Revocation must stop microphone delivery")
+        var backoff = ReconnectBackoff()
+        precondition((0..<7).map { _ in backoff.nextDelay() } == [1, 2, 4, 8, 8, 8, 8])
+        backoff.reset()
+        precondition(backoff.nextDelay() == 1, "A successful connection must reset retry delay")
 
         let ok = Data("OK\n".utf8)
         func reply(_ text: String, ended: Bool = false) -> AuthenticationReply {
@@ -72,6 +92,6 @@ struct AudioReliabilitySmoke {
         precondition(reply("N") == .pending && reply("NO") == .pending)
         precondition(reply("NO\n") == .rejected && reply("NO\n", ended: true) == .rejected)
         precondition(reply("NO", ended: true) == .unavailable && reply("BAD") == .invalid)
-        print("Audio reliability smoke passed: startup/refill, 20s burst jitter, fades, bounded backlog, owner reset, send budget generations, fragmented auth and transient disconnects")
+        print("Audio reliability smoke passed: startup/refill, 20s burst jitter, fades, bounded backlog, owner reset, reauthorized microphone retargeting, bounded retry delays, fragmented auth and transient disconnects")
     }
 }

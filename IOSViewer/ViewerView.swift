@@ -103,8 +103,8 @@ struct ViewerView: View {
         }
         .onChange(of: viewer.isConnected) { _, connected in
             if connected {
-                microphoneSessionEnabled = microphoneOnConnect
-                macAudioSessionEnabled = macAudioOnConnect
+                microphoneSessionEnabled = viewer.microphoneWanted
+                macAudioSessionEnabled = viewer.macAudioWanted
                 showPairing = false
                 automaticConnection = true
                 code = ""
@@ -204,7 +204,7 @@ struct ViewerView: View {
                 ContentUnavailableView("Waiting for Mac", systemImage: "display",
                                        description: Text(viewer.status))
                     .frame(maxWidth: .infinity)
-                if viewer.isConnecting {
+                if viewer.isConnecting || viewer.isReconnecting {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                     Button("Cancel connection") {
@@ -416,7 +416,7 @@ struct ViewerView: View {
             Form {
                 Section("Connection") {
                     Text(viewer.status)
-                    if viewer.isConnected {
+                    if viewer.isConnected || viewer.isReconnecting {
                         Button("Disconnect") {
                             automaticConnection = false
                             viewer.disconnect()
@@ -515,7 +515,7 @@ struct ViewerView: View {
         guard !ProcessInfo.processInfo.arguments.contains("--tailview-test-isolated-recorder") else { return }
         #endif
         guard scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
-              !viewer.isConnected, !viewer.isConnecting, !viewer.savedCredentialRejected,
+              !viewer.isConnected, !viewer.isConnecting, !viewer.isReconnecting, !viewer.savedCredentialRejected,
               let profile = preferredProfile else { return }
         viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
                        startMacAudioOnConnect: macAudioOnConnect)
