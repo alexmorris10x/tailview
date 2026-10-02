@@ -4,9 +4,8 @@ import os
 
 final class VideoServer {
     private static let transportLog = Logger(subsystem: "com.10x.tailview.mac", category: "Transport")
-    // 100 captured 20 ms blocks cover a short cellular stall without retaining
-    // an unbounded backlog. Playback may lag, but sound is not discarded at 240 ms.
-    private static let maximumPendingAudioPackets = 100
+    // Two seconds of stereo PCM, regardless of capture packet size.
+    private static let maximumPendingAudioBytes = 48_000 * 4 * 2
     private final class ViewerConnection {
         let id = UUID()
         let fd: Int32
@@ -16,6 +15,7 @@ final class VideoServer {
         var controlEnabled: Bool
         var framePending = false
         var audioPending = 0
+        var audioPendingBytes = 0
         var didReportMicrophone = false
         var lastLevelReport = 0.0
 
@@ -179,16 +179,24 @@ final class VideoServer {
         lock.lock()
         let clients = running ? viewers.values.filter {
             $0.pairedID != nil && $0.id == microphoneOwner &&
-                $0.audioPending < Self.maximumPendingAudioPackets
+                $0.audioPendingBytes + pcm.count <= Self.maximumPendingAudioBytes
         } : []
-        for client in clients { client.audioPending += 1 }
+        for client in clients {
+            client.audioPending += 1
+            client.audioPendingBytes += pcm.count
+        }
         lock.unlock()
         let packet = Packet.encode(.macAudio, pcm)
+        let queuedAt = ProcessInfo.processInfo.systemUptime
         for client in clients {
             client.sendQueue.async { [weak self, client] in
                 guard let self else { return }
-                let sent = self.sendIfAudioOwner(packet, to: client)
-                self.lock.lock(); client.audioPending = max(0, client.audioPending - 1); self.lock.unlock()
+                let expired = ProcessInfo.processInfo.systemUptime - queuedAt > 2
+                let sent = expired || self.sendIfAudioOwner(packet, to: client)
+                self.lock.lock()
+                client.audioPending = max(0, client.audioPending - 1)
+                client.audioPendingBytes = max(0, client.audioPendingBytes - pcm.count)
+                self.lock.unlock()
                 if !sent { self.finish(client) }
             }
         }
@@ -206,6 +214,14 @@ final class VideoServer {
             }
             var yes: Int32 = 1
             setsockopt(clientFD, SOL_SOCKET, SO_NOSIGPIPE, &yes, socklen_t(MemoryLayout<Int32>.size))
+            setsockopt(clientFD, IPPROTO_TCP, TCP_NODELAY, &yes, socklen_t(MemoryLayout<Int32>.size))
+            setsockopt(clientFD, SOL_SOCKET, SO_KEEPALIVE, &yes, socklen_t(MemoryLayout<Int32>.size))
+            var idle: Int32 = 10
+            var interval: Int32 = 3
+            var probes: Int32 = 3
+            setsockopt(clientFD, IPPROTO_TCP, TCP_KEEPALIVE, &idle, socklen_t(MemoryLayout<Int32>.size))
+            setsockopt(clientFD, IPPROTO_TCP, TCP_KEEPINTVL, &interval, socklen_t(MemoryLayout<Int32>.size))
+            setsockopt(clientFD, IPPROTO_TCP, TCP_KEEPCNT, &probes, socklen_t(MemoryLayout<Int32>.size))
             lock.lock()
             let mayHandshake = running && pendingHandshakes < 4
             if mayHandshake { pendingHandshakes += 1 }
@@ -221,9 +237,16 @@ final class VideoServer {
 
     private func handleViewer(_ fd: Int32) {
         var admitted: ViewerConnection?
-        defer { if admitted == nil { Darwin.shutdown(fd, SHUT_RDWR); Darwin.close(fd) } }
+        // shutdown wakes recv; close only after the reader and queued writers
+        // have finished, so a reused descriptor cannot receive stale work.
+        defer {
+            if let admitted { admitted.sendQueue.async { Darwin.close(fd) } }
+            else { Darwin.shutdown(fd, SHUT_RDWR); Darwin.close(fd) }
+        }
         var timeout = timeval(tv_sec: 5, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout<timeval>.size))
+        var sendTimeout = timeval(tv_sec: 2, tv_usec: 0)
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, socklen_t(MemoryLayout<timeval>.size))
         guard let line = Self.readLine(fd, maximum: PairingRequest.maximumLineBytes),
               let request = PairingRequest.parse(line) else { return }
         var pairedID: UUID?
@@ -233,7 +256,12 @@ final class VideoServer {
         case .session(let suppliedCode):
             guard suppliedCode == code else { return }
         case .authenticate(let id, let token):
-            guard authenticateSaved?(id, token) == true else { return }
+            guard authenticateSaved?(id, token) == true else {
+                // An explicit response distinguishes revocation from a dropped
+                // handshake or a temporarily full/unavailable host.
+                _ = Self.writeExactly(fd, Data("NO\n".utf8))
+                return
+            }
             pairedID = id
         case .pair(let suppliedCode, let id, let token, let deviceName):
             guard suppliedCode == code, isPairingAvailable(), hasViewerCapacity(),
@@ -278,8 +306,6 @@ final class VideoServer {
         // Cellular RTT spikes and retransmissions can briefly fill the TCP
         // window. Frame/audio queues are already bounded, so allow a stalled
         // send to recover instead of resetting a healthy session at 250 ms.
-        var sendTimeout = timeval(tv_sec: 2, tv_usec: 0)
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, socklen_t(MemoryLayout<timeval>.size))
         if let pairedID, let pairingName { onPairingSuccess?(pairedID, pairingName) }
         onViewerStatus?("Connected")
         sendControlState(viewer)
@@ -414,7 +440,6 @@ final class VideoServer {
 
     private func close(_ viewer: ViewerConnection) {
         Darwin.shutdown(viewer.fd, SHUT_RDWR)
-        viewer.sendQueue.async { Darwin.close(viewer.fd) }
     }
 
     private static func readExactly(_ fd: Int32, _ count: Int) -> Data? {
@@ -424,6 +449,7 @@ final class VideoServer {
             var offset = 0
             while offset < count {
                 let received = Darwin.recv(fd, base.advanced(by: offset), count - offset, 0)
+                if received < 0 && errno == EINTR { continue }
                 if received <= 0 {
                     #if DEBUG
                     transportLog.notice("TCP receive ended result=\(received) errno=\(received < 0 ? errno : 0) offset=\(offset) count=\(count)")
@@ -464,6 +490,7 @@ final class VideoServer {
             var offset = 0
             while offset < bytes.count {
                 let sent = Darwin.send(fd, base.advanced(by: offset), bytes.count - offset, 0)
+                if sent < 0 && errno == EINTR { continue }
                 if sent <= 0 {
                     #if DEBUG
                     transportLog.error("TCP send failed result=\(sent) errno=\(sent < 0 ? errno : 0) offset=\(offset) count=\(bytes.count)")

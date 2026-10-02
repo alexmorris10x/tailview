@@ -354,6 +354,50 @@ struct TransportSmoke {
         guard waitForViewerCount(server, 0) else {
             throw TestError.message("Slow viewer did not disconnect after closing")
         }
+        // A longer outage must release the blocked connection, while the same
+        // saved pairing remains usable afterward.
+        let outage = try connect(to: address, receiveBuffer: 16_384)
+        guard writeExactly(outage, Data(saved.line.utf8)), readExactly(outage, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Outage viewer could not authenticate")
+        }
+        try expectState(outage, allowed: true, phase: "outage setup")
+        try expectMicrophoneState(outage, allowed: true, phase: "outage setup")
+        server.publish(largeFrame)
+        let outageDeadline = ProcessInfo.processInfo.systemUptime + 8
+        while server.viewerCount > 0 && ProcessInfo.processInfo.systemUptime < outageDeadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        Darwin.shutdown(outage, SHUT_RDWR)
+        Darwin.close(outage)
+        guard server.viewerCount == 0 else { throw TestError.message("Long blocked send did not release its viewer") }
+
+        // Repeated replacement while writers are queued must not reuse a closed
+        // descriptor underneath an old reader or corrupt a fresh auth response.
+        for attempt in 0..<8 {
+            let stalled = try connect(to: address, receiveBuffer: 16_384)
+            guard writeExactly(stalled, Data(saved.line.utf8)),
+                  readExactly(stalled, 3) == Data("OK\n".utf8) else {
+                throw TestError.message("Replacement setup failed at \(attempt)")
+            }
+            try expectState(stalled, allowed: true, phase: "replacement setup")
+            try expectMicrophoneState(stalled, allowed: true, phase: "replacement setup")
+            server.publish(largeFrame)
+            server.publishAudio(macAudio)
+            let fresh = try connect(to: address)
+            guard writeExactly(fresh, Data(saved.line.utf8)),
+                  readExactly(fresh, 3) == Data("OK\n".utf8) else {
+                throw TestError.message("Queued writer corrupted replacement auth at \(attempt)")
+            }
+            try expectState(fresh, allowed: true, phase: "replacement under load")
+            try expectMicrophoneState(fresh, allowed: true, phase: "replacement under load")
+            Darwin.shutdown(stalled, SHUT_RDWR)
+            Darwin.close(stalled)
+            Darwin.shutdown(fresh, SHUT_RDWR)
+            Darwin.close(fresh)
+            guard waitForViewerCount(server, 0) else {
+                throw TestError.message("Replacement under load did not finish")
+            }
+        }
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
         server.stop()
@@ -436,6 +480,12 @@ struct TransportSmoke {
         guard writeExactly(client, Data(line.utf8)) else { throw TestError.message("Could not send \(reason)") }
         var byte: UInt8 = 0
         let result = Darwin.recv(client, &byte, 1, 0)
+        if case .authenticate = PairingRequest.parse(line.trimmingCharacters(in: .newlines)) {
+            guard result == 1, byte == 78, readExactly(client, 2) == Data("O\n".utf8) else {
+                throw TestError.message("Missing explicit rejection for \(reason)")
+            }
+            return
+        }
         guard result == 0 else { throw TestError.message("Accepted \(reason) or timed out (recv=\(result), errno=\(errno))") }
     }
 

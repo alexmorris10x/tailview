@@ -4,7 +4,7 @@ import Foundation
 
 final class AudioSink {
     private let lock = NSLock()
-    private var samples = [Int16]()
+    private var jitterBuffer = AudioJitterBuffer()
     private var queue: AudioQueueRef?
     private let framesPerBuffer = 960
 
@@ -74,27 +74,16 @@ final class AudioSink {
     func append(_ data: Data) {
         guard data.count.isMultiple(of: 2) else { return }
         lock.lock()
-        if samples.count > 24_000 { samples.removeFirst(samples.count - 9_600) }
-        data.withUnsafeBytes { bytes in
-            for index in stride(from: 0, to: bytes.count, by: 2) {
-                samples.append(Int16(bitPattern: UInt16(bytes[index]) | (UInt16(bytes[index + 1]) << 8)))
-            }
-        }
+        jitterBuffer.append(data)
         lock.unlock()
     }
 
-    func clear() { lock.lock(); samples.removeAll(keepingCapacity: true); lock.unlock() }
+    func clear() { lock.lock(); jitterBuffer.clear(); lock.unlock() }
 
     private func fill(queue: AudioQueueRef, buffer: AudioQueueBufferRef) {
         let output = buffer.pointee.mAudioData.assumingMemoryBound(to: Int16.self)
         lock.lock()
-        let count = min(framesPerBuffer, samples.count)
-        for index in 0..<framesPerBuffer {
-            let value: Int16 = index < count ? samples[index] : 0
-            output[index * 2] = value
-            output[index * 2 + 1] = value
-        }
-        if count > 0 { samples.removeFirst(count) }
+        jitterBuffer.render(into: output, frames: framesPerBuffer)
         lock.unlock()
         buffer.pointee.mAudioDataByteSize = UInt32(framesPerBuffer * 4)
         AudioQueueEnqueueBuffer(queue, buffer, 0, nil)
