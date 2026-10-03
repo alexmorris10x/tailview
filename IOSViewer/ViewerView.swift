@@ -11,6 +11,7 @@ struct ViewerView: View {
     @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
     @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
     @AppStorage("useTailViewTouchKeyboard") private var useTailViewTouchKeyboard = false
+    @AppStorage("lockScreenControls") private var lockScreenControls = true
     @State private var code = ""
     @State private var profileName = "My Mac"
     @State private var showPairing = false
@@ -33,9 +34,6 @@ struct ViewerView: View {
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
     @State private var modifierSelection = ModifierSelection()
-    /// Whether a long press on fn holds the Mac's Fn key down. A reference,
-    /// so pressing does not rebuild the bar and drop the press's touch.
-    @State private var functionKey = FunctionKeyHold()
     @StateObject private var viewer = ViewerModel()
 
     var body: some View {
@@ -148,6 +146,14 @@ struct ViewerView: View {
             if enabled { viewer.startMicrophone() }
             else { viewer.stopMicrophone() }
         }
+        // Lock-screen controls can change either direction.
+        .onChange(of: viewer.microphoneEnabled) { _, enabled in
+            if viewer.isConnected { microphoneSessionEnabled = enabled }
+        }
+        .onChange(of: viewer.macAudioEnabled) { _, enabled in
+            if viewer.isConnected { macAudioSessionEnabled = enabled }
+        }
+        .onChange(of: lockScreenControls) { _, _ in viewer.refreshLiveControls() }
         .onChange(of: macAudioOnConnect) { _, enabled in
             guard viewer.isConnected else { return }
             macAudioSessionEnabled = enabled
@@ -398,8 +404,9 @@ struct ViewerView: View {
 
     private func modifierButton(_ modifier: ControlCommand.Modifier) -> some View {
         let mode = modifierSelection.mode(for: modifier)
-        let tint: Color? = mode == .held ? .orange : nil
-        let value = mode == .held ? "Held" : mode == .next ? "Next action" : "Off"
+        let latched = modifier == .function && viewer.functionLatched
+        let tint: Color? = latched ? .green : mode == .held ? .orange : nil
+        let value = latched ? "Held from lock screen" : mode == .held ? "Held" : mode == .next ? "Next action" : "Off"
         return Button {
             modifierSelection.tap(modifier)
         } label: {
@@ -411,7 +418,7 @@ struct ViewerView: View {
             }
             .frame(minWidth: BarIcon.size, minHeight: BarIcon.size)
         }
-        .barButtonStyle(prominent: mode != .off)
+        .barButtonStyle(prominent: mode != .off || latched)
         .tint(tint)
         // SwiftUI long presses on a button in the scrolling bar end as soon as
         // they begin, so fn takes its touches through UIKit recognizers.
@@ -420,7 +427,10 @@ struct ViewerView: View {
             if modifier == .function {
                 PressGestureOverlay(isEnabled: viewer.isControlAllowed,
                                     title: modifier.symbol,
-                                    onTap: { modifierSelection.tap(.function) },
+                                    onTap: {
+                                        if viewer.functionLatched { viewer.setFunctionLatched(false) }
+                                        else { modifierSelection.tap(.function) }
+                                    },
                                     onPressBegan: pressFunctionKey,
                                     onPressEnded: releaseFunctionKey)
             }
@@ -436,17 +446,15 @@ struct ViewerView: View {
     }
 
     private func pressFunctionKey() -> Bool {
-        guard viewer.isControlAllowed, !functionKey.isDown else { return false }
-        viewer.sendControl(ControlCommand(kind: .functionDown))
-        functionKey.isDown = true
+        guard viewer.pressFunction() else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         return true
     }
 
+    /// Ends a press on fn. Fn held from the lock screen stays down until
+    /// released there or by tapping fn.
     private func releaseFunctionKey() {
-        guard functionKey.isDown else { return }
-        viewer.sendControl(ControlCommand(kind: .functionUp))
-        functionKey.isDown = false
+        viewer.endFunctionPress()
     }
 
     private var settingsView: some View {
@@ -490,6 +498,10 @@ struct ViewerView: View {
                         Text("This device has the audio route.")
                     }
                     Text("Use Mic and Speaker in the floating bar to mute either direction for this connection.")
+                }
+                Section("Lock screen") {
+                    Toggle("Show lock screen controls", isOn: $lockScreenControls)
+                    Text("While connected, the lock screen and Dynamic Island show Mic, Sound, and fn. Tap Hold fn to hold the Mac's Fn key, for example for dictation, and tap Release fn to let go. Locking the phone does not release it. Mutes from the lock screen keep audio running silently and become ordinary mutes when you open TailView.")
                 }
                 Section("Microphone") {
                     Toggle("Connect microphone automatically", isOn: $microphoneOnConnect)
@@ -731,10 +743,6 @@ private enum MacNavigation: CaseIterable {
 }
 
 /// A control-bar icon sized so every bar button has the same shape.
-private final class FunctionKeyHold {
-    var isDown = false
-}
-
 /// Tap and press-and-hold for a bar button. Once the long press begins it
 /// keeps the touch, so the bar cannot scroll it away. The press draws its
 /// own highlight because rebuilding the button mid-press loses the release.

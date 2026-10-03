@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Network
 import SwiftUI
 
@@ -19,7 +20,19 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var isMicrophoneOn = false
     @Published private(set) var isMacAudioOn = false
     @Published private(set) var isPairedSession = false
-    @Published private(set) var isControlAllowed = false
+    @Published private(set) var isControlAllowed = false {
+        // The Mac releases a held Fn when control ends.
+        didSet { if !isControlAllowed { functionHeld = false; functionLatched = false } }
+    }
+    /// The Mac's Fn key is down, from a press on the bar or a lock-screen latch.
+    @Published private(set) var functionHeld = false
+    /// Held by a lock-screen tap; stays down when TailView leaves the foreground.
+    @Published private(set) var functionLatched = false
+    // Lock-screen mutes keep audio running: iOS may refuse to restart the
+    // microphone in the background, and stopping all audio would let iOS
+    // suspend the app. They become ordinary mutes when TailView returns.
+    @Published private(set) var microphoneSoftMuted = false
+    @Published private(set) var macAudioSoftMuted = false
     @Published private(set) var savedMacs = [SavedMac]()
     @Published private(set) var savedCredentialRejected = false
 
@@ -91,6 +104,10 @@ final class ViewerModel: ObservableObject {
     // Frames are acknowledged only while the app is active; see VideoFlow.
     // Read on the network queue under deliveryLock.
     private var videoActive = true
+    private let liveControls = LiveControlsActivity()
+    private var liveControlsUpdates: AnyCancellable?
+    // Mirrors microphoneSoftMuted for the tap thread, under packetLock.
+    private var microphoneSendMuted = false
     // The connection whose Mac accepted AAC audio, under packetLock.
     private var aacConnection: NWConnection?
     // Microphone tap health, written by the tap under packetLock.
@@ -186,6 +203,11 @@ final class ViewerModel: ObservableObject {
             self.audioRecoveryAttempts = 0
             self.scheduleAudioRouteRecovery()
         }
+        LiveControls.handler = { [weak self] action in self?.performLiveControl(action) }
+        // objectWillChange fires before the change lands, so read on the next turn.
+        liveControlsUpdates = objectWillChange
+            .throttle(for: .milliseconds(300), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] _ in DispatchQueue.main.async { self?.refreshLiveControls() } }
         microphoneWatchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.checkMicrophoneHealth()
         }
@@ -356,6 +378,8 @@ final class ViewerModel: ObservableObject {
         reconnectBackgroundTimeRequested = false
         microphoneWanted = false
         macAudioWanted = false
+        setMicrophoneSoftMuted(false)
+        macAudioSoftMuted = false
         audioInterrupted = false
         tearDownConnection(keepingMicrophone: false)
         status = "Disconnected"
@@ -421,6 +445,17 @@ final class ViewerModel: ObservableObject {
     }
 
     func resumeAudioAfterForeground() {
+        // Back in the app, lock-screen mutes become ordinary mutes, so the
+        // microphone indicator turns off.
+        if microphoneSoftMuted {
+            setMicrophoneSoftMuted(false)
+            stopMicrophone()
+        }
+        if macAudioSoftMuted {
+            macAudioSoftMuted = false
+            stopMacAudio()
+            macAudioPlayer?.volume = 1
+        }
         if isReconnecting, connection == nil {
             reconnectBackoff.reset()
             scheduleReconnect()
@@ -850,8 +885,87 @@ final class ViewerModel: ObservableObject {
         engine.connect(player, to: engine.mainMixerNode, format: macAudioFormat)
         try engine.start()
         self.engine = engine
+        player.volume = macAudioSoftMuted ? 0 : 1
         macAudioPlayer = player
         return engine
+    }
+
+    var microphoneEnabled: Bool { microphoneWanted && !microphoneSoftMuted }
+    var macAudioEnabled: Bool { macAudioWanted && !macAudioSoftMuted }
+
+    private func setMicrophoneSoftMuted(_ muted: Bool) {
+        microphoneSoftMuted = muted
+        packetLock.lock(); microphoneSendMuted = muted; packetLock.unlock()
+    }
+
+    // MARK: Fn key
+
+    /// A press on the bar's fn button. Returns whether Fn went down.
+    func pressFunction() -> Bool {
+        guard isControlAllowed, !functionHeld else { return false }
+        sendControl(ControlCommand(kind: .functionDown))
+        functionHeld = true
+        return true
+    }
+
+    /// The press ended or TailView left the foreground. A latch stays down.
+    func endFunctionPress() {
+        guard functionHeld, !functionLatched else { return }
+        sendControl(ControlCommand(kind: .functionUp))
+        functionHeld = false
+    }
+
+    func setFunctionLatched(_ latched: Bool) {
+        if latched {
+            guard isControlAllowed else { return }
+            if !functionHeld { sendControl(ControlCommand(kind: .functionDown)) }
+            functionHeld = true
+            functionLatched = true
+        } else {
+            if functionHeld { sendControl(ControlCommand(kind: .functionUp)) }
+            functionHeld = false
+            functionLatched = false
+        }
+    }
+
+    // MARK: Lock-screen controls
+
+    private func performLiveControl(_ action: LiveControlAction) {
+        let background = UIApplication.shared.applicationState != .active
+        switch action {
+        case .microphone:
+            if microphoneSoftMuted { setMicrophoneSoftMuted(false) }
+            else if !microphoneWanted { startMicrophone() }
+            else if background && isMicrophoneOn { setMicrophoneSoftMuted(true) }
+            else { stopMicrophone() }
+        case .macSound:
+            if macAudioSoftMuted {
+                macAudioSoftMuted = false
+                macAudioPlayer?.volume = 1
+            } else if !macAudioWanted { startMacAudio() }
+            else if background && isMacAudioOn {
+                macAudioSoftMuted = true
+                macAudioPlayer?.volume = 0
+            } else { stopMacAudio() }
+        case .function:
+            setFunctionLatched(!functionHeld)
+        }
+        refreshLiveControls()
+    }
+
+    func refreshLiveControls() {
+        let enabled = UserDefaults.standard.object(forKey: "lockScreenControls") as? Bool ?? true
+        guard enabled, isPairedSession || isReconnecting, let profile = reconnectProfile else {
+            liveControls.end()
+            return
+        }
+        liveControls.update(macName: profile.name, state: TailViewControlsAttributes.ContentState(
+            status: isConnected ? "Connected" : "Reconnecting…",
+            microphoneOn: microphoneEnabled,
+            microphoneNeedsAttention: microphoneNeedsAttention,
+            macSoundOn: macAudioEnabled,
+            functionHeld: functionHeld,
+            controlAvailable: isConnected && isControlAllowed))
     }
 
     private func stopAudioEngine() {
@@ -964,7 +1078,7 @@ final class ViewerModel: ObservableObject {
     /// The microphone is unmuted but no voice is being sent: another device
     /// owns audio, or capture is waiting, failed, or restarting.
     var microphoneNeedsAttention: Bool {
-        isConnected && microphoneWanted && !isMicrophoneOn
+        isConnected && microphoneEnabled && !isMicrophoneOn
     }
 
     private func refreshMacAudioOutput() {
@@ -1142,7 +1256,9 @@ final class ViewerModel: ObservableObject {
         packetLock.lock()
         let firstCapture = !didReportCapture
         didReportCapture = true
+        let muted = microphoneSendMuted
         packetLock.unlock()
+        if muted { return }
         if firstCapture {
             DispatchQueue.main.async { [weak self] in
                 if self?.isMicrophoneOn == true { self?.microphoneStatus = "Captured microphone samples; converting…" }
