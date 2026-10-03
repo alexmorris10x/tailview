@@ -188,6 +188,12 @@ struct TransportSmoke {
               delivered.waitForCount(3), delivered.count == 3 else {
             throw TestError.message("Second paired viewer could not control Mac")
         }
+        guard let functionDown = ControlCommand(kind: .functionDown).encoded(),
+              ControlCommand(kind: .functionDown, modifiers: [.function]).encoded() == nil,
+              writeExactly(phoneClient, Packet.encode(.control, functionDown)),
+              delivered.waitForCount(4), delivered.last?.kind == .functionDown else {
+            throw TestError.message("Phone could not hold the Mac's Fn key")
+        }
         guard writeExactly(phoneClient, Packet.encode(.microphone, microphone)) else {
             throw TestError.message("Second viewer microphone packet could not be sent")
         }
@@ -221,6 +227,9 @@ struct TransportSmoke {
         Darwin.close(phoneClient)
         guard waitForViewerCount(server, 1) else {
             throw TestError.message("Phone did not disconnect before microphone reconnect")
+        }
+        guard delivered.waitForCount(5), delivered.last?.kind == .functionUp else {
+            throw TestError.message("Disconnecting phone left the Mac's Fn key held")
         }
         try expectMicrophoneState(savedClient, allowed: true, phase: "iPad fallback during phone disconnect")
         let phoneSaved = PairingRequest.authenticate(id: phoneID, token: phoneToken)
@@ -555,6 +564,11 @@ private final class ControlRecorder {
     var count: Int {
         lock.lock(); defer { lock.unlock() }
         return commands.count
+    }
+
+    var last: ControlCommand? {
+        lock.lock(); defer { lock.unlock() }
+        return commands.last
     }
 
     func append(_ command: ControlCommand) {

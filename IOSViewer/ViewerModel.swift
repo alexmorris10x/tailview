@@ -752,6 +752,9 @@ final class ViewerModel: ObservableObject {
             // playback to its quiet receiver. Headphones still take precedence.
             try session.setCategory(.playAndRecord, mode: .default,
                                     options: [.allowBluetoothA2DP, .defaultToSpeaker])
+            // iOS silences haptics while recording unless the session allows
+            // them; the fn hold confirms itself with one.
+            try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
         } else {
             // Playback routes to selected A2DP devices automatically. Do not
             // keep playAndRecord active on the viewer that does not own the mic.

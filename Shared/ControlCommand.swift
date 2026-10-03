@@ -4,14 +4,19 @@ import Foundation
 struct ControlCommand: Codable, Equatable {
     enum Kind: String, Codable {
         case move, leftClick, rightClick, leftDown, leftDrag, leftUp, scroll, text, key, window
+        /// The Fn key itself, held between down and up, for hold-to-talk tools.
+        /// Hosts before 0.5.7 reject these and close the viewer connection.
+        case functionDown, functionUp
     }
 
     enum Key: String, Codable {
         case returnKey, tab, delete, escape, left, right, up, down
     }
 
+    /// Ordered like the bottom-left keys of a Mac keyboard. Hosts before
+    /// 0.5.6 reject `function` and close the viewer connection.
     enum Modifier: String, Codable, CaseIterable, Hashable {
-        case control, option, command
+        case function, control, option, command
     }
 
     /// Where the Mac's frontmost window is moved on its screen.
@@ -72,6 +77,9 @@ struct ControlCommand: Codable, Equatable {
         case .window:
             return x == nil && y == nil && amount == nil && horizontalAmount == nil && text == nil
                 && key == nil && modifiers == nil && window != nil
+        case .functionDown, .functionUp:
+            return x == nil && y == nil && amount == nil && horizontalAmount == nil && text == nil
+                && key == nil && modifiers == nil
         }
     }
 }

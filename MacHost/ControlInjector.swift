@@ -8,6 +8,7 @@ final class ControlInjector {
     private var enabled = false
     private var generation: UInt64 = 0
     private var mouseIsDown = false
+    private var functionIsDown = false
     private var lastPoint = CGPoint.zero
 
     static func hasPermission() -> Bool { CGPreflightPostEventAccess() }
@@ -18,7 +19,10 @@ final class ControlInjector {
         lock.lock(); defer { lock.unlock() }
         generation &+= 1
         enabled = value
-        if !value { releaseHeldMouse() }
+        if !value {
+            releaseHeldMouse()
+            setFunctionKey(down: false)
+        }
     }
 
     func submit(_ command: ControlCommand) {
@@ -83,13 +87,29 @@ final class ControlInjector {
             if let layout = command.window {
                 Task { @MainActor in WindowArranger.arrange(layout) }
             }
+        case .functionDown:
+            setFunctionKey(down: true)
+        case .functionUp:
+            setFunctionKey(down: false)
         }
+    }
+
+    /// Posts the Fn key's own flags-changed event, as a physical keyboard does
+    /// when Fn is pressed alone. Disabling control releases a held Fn key.
+    private func setFunctionKey(down: Bool) {
+        guard functionIsDown != down,
+              let event = CGEvent(keyboardEventSource: nil, virtualKey: 63, keyDown: down) else { return }
+        event.type = .flagsChanged
+        event.flags = down ? .maskSecondaryFn : []
+        event.post(tap: .cghidEventTap)
+        functionIsDown = down
     }
 
     private static func eventFlags(for modifiers: [ControlCommand.Modifier]?) -> CGEventFlags {
         var flags: CGEventFlags = []
         for modifier in modifiers ?? [] {
             switch modifier {
+            case .function: flags.insert(.maskSecondaryFn)
             case .control: flags.insert(.maskControl)
             case .option: flags.insert(.maskAlternate)
             case .command: flags.insert(.maskCommand)
@@ -123,7 +143,10 @@ final class ControlInjector {
             let units = Array(String(character).utf16)
             // A shortcut needs the actual keycode. Some Mac apps ignore the
             // Unicode override and inspect only keycode plus modifier flags.
-            let modifiedKey = flags.isEmpty ? nil : Self.shortcutKey(for: character)
+            let functionKey = flags.contains(.maskSecondaryFn)
+                ? FunctionKeys.functionKeyCode(for: character) : nil
+            let modifiedKey = functionKey.map { (code: $0, extraFlags: CGEventFlags()) }
+                ?? (flags.isEmpty ? nil : Self.shortcutKey(for: character))
             if !flags.isEmpty && modifiedKey == nil { continue }
             for isDown in [true, false] {
                 guard let event = CGEvent(keyboardEventSource: nil,
@@ -171,17 +194,7 @@ final class ControlInjector {
     }
 
     private func postKey(_ key: ControlCommand.Key, flags: CGEventFlags) {
-        let code: CGKeyCode
-        switch key {
-        case .returnKey: code = 36
-        case .tab: code = 48
-        case .delete: code = 51
-        case .escape: code = 53
-        case .left: code = 123
-        case .right: code = 124
-        case .down: code = 125
-        case .up: code = 126
-        }
+        let code = FunctionKeys.keyCode(for: key, function: flags.contains(.maskSecondaryFn))
         // Physical arrow keys carry the function and keypad flags. macOS
         // system shortcuts such as Control-arrow for Spaces require them.
         let isArrow = [123, 124, 125, 126].contains(code)

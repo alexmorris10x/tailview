@@ -33,6 +33,9 @@ struct ViewerView: View {
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
     @State private var modifierSelection = ModifierSelection()
+    /// Whether a long press on fn holds the Mac's Fn key down. A reference,
+    /// so pressing does not rebuild the bar and drop the press's touch.
+    @State private var functionKey = FunctionKeyHold()
     @StateObject private var viewer = ViewerModel()
 
     var body: some View {
@@ -86,6 +89,7 @@ struct ViewerView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         releaseHeldMouse()
+                        releaseFunctionKey()
                         modifierSelection.reset()
                         closeKeyboard()
                         showSettings = true
@@ -112,6 +116,7 @@ struct ViewerView: View {
                     preferredMacID = profile.id.uuidString
                 }
             } else {
+                releaseFunctionKey()
                 modifierSelection.reset()
                 closeKeyboard()
                 keyboardUserHidden = false
@@ -127,6 +132,7 @@ struct ViewerView: View {
                 if !showSettings && !keyboardUserHidden { showKeyboard() }
             } else {
                 closeKeyboard()
+                releaseFunctionKey()
                 modifierSelection.reset()
                 isDraggingRemote = false
                 isTouchDraggingRemote = false
@@ -159,6 +165,7 @@ struct ViewerView: View {
             else {
                 closeKeyboard()
                 releaseHeldMouse()
+                releaseFunctionKey()
                 modifierSelection.reset()
             }
         }
@@ -401,6 +408,18 @@ struct ViewerView: View {
         }
         .barButtonStyle(prominent: mode != .off)
         .tint(tint)
+        // SwiftUI long presses on a button in the scrolling bar end as soon as
+        // they begin, so fn takes its touches through UIKit recognizers.
+        .allowsHitTesting(modifier != .function)
+        .overlay {
+            if modifier == .function {
+                PressGestureOverlay(isEnabled: viewer.isControlAllowed,
+                                    title: modifier.symbol,
+                                    onTap: { modifierSelection.tap(.function) },
+                                    onPressBegan: pressFunctionKey,
+                                    onPressEnded: releaseFunctionKey)
+            }
+        }
         .accessibilityLabel("\(modifier.title) modifier")
         .accessibilityValue(value)
         .accessibilityHint("Tap once for the next action. Double tap to hold. Tap a held modifier to release it.")
@@ -409,6 +428,20 @@ struct ViewerView: View {
         }
         .accessibilityIdentifier("tailview.modifier.\(modifier.rawValue)")
         .disabled(!viewer.isControlAllowed)
+    }
+
+    private func pressFunctionKey() -> Bool {
+        guard viewer.isControlAllowed, !functionKey.isDown else { return false }
+        viewer.sendControl(ControlCommand(kind: .functionDown))
+        functionKey.isDown = true
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        return true
+    }
+
+    private func releaseFunctionKey() {
+        guard functionKey.isDown else { return }
+        viewer.sendControl(ControlCommand(kind: .functionUp))
+        functionKey.isDown = false
     }
 
     private var settingsView: some View {
@@ -618,7 +651,7 @@ struct ViewerView: View {
         switch command.kind {
         case .leftClick, .rightClick, .leftUp, .scroll, .text, .key:
             modifierSelection.consumeNext()
-        case .move, .leftDown, .leftDrag, .window:
+        case .move, .leftDown, .leftDrag, .window, .functionDown, .functionUp:
             break
         }
     }
@@ -693,6 +726,115 @@ private enum MacNavigation: CaseIterable {
 }
 
 /// A control-bar icon sized so every bar button has the same shape.
+private final class FunctionKeyHold {
+    var isDown = false
+}
+
+/// Tap and press-and-hold for a bar button. Once the long press begins it
+/// keeps the touch, so the bar cannot scroll it away. The press draws its
+/// own highlight because rebuilding the button mid-press loses the release.
+private struct PressGestureOverlay: UIViewRepresentable {
+    var isEnabled: Bool
+    var title: String
+    var onTap: () -> Void
+    /// Returns whether the press was accepted and should show as held.
+    var onPressBegan: () -> Bool
+    var onPressEnded: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeUIView(context: Context) -> PressView {
+        let view = PressView()
+        view.coordinator = context.coordinator
+        let press = UILongPressGestureRecognizer(target: context.coordinator,
+                                                 action: #selector(Coordinator.press(_:)))
+        press.minimumPressDuration = 0.35
+        press.allowableMovement = 12
+        let tap = UITapGestureRecognizer(target: context.coordinator,
+                                         action: #selector(Coordinator.tap(_:)))
+        tap.require(toFail: press)
+        view.addGestureRecognizer(press)
+        view.addGestureRecognizer(tap)
+        return view
+    }
+
+    func updateUIView(_ view: PressView, context: Context) {
+        context.coordinator.parent = self
+        view.label.text = title
+        view.isUserInteractionEnabled = isEnabled
+    }
+
+    static func dismantleUIView(_ view: PressView, coordinator: Coordinator) {
+        coordinator.endPress(in: view)
+    }
+
+    final class PressView: UIView {
+        weak var coordinator: Coordinator?
+        let label = UILabel()
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            backgroundColor = .clear
+            isAccessibilityElement = false
+            label.font = .systemFont(ofSize: 17, weight: .semibold)
+            label.textColor = .white
+            label.textAlignment = .center
+            label.isHidden = true
+            addSubview(label)
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            label.frame = bounds
+            layer.cornerRadius = bounds.height / 2
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            if window == nil { coordinator?.endPress(in: self) }
+        }
+
+        func showPressed(_ pressed: Bool) {
+            backgroundColor = pressed ? .systemGreen : .clear
+            label.isHidden = !pressed
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: PressGestureOverlay
+        private var pressing = false
+
+        init(_ parent: PressGestureOverlay) { self.parent = parent }
+
+        @objc func tap(_ recognizer: UITapGestureRecognizer) {
+            if recognizer.state == .ended { parent.onTap() }
+        }
+
+        @objc func press(_ recognizer: UILongPressGestureRecognizer) {
+            guard let view = recognizer.view as? PressView else { return }
+            switch recognizer.state {
+            case .began:
+                guard parent.onPressBegan() else { return }
+                pressing = true
+                view.showPressed(true)
+            case .ended, .cancelled, .failed:
+                endPress(in: view)
+            default:
+                break
+            }
+        }
+
+        func endPress(in view: PressView) {
+            guard pressing else { return }
+            pressing = false
+            view.showPressed(false)
+            parent.onPressEnded()
+        }
+    }
+}
+
 private struct BarIcon: View {
     static let size: CGFloat = 26
     let name: String
@@ -733,6 +875,7 @@ private extension ControlCommand.WindowLayout {
 private extension ControlCommand.Modifier {
     var title: String {
         switch self {
+        case .function: "Function"
         case .control: "Control"
         case .option: "Option"
         case .command: "Command"
@@ -741,6 +884,7 @@ private extension ControlCommand.Modifier {
 
     var symbol: String {
         switch self {
+        case .function: "fn"
         case .control: "⌃"
         case .option: "⌥"
         case .command: "⌘"

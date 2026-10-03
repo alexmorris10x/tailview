@@ -18,6 +18,7 @@ final class VideoServer {
         var audioPendingBytes = 0
         var didReportMicrophone = false
         var lastLevelReport = 0.0
+        var functionHeld = false
 
         init(fd: Int32, pairedID: UUID?, controlEnabled: Bool, prefersMicrophone: Bool) {
             self.fd = fd
@@ -344,6 +345,8 @@ final class VideoServer {
                       let command = ControlCommand.decode(payload) else { return }
                 lock.lock()
                 let allowed = running && viewers[viewer.id] === viewer && viewer.controlEnabled
+                if allowed && command.kind == .functionDown { viewer.functionHeld = true }
+                if command.kind == .functionUp { viewer.functionHeld = false }
                 lock.unlock()
                 if allowed { onControlCommand?(command) }
             case .microphoneRequest:
@@ -428,8 +431,12 @@ final class VideoServer {
             microphoneOwner = nextMicrophone?.id
         }
         let connected = !viewers.isEmpty
+        let releaseFunction = viewer.functionHeld && !controlEnded
+        viewer.functionHeld = false
         lock.unlock()
         close(viewer)
+        // Another device keeps control, so release only this device's Fn key.
+        if releaseFunction { onControlCommand?(ControlCommand(kind: .functionUp)) }
         if controlEnded { onControlSessionEnded?() }
         if microphoneEnded {
             audioSink?.clear()

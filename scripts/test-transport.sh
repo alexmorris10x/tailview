@@ -8,7 +8,7 @@ swiftc Shared/Packet.swift Shared/PairingRequest.swift Shared/ControlCommand.swi
 DerivedData/Tests/TransportSmoke 127.0.0.1
 swiftc Shared/ScreenViewport.swift Tests/ViewportSmoke.swift -o DerivedData/Tests/ViewportSmoke
 DerivedData/Tests/ViewportSmoke
-swiftc Shared/ControlCommand.swift IOSViewer/ModifierSelection.swift Tests/ModifierSmoke.swift -o DerivedData/Tests/ModifierSmoke
+swiftc Shared/ControlCommand.swift IOSViewer/ModifierSelection.swift MacHost/FunctionKeys.swift Tests/ModifierSmoke.swift -o DerivedData/Tests/ModifierSmoke
 DerivedData/Tests/ModifierSmoke
 swiftc -parse-as-library MacHost/DisplayControl/BacklightController.swift MacHost/DisplayControl/LocalInputController.swift Tests/DisplayControlSmoke.swift -o DerivedData/Tests/DisplayControlSmoke
 DerivedData/Tests/DisplayControlSmoke
