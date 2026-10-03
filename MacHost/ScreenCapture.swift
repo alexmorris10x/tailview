@@ -90,7 +90,9 @@ final class ScreenCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         let scale = capturesAudio ? min(1, 1024.0 / Double(captureWidth)) : 1.0
         config.width = max(1, Int(Double(captureWidth) * scale))
         config.height = max(1, Int(Double(captureHeight) * scale))
-        config.minimumFrameInterval = CMTime(value: 1, timescale: capturesAudio ? 4 : 8)
+        // Viewers acknowledge frames, so the link sets the delivered rate;
+        // a faster capture means the frame sent next is fresher.
+        config.minimumFrameInterval = CMTime(value: 1, timescale: 15)
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.queueDepth = 3
         config.showsCursor = true

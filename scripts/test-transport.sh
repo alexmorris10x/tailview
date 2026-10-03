@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 mkdir -p DerivedData/Tests
 swiftc Shared/AudioJitterBuffer.swift Shared/AudioConnectionGate.swift Shared/ReconnectBackoff.swift Shared/AuthenticationReply.swift Tests/AudioReliabilitySmoke.swift -o DerivedData/Tests/AudioReliabilitySmoke
 DerivedData/Tests/AudioReliabilitySmoke
-swiftc Shared/Packet.swift Shared/PairingRequest.swift Shared/ControlCommand.swift Shared/AudioJitterBuffer.swift MacHost/AudioSink.swift MacHost/VideoServer.swift Tests/TransportSmoke.swift -o DerivedData/Tests/TransportSmoke
+swiftc Shared/Packet.swift Shared/AACAudio.swift Shared/PairingRequest.swift Shared/ControlCommand.swift Shared/AudioJitterBuffer.swift MacHost/AudioSink.swift MacHost/VideoServer.swift Tests/TransportSmoke.swift -o DerivedData/Tests/TransportSmoke
 DerivedData/Tests/TransportSmoke 127.0.0.1
 swiftc Shared/ScreenViewport.swift Tests/ViewportSmoke.swift -o DerivedData/Tests/ViewportSmoke
 DerivedData/Tests/ViewportSmoke

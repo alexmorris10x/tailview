@@ -31,6 +31,10 @@ struct RemoteKeyboardInput: UIViewRepresentable {
         field.onSoftwareKeyboardVisibilityChange = { [weak coordinator = context.coordinator] visible in
             coordinator?.parent.onSoftwareKeyboardVisibilityChange(visible)
         }
+        field.onDeleteBackward = { [weak coordinator = context.coordinator] in
+            guard let parent = coordinator?.parent, parent.isActive else { return }
+            parent.onDelete()
+        }
         return field
     }
 
@@ -57,9 +61,10 @@ struct RemoteKeyboardInput: UIViewRepresentable {
 
         func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange,
                        replacementString string: String) -> Bool {
-            guard parent.isActive else { return false }
-            if string.isEmpty { parent.onDelete() }
-            else { parent.onText(string) }
+            // Backspace never reaches here: the field is always empty, so
+            // UIKit has nothing to replace. RemoteTextField forwards it.
+            guard parent.isActive, !string.isEmpty else { return false }
+            parent.onText(string)
             return false
         }
 
@@ -73,6 +78,7 @@ struct RemoteKeyboardInput: UIViewRepresentable {
 final class RemoteTextField: UITextField {
     var desiredActive = false
     var onSoftwareKeyboardVisibilityChange: ((Bool) -> Void)?
+    var onDeleteBackward: (() -> Void)?
     private let tailViewInputView = UIView(frame: .zero)
     private var usesTailViewKeyboard = false
     private var focusGeneration = 0
@@ -87,6 +93,12 @@ final class RemoteTextField: UITextField {
         usesTailViewKeyboard = enabled
         inputView = enabled ? tailViewInputView : nil
         if isFirstResponder { reloadInputViews() }
+    }
+
+    /// The software and hardware keyboards call this for Backspace, including
+    /// each auto-repeat while the key is held, even though the field is empty.
+    override func deleteBackward() {
+        onDeleteBackward?()
     }
 
     deinit {

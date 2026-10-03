@@ -345,6 +345,9 @@ struct TransportSmoke {
         try expectState(slowClient, allowed: true, phase: "slow viewer")
         try expectMicrophoneState(slowClient, allowed: true, phase: "slow viewer")
         let largeFrame = Data(repeating: 0x5a, count: 2_000_000)
+        // Admission sent the previous frame; stay outside the legacy frame
+        // interval so this frame is written before the audio.
+        Thread.sleep(forTimeInterval: 0.2)
         server.publish(largeFrame)
         // Audio captured while a large video packet is blocked must remain
         // available once the cellular receiver catches up.
@@ -407,6 +410,86 @@ struct TransportSmoke {
                 throw TestError.message("Replacement under load did not finish")
             }
         }
+        // A viewer with frame flow control gets no frames while paused, at most
+        // two unacknowledged frames, and then the newest frame, not a backlog.
+        let flowClient = try connect(to: address)
+        guard writeExactly(flowClient, Data(saved.line.utf8)),
+              readExactly(flowClient, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Flow-control viewer could not authenticate")
+        }
+        try expectState(flowClient, allowed: true, phase: "flow setup")
+        try expectMicrophoneState(flowClient, allowed: true, phase: "flow setup")
+        func sendFlow(_ flow: VideoFlow) throws {
+            guard writeExactly(flowClient, Packet.encode(.videoFlow, Data([flow.rawValue]))) else {
+                throw TestError.message("Could not send video flow \(flow)")
+            }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        try sendFlow(.pause)
+        _ = try nextFrame(flowClient, phase: "admission frame")
+        let frames = (0..<4).map { Data(repeating: UInt8(0x60 + $0), count: 4_000) }
+        server.publish(frames[0])
+        guard try nextFrame(flowClient, phase: "paused") == nil else {
+            throw TestError.message("Paused viewer received a frame")
+        }
+        try sendFlow(.resume)
+        guard try nextFrame(flowClient, phase: "resume") == frames[0] else {
+            throw TestError.message("Resume did not send the latest frame")
+        }
+        for frame in frames.dropFirst() { server.publish(frame) }
+        guard try nextFrame(flowClient, phase: "second credit") == frames[1],
+              try nextFrame(flowClient, phase: "no credit") == nil else {
+            throw TestError.message("Viewer exceeded two unacknowledged frames")
+        }
+        try sendFlow(.received)
+        guard try nextFrame(flowClient, phase: "acknowledged") == frames[3] else {
+            throw TestError.message("Acknowledgment did not send the newest frame")
+        }
+        // After both sides offer AAC, the audio owner gets compressed Mac
+        // sound and the Mac decodes compressed microphone audio.
+        guard writeExactly(flowClient, Packet.encode(.capabilities, Data([AACAudio.capability]))) else {
+            throw TestError.message("Could not send capabilities")
+        }
+        try expectPayload(flowClient, kind: .capabilities, payload: Data([AACAudio.capability]),
+                          phase: "capabilities reply")
+        func tone(channels: Int, frames: Int, offset: Int) -> Data {
+            var pcm = Data(capacity: frames * channels * 2)
+            for frame in 0..<frames {
+                let value = Int16(8_000 * sin(2 * Double.pi * 440 * Double(offset + frame) / 48_000))
+                for _ in 0..<channels { withUnsafeBytes(of: value.littleEndian) { pcm.append(contentsOf: $0) } }
+            }
+            return pcm
+        }
+        for chunk in 0..<10 { server.publishAudio(tone(channels: 2, frames: 960, offset: chunk * 960)) }
+        guard let macDecoder = AACDecoder(channels: 2) else { throw TestError.message("No AAC decoder") }
+        var decodedMacAudio = Data()
+        for _ in 0..<16 {
+            guard let packet = readPacket(flowClient) else { break }
+            if packet.kind == .macAudio { throw TestError.message("AAC viewer received PCM Mac sound") }
+            if packet.kind == .macAudioAAC, let pcm = macDecoder.decode(packet.payload) { decodedMacAudio.append(pcm) }
+            if decodedMacAudio.count >= 4 * AACAudio.framesPerPacket * 4 { break }
+        }
+        let macPeak = decodedMacAudio.withUnsafeBytes { $0.bindMemory(to: Int16.self).map { abs(Int($0)) }.max() ?? 0 }
+        guard macPeak > 4_000 else { throw TestError.message("AAC Mac sound did not decode to the tone (peak \(macPeak))") }
+        guard let microphoneEncoder = AACEncoder(channels: 1, bitRate: 64_000) else {
+            throw TestError.message("No AAC encoder")
+        }
+        let levelsBeforeAAC = microphoneLevels.count
+        for chunk in 0..<10 {
+            for packet in microphoneEncoder.encode(tone(channels: 1, frames: 960, offset: chunk * 960)) {
+                guard writeExactly(flowClient, Packet.encode(.microphoneAAC, packet)) else {
+                    throw TestError.message("Could not send AAC microphone audio")
+                }
+            }
+        }
+        guard microphoneLevels.waitForCount(levelsBeforeAAC + 1) else {
+            throw TestError.message("Mac did not decode AAC microphone audio")
+        }
+        Darwin.shutdown(flowClient, SHUT_RDWR)
+        Darwin.close(flowClient)
+        guard waitForViewerCount(server, 0) else {
+            throw TestError.message("Flow-control viewer did not disconnect")
+        }
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
         server.stop()
@@ -414,7 +497,21 @@ struct TransportSmoke {
             Darwin.close(unexpected)
             throw TestError.message("Stopped server still accepted a viewer")
         }
-        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, stopped listener, session access denial")
+        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, stopped listener, session access denial, frame flow control, AAC audio both ways")
+    }
+
+    /// The next screen frame within 300 ms, skipping other packets.
+    private static func nextFrame(_ fd: Int32, phase: String) throws -> Data? {
+        let deadline = ProcessInfo.processInfo.systemUptime + 0.3
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            var descriptor = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            let ready = Darwin.poll(&descriptor, 1, 25)
+            guard ready >= 0 else { throw TestError.message("Could not poll \(phase)") }
+            if ready == 0 { continue }
+            guard let packet = readPacket(fd) else { throw TestError.message("Viewer disconnected at \(phase)") }
+            if packet.kind == .jpeg { return packet.payload }
+        }
+        return nil
     }
 
     private static func expectState(_ fd: Int32, allowed: Bool, phase: String) throws {

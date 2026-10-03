@@ -155,6 +155,7 @@ struct ViewerView: View {
             else { viewer.stopMacAudio() }
         }
         .onChange(of: scenePhase) { _, phase in
+            viewer.setVideoActive(phase == .active)
             if phase == .active {
                 connectPreferredIfNeeded()
                 viewer.resumeAudioAfterForeground()
@@ -294,11 +295,15 @@ struct ViewerView: View {
                     if microphoneSessionEnabled { viewer.startMicrophone() }
                     else { viewer.stopMicrophone() }
                 } label: {
-                    BarIcon(microphoneSessionEnabled ? "mic.fill" : "mic.slash.fill")
+                    BarIcon(!microphoneSessionEnabled ? "mic.slash.fill"
+                            : viewer.microphoneNeedsAttention ? "mic.badge.xmark" : "mic.fill")
                 }
-                .tint(microphoneSessionEnabled ? nil : Color.red)
+                // Orange: unmuted but not sending. Muting and unmuting retries.
+                .tint(!microphoneSessionEnabled ? Color.red
+                      : viewer.microphoneNeedsAttention ? Color.orange : nil)
                 .accessibilityLabel(microphoneSessionEnabled ? "Mute microphone" : "Unmute microphone")
-                .accessibilityValue(microphoneSessionEnabled ? "On" : "Muted")
+                .accessibilityValue(!microphoneSessionEnabled ? "Muted"
+                                    : viewer.microphoneNeedsAttention ? "Not sending: \(viewer.microphoneStatus)" : "On")
                 .accessibilityHint("Controls voice sent to the Mac when this device owns audio")
                 .accessibilityIdentifier("tailview.microphoneMuteButton")
                 Button {

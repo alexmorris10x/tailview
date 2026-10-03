@@ -6,6 +6,20 @@ final class VideoServer {
     private static let transportLog = Logger(subsystem: "com.10x.tailview.mac", category: "Transport")
     // Two seconds of stereo PCM, regardless of capture packet size.
     private static let maximumPendingAudioBytes = 48_000 * 4 * 2
+    // Two frames in flight keep the link busy across the acknowledgment's
+    // return trip while bounding how stale the viewer's screen can get.
+    private static let maximumFrameCredits = 2
+    // Viewers without flow control keep their former frame rate.
+    private static let legacyFrameInterval = 0.125
+    private struct LinkStats {
+        var since = ProcessInfo.processInfo.systemUptime
+        var frames = 0
+        var frameBytes = 0
+        var audioBytes = 0
+        var roundTrips = 0
+        var roundTripTotal = 0.0
+        var roundTripMaximum = 0.0
+    }
     private final class ViewerConnection {
         let id = UUID()
         let fd: Int32
@@ -19,6 +33,19 @@ final class VideoServer {
         var didReportMicrophone = false
         var lastLevelReport = 0.0
         var functionHeld = false
+        // Frame flow control starts with the viewer's first videoFlow packet.
+        var flowControlled = false
+        var frameCredits = 0
+        // The viewer has not received the latest frame yet.
+        var frameDirty = false
+        var pumpScheduled = false
+        var lastLegacyFrame = 0.0
+        var unacknowledgedFrames = [Double]()
+        var stats = LinkStats()
+        // Both sides offered AAC; see AACAudio.
+        var aacAudio = false
+        // Used only by this viewer's reader thread.
+        var microphoneDecoder: AACDecoder?
 
         init(fd: Int32, pairedID: UUID?, controlEnabled: Bool, prefersMicrophone: Bool) {
             self.fd = fd
@@ -33,6 +60,7 @@ final class VideoServer {
     var onViewerStatus: ((String) -> Void)?
     var onMicrophonePacket: (() -> Void)?
     var onMicrophoneLevel: ((Double) -> Void)?
+    var onLinkStats: ((String) -> Void)?
     var onError: ((String) -> Void)?
     var authenticateSaved: ((UUID, String) -> Bool)?
     var isPreferredMicrophone: ((UUID) -> Bool)?
@@ -57,6 +85,9 @@ final class VideoServer {
     private var running = false
     private var pairingDeadline = 0.0
     private var latestFrame: Data?
+    // Used only on the capture audio queue that calls publishAudio.
+    private var macAudioEncoder: AACEncoder?
+    private var macAudioEncoderOwner: UUID?
 
     init(address: String, code: String, audioSink: AudioSink?) throws {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
@@ -157,49 +188,170 @@ final class VideoServer {
 
     func publish(_ jpeg: Data) {
         guard !jpeg.isEmpty, jpeg.count <= 2_000_000 else { return }
+        let now = ProcessInfo.processInfo.systemUptime
         lock.lock()
         latestFrame = jpeg
-        let clients = running ? viewers.values.filter { !$0.framePending && $0.audioPending < 6 } : []
-        for client in clients { client.framePending = true }
+        let clients = running ? viewers.values.filter { takeFrameSlot($0, now: now) } : []
         lock.unlock()
+        guard !clients.isEmpty else { return }
         let packet = Packet.encode(.jpeg, jpeg)
-        for client in clients {
-            client.sendQueue.async { [weak self, client] in
-                guard let self else { return }
-                let sent = self.sendIfCurrent(packet, to: client)
-                self.lock.lock(); client.framePending = false; self.lock.unlock()
-                if !sent { self.finish(client) }
+        for client in clients { sendFrame(packet, to: client, queuedAt: now) }
+    }
+
+    /// Call with the lock held. Reserves a send for the latest frame, or marks
+    /// that the viewer still needs it so a static screen is not left stale.
+    private func takeFrameSlot(_ client: ViewerConnection, now: Double) -> Bool {
+        // Audio has priority; the latest frame follows once audio drains.
+        guard client.audioPending < 6 else { client.frameDirty = true; return false }
+        if client.flowControlled {
+            guard client.frameCredits > 0 else { client.frameDirty = true; return false }
+            client.frameCredits -= 1
+            client.unacknowledgedFrames.append(now)
+        } else {
+            guard !client.framePending else { client.frameDirty = true; return false }
+            let wait = client.lastLegacyFrame + Self.legacyFrameInterval - now
+            guard wait <= 0 else {
+                client.frameDirty = true
+                if !client.pumpScheduled {
+                    client.pumpScheduled = true
+                    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + wait) { [weak self, client] in
+                        self?.lock.lock(); client.pumpScheduled = false; self?.lock.unlock()
+                        self?.pumpLatestFrame(to: client)
+                    }
+                }
+                return false
             }
+            client.framePending = true
+            client.lastLegacyFrame = now
+        }
+        client.frameDirty = false
+        return true
+    }
+
+    private func pumpLatestFrame(to client: ViewerConnection) {
+        let now = ProcessInfo.processInfo.systemUptime
+        lock.lock()
+        let frame = latestFrame
+        let send = running && viewers[client.id] === client && client.frameDirty && frame != nil &&
+            takeFrameSlot(client, now: now)
+        lock.unlock()
+        if send, let frame { sendFrame(Packet.encode(.jpeg, frame), to: client, queuedAt: now) }
+    }
+
+    private func sendFrame(_ packet: Data, to client: ViewerConnection, queuedAt: Double) {
+        client.sendQueue.async { [weak self, client] in
+            guard let self else { return }
+            let sent = self.sendIfCurrent(packet, to: client)
+            self.lock.lock()
+            client.framePending = false
+            client.stats.frames += 1
+            client.stats.frameBytes += packet.count
+            let pump = sent && client.frameDirty && !client.flowControlled
+            self.lock.unlock()
+            guard sent else { self.finish(client); return }
+            if pump { self.pumpLatestFrame(to: client) }
+            self.reportLinkStatsIfDue(client)
         }
     }
 
-    /// Sends stereo 48 kHz signed 16-bit PCM only to the audio owner.
-    /// A bounded queue prevents a slow viewer from accumulating seconds of stale sound.
+    private func handleVideoFlow(_ flow: VideoFlow, from client: ViewerConnection) {
+        let now = ProcessInfo.processInfo.systemUptime
+        lock.lock()
+        client.flowControlled = true
+        switch flow {
+        case .pause:
+            client.frameCredits = 0
+            client.unacknowledgedFrames.removeAll()
+            client.frameDirty = true
+        case .resume:
+            client.frameCredits = Self.maximumFrameCredits
+            client.unacknowledgedFrames.removeAll()
+            client.frameDirty = true
+        case .received:
+            client.frameCredits = min(Self.maximumFrameCredits, client.frameCredits + 1)
+            if !client.unacknowledgedFrames.isEmpty {
+                let roundTrip = now - client.unacknowledgedFrames.removeFirst()
+                client.stats.roundTrips += 1
+                client.stats.roundTripTotal += roundTrip
+                client.stats.roundTripMaximum = max(client.stats.roundTripMaximum, roundTrip)
+            }
+        }
+        lock.unlock()
+        pumpLatestFrame(to: client)
+    }
+
+    private func reportLinkStatsIfDue(_ client: ViewerConnection) {
+        let now = ProcessInfo.processInfo.systemUptime
+        lock.lock()
+        let stats = client.stats
+        let elapsed = now - stats.since
+        guard elapsed >= 10 else { lock.unlock(); return }
+        client.stats = LinkStats(since: now)
+        let flowControlled = client.flowControlled
+        lock.unlock()
+        var summary = String(format: "%.1f fps · video %.0f KB/s · sound %.0f KB/s",
+                             Double(stats.frames) / elapsed, Double(stats.frameBytes) / elapsed / 1000,
+                             Double(stats.audioBytes) / elapsed / 1000)
+        if flowControlled && stats.roundTrips > 0 {
+            summary += String(format: " · frame round trip %.0f ms avg, %.0f ms max",
+                              stats.roundTripTotal / Double(stats.roundTrips) * 1000,
+                              stats.roundTripMaximum * 1000)
+        } else if !flowControlled {
+            summary += " · no frame acknowledgments"
+        }
+        Self.transportLog.notice("Viewer link: \(summary, privacy: .public)")
+        onLinkStats?(summary)
+    }
+
+    /// Sends stereo 48 kHz signed 16-bit PCM, or AAC when the viewer offered
+    /// it, only to the audio owner. A bounded queue prevents a slow viewer
+    /// from accumulating seconds of stale sound.
     func publishAudio(_ pcm: Data) {
         guard !pcm.isEmpty, pcm.count <= 65_536, pcm.count.isMultiple(of: 4) else { return }
         lock.lock()
-        let clients = running ? viewers.values.filter {
-            $0.pairedID != nil && $0.id == microphoneOwner &&
-                $0.audioPendingBytes + pcm.count <= Self.maximumPendingAudioBytes
-        } : []
-        for client in clients {
+        let owner = running ? viewers.values.first { $0.pairedID != nil && $0.id == microphoneOwner } : nil
+        let compressed = owner?.aacAudio == true
+        lock.unlock()
+        guard let owner else { return }
+        guard compressed else {
+            enqueueAudio(Packet.encode(.macAudio, pcm), duration: pcm.count, to: owner)
+            return
+        }
+        // A new owner starts a new AAC stream.
+        if macAudioEncoderOwner != owner.id {
+            macAudioEncoder = AACEncoder(channels: 2, bitRate: 128_000)
+            macAudioEncoderOwner = owner.id
+        }
+        for packet in macAudioEncoder?.encode(pcm) ?? [] {
+            enqueueAudio(Packet.encode(.macAudioAAC, packet), duration: AACAudio.framesPerPacket * 4, to: owner)
+        }
+    }
+
+    /// `duration` is the stereo PCM byte count the packet plays for, so the
+    /// two-second budget is the same for PCM and AAC.
+    private func enqueueAudio(_ packet: Data, duration: Int, to client: ViewerConnection) {
+        lock.lock()
+        let accepted = running && viewers[client.id] === client && client.id == microphoneOwner &&
+            client.audioPendingBytes + duration <= Self.maximumPendingAudioBytes
+        if accepted {
             client.audioPending += 1
-            client.audioPendingBytes += pcm.count
+            client.audioPendingBytes += duration
         }
         lock.unlock()
-        let packet = Packet.encode(.macAudio, pcm)
+        guard accepted else { return }
         let queuedAt = ProcessInfo.processInfo.systemUptime
-        for client in clients {
-            client.sendQueue.async { [weak self, client] in
-                guard let self else { return }
-                let expired = ProcessInfo.processInfo.systemUptime - queuedAt > 2
-                let sent = expired || self.sendIfAudioOwner(packet, to: client)
-                self.lock.lock()
-                client.audioPending = max(0, client.audioPending - 1)
-                client.audioPendingBytes = max(0, client.audioPendingBytes - pcm.count)
-                self.lock.unlock()
-                if !sent { self.finish(client) }
-            }
+        client.sendQueue.async { [weak self, client] in
+            guard let self else { return }
+            let expired = ProcessInfo.processInfo.systemUptime - queuedAt > 2
+            let sent = expired || self.sendIfAudioOwner(packet, to: client)
+            self.lock.lock()
+            client.audioPending = max(0, client.audioPending - 1)
+            client.audioPendingBytes = max(0, client.audioPendingBytes - duration)
+            if !expired { client.stats.audioBytes += packet.count }
+            let pump = sent && client.frameDirty && client.audioPending < 6
+            self.lock.unlock()
+            if !sent { self.finish(client); return }
+            if pump { self.pumpLatestFrame(to: client) }
         }
     }
 
@@ -325,20 +477,19 @@ final class VideoServer {
             case .microphone:
                 guard length > 0, length <= 65_536, length.isMultiple(of: 2),
                       let payload = Self.readExactly(fd, Int(length)) else { return }
-                lock.lock()
-                let allowed = running && viewers[viewer.id] === viewer && microphoneOwner == viewer.id
-                lock.unlock()
-                guard allowed else { continue }
-                if !viewer.didReportMicrophone {
-                    viewer.didReportMicrophone = true
-                    onMicrophonePacket?()
-                }
-                let now = ProcessInfo.processInfo.systemUptime
-                if now - viewer.lastLevelReport >= 0.2 {
-                    viewer.lastLevelReport = now
-                    onMicrophoneLevel?(Self.microphoneLevel(payload))
-                }
-                audioSink?.append(payload)
+                receiveMicrophone(payload, from: viewer)
+            case .microphoneAAC:
+                guard length > 0, length <= AACAudio.maximumPacketBytes,
+                      let payload = Self.readExactly(fd, Int(length)) else { return }
+                if viewer.microphoneDecoder == nil { viewer.microphoneDecoder = AACDecoder(channels: 1) }
+                // A corrupt packet loses 21 ms of voice, not the session.
+                if let pcm = viewer.microphoneDecoder?.decode(payload) { receiveMicrophone(pcm, from: viewer) }
+            case .capabilities:
+                guard length == 1, let payload = Self.readExactly(fd, 1) else { return }
+                let aac = AACAudio.isAvailable && payload[0] & AACAudio.capability != 0
+                lock.lock(); viewer.aacAudio = aac; lock.unlock()
+                enqueue(Packet.encode(.capabilities, Data([AACAudio.isAvailable ? AACAudio.capability : 0])),
+                        to: viewer)
             case .control:
                 guard length > 0, length <= ControlCommand.maximumBytes,
                       let payload = Self.readExactly(fd, Int(length)),
@@ -365,10 +516,31 @@ final class VideoServer {
                     if let previous { sendMicrophoneState(previous) }
                     sendMicrophoneState(viewer)
                 }
-            case .jpeg, .controlState, .macAudio, .microphoneState:
+            case .videoFlow:
+                guard length == 1, let payload = Self.readExactly(fd, 1),
+                      let flow = VideoFlow(rawValue: payload[0]) else { return }
+                handleVideoFlow(flow, from: viewer)
+            case .jpeg, .controlState, .macAudio, .microphoneState, .macAudioAAC:
                 return
             }
         }
+    }
+
+    private func receiveMicrophone(_ pcm: Data, from viewer: ViewerConnection) {
+        lock.lock()
+        let allowed = running && viewers[viewer.id] === viewer && microphoneOwner == viewer.id
+        lock.unlock()
+        guard allowed else { return }
+        if !viewer.didReportMicrophone {
+            viewer.didReportMicrophone = true
+            onMicrophonePacket?()
+        }
+        let now = ProcessInfo.processInfo.systemUptime
+        if now - viewer.lastLevelReport >= 0.2 {
+            viewer.lastLevelReport = now
+            onMicrophoneLevel?(Self.microphoneLevel(pcm))
+        }
+        audioSink?.append(pcm)
     }
 
     private func sendControlState(_ viewer: ViewerConnection) {

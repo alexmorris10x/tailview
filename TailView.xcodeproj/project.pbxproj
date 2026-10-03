@@ -16,9 +16,11 @@
 		2C3138630F878A33B50EA70F /* AudioRoutingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */; };
 		3490C489727F9C7FBE54BECF /* TailViewMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */; };
 		3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
+		3F21E4E5C576E2737968CBD8 /* AACAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */; };
 		45D75DC6E5ED31A1D5AA4A9D /* FunctionKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0783290D5A919CD6310B9B9 /* FunctionKeys.swift */; };
 		48E9D18EFF50F2B35287C264 /* ViewerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D10F8991B1089241B3E66D5 /* ViewerModel.swift */; };
 		4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E90C7F0AF464E7238A871F0 /* ContentView.swift */; };
+		4BEEE2D8132A535FEEB1A2A6 /* AACAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */; };
 		4CB79A26FA3BA693C2D48847 /* WindowArranger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1677B424CBD84C8CA05935 /* WindowArranger.swift */; };
 		5B1BC0F9D158C872A6F8C1C9 /* HostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FB29C814C93650C267420E /* HostModel.swift */; };
 		5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */; };
@@ -73,6 +75,7 @@
 		7120797B5BA592ECF917EBD6 /* LocalInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalInputController.swift; sourceTree = "<group>"; };
 		747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteKeyboardInput.swift; sourceTree = "<group>"; };
 		7C1677B424CBD84C8CA05935 /* WindowArranger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowArranger.swift; sourceTree = "<group>"; };
+		83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AACAudio.swift; sourceTree = "<group>"; };
 		89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlInjector.swift; sourceTree = "<group>"; };
 		8A18A3313347868348999728 /* BacklightController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklightController.swift; sourceTree = "<group>"; };
 		8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
@@ -129,6 +132,7 @@
 		8C10591072A0B1C8A842CE2C /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */,
 				635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */,
 				C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */,
 				97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */,
@@ -279,6 +283,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3F21E4E5C576E2737968CBD8 /* AACAudio.swift in Sources */,
 				8BBE9A9B25D7BE58A16B7F6F /* AudioConnectionGate.swift in Sources */,
 				A783C36DF12F342C9E17E7BC /* AudioJitterBuffer.swift in Sources */,
 				17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */,
@@ -302,6 +307,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4BEEE2D8132A535FEEB1A2A6 /* AACAudio.swift in Sources */,
 				C0DEFAEBDD2EBE85678E9CD1 /* AudioConnectionGate.swift in Sources */,
 				829F0A82AC53DB09A2BA7403 /* AudioJitterBuffer.swift in Sources */,
 				2C3138630F878A33B50EA70F /* AudioRoutingController.swift in Sources */,

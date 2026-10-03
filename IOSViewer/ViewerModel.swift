@@ -88,6 +88,25 @@ final class ViewerModel: ObservableObject {
     private var routeRecoveryWork: DispatchWorkItem?
     private var activeRouteSignature: String?
     private let macAudioFormat = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 2)!
+    // Frames are acknowledged only while the app is active; see VideoFlow.
+    // Read on the network queue under deliveryLock.
+    private var videoActive = true
+    // The connection whose Mac accepted AAC audio, under packetLock.
+    private var aacConnection: NWConnection?
+    // Microphone tap health, written by the tap under packetLock.
+    private var microphoneCallbackAt = 0.0
+    private var microphoneSilentSince: Double?
+    private var lastSilenceRestart = -Double.infinity
+    private var microphoneWatchdog: Timer?
+    // Link counters for the --tailview-health log. Mac sound and playback
+    // counters are main-thread only; the others use their locks.
+    private var healthTimer: Timer?
+    private var playbackUnderruns = 0
+    private var receivedMacAudioFrames = 0
+    private var sentMicrophoneFrames = 0
+    private var droppedMicrophoneFrames = 0
+    private var receivedScreenFrames = 0
+    private var receivedScreenBytes = 0
     #if DEBUG
     private var acousticTestPlayer: AVAudioPlayer?
     private var didReportBackgroundMacAudio = false
@@ -98,10 +117,6 @@ final class ViewerModel: ObservableObject {
     private var diagnosticTimer: Timer?
     private var diagnosticPeak = -90.0
     private var didRunAudioRecoveryDiagnostic = false
-    private var transportDiagnosticTimer: Timer?
-    private var playbackUnderruns = 0
-    private var receivedMacAudioFrames = 0
-    private var sentMicrophoneFrames = 0
     #endif
     private var startMicrophoneAfterConnect = false
     private var startMacAudioAfterConnect = false
@@ -109,7 +124,7 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var macAudioWanted = false
     // The host's microphoneState packet grants both audio directions to one
     // paired viewer. Wait for it before activating an iOS audio session.
-    private var audioRouteAllowed = false
+    @Published private(set) var audioRouteAllowed = false
     private var inputRouteName = "iPhone microphone"
 
     init() {
@@ -151,7 +166,10 @@ final class ViewerModel: ObservableObject {
                 self.macAudioStatus = "Audio paused by an interruption"
             } else {
                 let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-                self.audioInterrupted = !AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume)
+                // iOS may omit shouldResume, but a foreground app is free to
+                // restart its own audio, so only wait for the user in the background.
+                self.audioInterrupted = !AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume) &&
+                    UIApplication.shared.applicationState != .active
                 self.audioRecoveryAttempts = 0
                 if self.audioInterrupted {
                     self.microphoneStatus = "Return to TailView or tap Mic to resume audio"
@@ -168,17 +186,31 @@ final class ViewerModel: ObservableObject {
             self.audioRecoveryAttempts = 0
             self.scheduleAudioRouteRecovery()
         }
-        #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--tailview-test-locked-audio") {
-            transportDiagnosticTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+        microphoneWatchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.checkMicrophoneHealth()
+        }
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--tailview-health") || arguments.contains("--tailview-test-locked-audio") {
+            var lastScreenFrames = 0
+            var lastScreenBytes = 0
+            healthTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
                 guard let self else { return }
                 self.packetLock.lock()
                 let sent = self.sentMicrophoneFrames
+                let dropped = self.droppedMicrophoneFrames
+                let silent = self.microphoneSilentSince != nil
                 self.packetLock.unlock()
-                print("TailView health: background=\(UIApplication.shared.applicationState != .active) connected=\(self.isConnected) reconnecting=\(self.isReconnecting) microphone=\(self.isMicrophoneOn) playback=\(self.isMacAudioOn) queuedMs=\(self.queuedMacAudioFrames / 48) underruns=\(self.playbackUnderruns) receivedFrames=\(self.receivedMacAudioFrames) sentFrames=\(sent)")
+                self.deliveryLock.lock()
+                let screenFrames = self.receivedScreenFrames
+                let screenBytes = self.receivedScreenBytes
+                self.deliveryLock.unlock()
+                let fps = Double(screenFrames - lastScreenFrames) / 10
+                let screenKBps = Double(screenBytes - lastScreenBytes) / 10_000
+                lastScreenFrames = screenFrames
+                lastScreenBytes = screenBytes
+                print("TailView health: background=\(UIApplication.shared.applicationState != .active) connected=\(self.isConnected) reconnecting=\(self.isReconnecting) microphone=\(self.isMicrophoneOn) micWanted=\(self.microphoneWanted) audioOwner=\(self.audioRouteAllowed) micSilent=\(silent) playback=\(self.isMacAudioOn) queuedMs=\(self.queuedMacAudioFrames / 48) underruns=\(self.playbackUnderruns) receivedFrames=\(self.receivedMacAudioFrames) sentFrames=\(sent) micDropped=\(dropped) screen=\(String(format: "%.1f", fps))fps/\(Int(screenKBps))KBps macSound=\(self.macAudioStatus) status=\(self.microphoneStatus)")
             }
         }
-        #endif
     }
 
     deinit {
@@ -188,9 +220,8 @@ final class ViewerModel: ObservableObject {
         if let mediaResetObserver { NotificationCenter.default.removeObserver(mediaResetObserver) }
         routeRecoveryWork?.cancel()
         reconnectWork?.cancel()
-        #if DEBUG
-        transportDiagnosticTimer?.invalidate()
-        #endif
+        microphoneWatchdog?.invalidate()
+        healthTimer?.invalidate()
     }
 
     func pair(host: String, code: String, name: String, startMicrophoneOnConnect: Bool = true,
@@ -337,6 +368,7 @@ final class ViewerModel: ObservableObject {
         let oldConnection = connection
         connection = nil
         microphoneGate.setConnection(nil)
+        packetLock.lock(); aacConnection = nil; packetLock.unlock()
         isConnected = false
         isConnecting = false
         isControlAllowed = false
@@ -497,7 +529,11 @@ final class ViewerModel: ObservableObject {
                         self.microphoneStatus = "Waiting for this device's audio turn…"
                         #endif
                     }
-                    self.receiveFrames(connection, parser: PacketParser())
+                    self.receiveFrames(connection, parser: PacketParser(),
+                                       macAudioDecoder: AACDecoder(channels: 2))
+                    self.send(.capabilities, Data([AACAudio.isAvailable ? AACAudio.capability : 0]),
+                              on: connection)
+                    self.setVideoActive(UIApplication.shared.applicationState == .active)
                     #if DEBUG
                     if ProcessInfo.processInfo.arguments.contains("--tailview-test-audio-recovery"),
                        !self.didRunAudioRecoveryDiagnostic {
@@ -515,18 +551,42 @@ final class ViewerModel: ObservableObject {
         }
     }
 
-    private func receiveFrames(_ connection: NWConnection, parser: PacketParser) {
+    /// `macAudioDecoder` is used only on the network queue.
+    private func receiveFrames(_ connection: NWConnection, parser: PacketParser,
+                               macAudioDecoder: AACDecoder?) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self, weak connection] data, _, complete, error in
             guard let self, let connection, self.connection === connection else { return }
             guard error == nil, !complete, let data, !data.isEmpty else {
                 self.failConnection(connection, message: "Mac connection lost; reconnecting…")
                 return
             }
+            func deliverMacAudio(_ pcm: Data) {
+                self.deliveryLock.lock()
+                // A delayed cellular burst can contain well over eight
+                // 20 ms packets. Give playback time to absorb the burst.
+                let shouldDeliver = self.audioDeliveriesPending < 150
+                if shouldDeliver { self.audioDeliveriesPending += 1 }
+                self.deliveryLock.unlock()
+                guard shouldDeliver else { return }
+                DispatchQueue.main.async {
+                    self.deliveryLock.lock()
+                    self.audioDeliveriesPending -= 1
+                    self.deliveryLock.unlock()
+                    if self.connection === connection { self.playMacAudio(pcm) }
+                }
+            }
             do {
                 try parser.append(data) { kind, payload in
                     switch kind {
                     case .jpeg:
-                        guard UIApplication.shared.applicationState == .active,
+                        self.deliveryLock.lock()
+                        let active = self.videoActive
+                        self.receivedScreenFrames += 1
+                        self.receivedScreenBytes += payload.count
+                        self.deliveryLock.unlock()
+                        // Each acknowledgment lets the Mac send its newest frame.
+                        if active { self.sendVideoFlow(.received, on: connection) }
+                        guard active, UIApplication.shared.applicationState == .active,
                               let image = UIImage(data: payload) else { return }
                         self.deliveryLock.lock()
                         let shouldDeliver = !self.imageDeliveryPending
@@ -545,18 +605,14 @@ final class ViewerModel: ObservableObject {
                             if self.connection === connection { self.isControlAllowed = payload[0] == 1 }
                         }
                     case .macAudio:
-                        self.deliveryLock.lock()
-                        // A delayed cellular burst can contain well over eight
-                        // 20 ms packets. Give playback time to absorb the burst.
-                        let shouldDeliver = self.audioDeliveriesPending < 150
-                        if shouldDeliver { self.audioDeliveriesPending += 1 }
-                        self.deliveryLock.unlock()
-                        guard shouldDeliver else { return }
-                        DispatchQueue.main.async {
-                            self.deliveryLock.lock()
-                            self.audioDeliveriesPending -= 1
-                            self.deliveryLock.unlock()
-                            if self.connection === connection { self.playMacAudio(payload) }
+                        deliverMacAudio(payload)
+                    case .macAudioAAC:
+                        // A corrupt packet loses 21 ms of sound, not the session.
+                        if let pcm = macAudioDecoder?.decode(payload) { deliverMacAudio(pcm) }
+                    case .capabilities:
+                        guard payload.count == 1 else { return }
+                        if AACAudio.isAvailable && payload[0] & AACAudio.capability != 0 {
+                            self.packetLock.lock(); self.aacConnection = connection; self.packetLock.unlock()
                         }
                     case .microphoneState:
                         guard payload.count == 1, payload[0] <= 1 else { return }
@@ -565,11 +621,11 @@ final class ViewerModel: ObservableObject {
                                 self.setAudioRouteAllowed(payload[0] == 1)
                             }
                         }
-                    case .microphone, .control, .microphoneRequest:
+                    case .microphone, .control, .microphoneRequest, .videoFlow, .microphoneAAC:
                         return
                     }
                 }
-                self.receiveFrames(connection, parser: parser)
+                self.receiveFrames(connection, parser: parser, macAudioDecoder: macAudioDecoder)
             } catch {
                 self.failConnection(connection, message: "Invalid screen data")
             }
@@ -584,6 +640,31 @@ final class ViewerModel: ObservableObject {
             DispatchQueue.main.async {
                 guard let self, let connection, self.connection === connection else { return }
                 self.failConnection(connection, message: "Mac connection lost while sending control")
+            }
+        })
+    }
+
+    /// Pauses screen frames while the app is not active, leaving a locked
+    /// phone's connection to audio, and resumes with the latest frame.
+    func setVideoActive(_ active: Bool) {
+        deliveryLock.lock()
+        videoActive = active
+        deliveryLock.unlock()
+        guard isConnected, let connection else { return }
+        sendVideoFlow(active ? .resume : .pause, on: connection)
+    }
+
+    private func sendVideoFlow(_ flow: VideoFlow, on connection: NWConnection) {
+        send(.videoFlow, Data([flow.rawValue]), on: connection)
+    }
+
+    private func send(_ kind: PacketKind, _ payload: Data, on connection: NWConnection) {
+        connection.send(content: Packet.encode(kind, payload),
+                        completion: .contentProcessed { [weak self, weak connection] error in
+            guard error != nil else { return }
+            DispatchQueue.main.async {
+                guard let self, let connection, self.connection === connection else { return }
+                self.failConnection(connection, message: "Mac connection lost; reconnecting…")
             }
         })
     }
@@ -668,9 +749,7 @@ final class ViewerModel: ObservableObject {
               !payload.isEmpty, payload.count <= 65_536,
               let player = macAudioPlayer else { return }
         let frameCount = payload.count / 4
-        #if DEBUG
         receivedMacAudioFrames += frameCount
-        #endif
         guard let buffer = AVAudioPCMBuffer(pcmFormat: macAudioFormat,
                                              frameCapacity: AVAudioFrameCount(frameCount)),
               let channels = buffer.floatChannelData else { return }
@@ -719,8 +798,8 @@ final class ViewerModel: ObservableObject {
                 self.queuedMacAudioFrames = max(0, self.queuedMacAudioFrames - frameCount)
                 if self.queuedMacAudioFrames == 0, self.isMacAudioOn,
                    self.macAudioPlayer === player {
-                    #if DEBUG
                     self.playbackUnderruns += 1
+                    #if DEBUG
                     print("TailView Mac sound buffer underrun; waiting to refill")
                     #endif
                     player.pause()
@@ -800,14 +879,17 @@ final class ViewerModel: ObservableObject {
     }
 
     private func scheduleAudioRouteRecovery() {
+        // In the background iOS may refuse to start recording until the app
+        // returns, so stop after five attempts there. In the foreground keep
+        // retrying; resumeAudioAfterForeground resets the count.
         guard isConnected, audioRouteAllowed, !audioInterrupted,
               microphoneCanRecover || macAudioWanted, audioNeedsRecovery,
-              audioRecoveryAttempts < 5 else { return }
+              audioRecoveryAttempts < 5 || UIApplication.shared.applicationState == .active else { return }
         routeRecoveryWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.recoverAudioRoute() }
         routeRecoveryWork = work
         // Let hardware settle; retry a failed rebuild without a notification storm.
-        let delay = audioRecoveryAttempts == 0 ? 0.25 : min(4, Double(audioRecoveryAttempts))
+        let delay = audioRecoveryAttempts == 0 ? 0.25 : min(5, Double(audioRecoveryAttempts))
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
@@ -850,6 +932,39 @@ final class ViewerModel: ObservableObject {
         if engine?.isRunning == true && (!microphoneCanRecover || isMicrophoneOn) && (!macAudioWanted || isMacAudioOn) {
             audioRecoveryAttempts = 0
         } else { scheduleAudioRouteRecovery() }
+    }
+
+    /// The engine can keep reporting that it runs after iOS stops feeding
+    /// the input tap, or feeds it digital silence (another process holding the
+    /// microphone). Neither raises a notification, so rebuild the graph.
+    private func checkMicrophoneHealth() {
+        guard isMicrophoneOn, isConnected, audioRouteAllowed, !audioInterrupted,
+              routeRecoveryWork == nil else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        packetLock.lock()
+        let lastCallback = microphoneCallbackAt
+        let silentSince = microphoneSilentSince
+        packetLock.unlock()
+        if now - lastCallback > 2 {
+            restartMicrophone(reason: "Microphone stopped delivering audio; restarting…")
+        } else if let silentSince, now - silentSince > 4, now - lastSilenceRestart > 30 {
+            lastSilenceRestart = now
+            restartMicrophone(reason: "Microphone delivered only silence; restarting…")
+        }
+    }
+
+    private func restartMicrophone(reason: String) {
+        print("TailView \(reason)")
+        resetAudioGraph()
+        audioRecoveryAttempts = 0
+        microphoneStatus = reason
+        scheduleAudioRouteRecovery()
+    }
+
+    /// The microphone is unmuted but no voice is being sent: another device
+    /// owns audio, or capture is waiting, failed, or restarting.
+    var microphoneNeedsAttention: Bool {
+        isConnected && microphoneWanted && !isMicrophoneOn
     }
 
     private func refreshMacAudioOutput() {
@@ -908,6 +1023,8 @@ final class ViewerModel: ObservableObject {
         microphoneGate.setConnection(allowed ? connection : nil)
         if allowed {
             if macAudioWanted { startMacAudio(userInitiated: false) }
+            // A capture kept running across a reconnect resumes sending now.
+            if isMicrophoneOn { microphoneStatus = "Audio packets sent to Mac · \(inputRouteName)" }
             if microphoneWanted { startMicrophone(userInitiated: false) }
         } else {
             suspendMacAudio()
@@ -993,9 +1110,15 @@ final class ViewerModel: ObservableObject {
             }
             let generation = microphoneGate.resetCapture()
             microphoneGate.setConnection(connection)
+            packetLock.lock()
+            microphoneCallbackAt = ProcessInfo.processInfo.systemUptime
+            microphoneSilentSince = nil
+            packetLock.unlock()
+            // Used only by this capture's tap.
+            let encoder = AACEncoder(channels: 1, bitRate: 64_000)
             input.installTap(onBus: 0, bufferSize: 960, format: sourceFormat) { [weak self] buffer, _ in
                 self?.sendMicrophone(buffer, converter: converter, format: targetFormat,
-                                     generation: generation)
+                                     encoder: encoder, generation: generation)
             }
             inputTapInstalled = true
             if !engine.isRunning { try engine.start() }
@@ -1014,7 +1137,7 @@ final class ViewerModel: ObservableObject {
     }
 
     private func sendMicrophone(_ input: AVAudioPCMBuffer, converter: AVAudioConverter,
-                                format: AVAudioFormat, generation: UInt64) {
+                                format: AVAudioFormat, encoder: AACEncoder?, generation: UInt64) {
         reportInputLevel(input)
         packetLock.lock()
         let firstCapture = !didReportCapture
@@ -1048,11 +1171,34 @@ final class ViewerModel: ObservableObject {
             return
         }
         let frames = Int(output.frameLength)
-        guard let ticket = microphoneGate.reserve(frames: frames, capture: generation) else { return }
+        let pcm = Data(bytes: channel, count: frames * 2)
+        packetLock.lock()
+        let aacConnection = self.aacConnection
+        packetLock.unlock()
+        if let aacConnection, let encoder {
+            for packet in encoder.encode(pcm) {
+                sendMicrophonePacket(.microphoneAAC, packet, frames: AACAudio.framesPerPacket,
+                                     generation: generation, requiring: aacConnection)
+            }
+        } else {
+            sendMicrophonePacket(.microphone, pcm, frames: frames, generation: generation, requiring: nil)
+        }
+    }
+
+    /// `requiring` drops an AAC packet if audio moved to a connection that
+    /// has not accepted AAC yet.
+    private func sendMicrophonePacket(_ kind: PacketKind, _ payload: Data, frames: Int,
+                                      generation: UInt64, requiring: NWConnection?) {
+        guard let ticket = microphoneGate.reserve(frames: frames, capture: generation) else {
+            packetLock.lock(); droppedMicrophoneFrames += frames; packetLock.unlock()
+            return
+        }
         let connection = ticket.connection
-        let byteCount = frames * 2
-        let payload = Data(bytes: channel, count: byteCount)
-        connection.send(content: Packet.encode(.microphone, payload), completion: .contentProcessed { [weak self] error in
+        if let requiring, requiring !== connection {
+            microphoneGate.complete(ticket)
+            return
+        }
+        connection.send(content: Packet.encode(kind, payload), completion: .contentProcessed { [weak self] error in
             self?.microphoneGate.complete(ticket)
             if error != nil {
                 DispatchQueue.main.async {
@@ -1061,9 +1207,7 @@ final class ViewerModel: ObservableObject {
                 }
             } else if let self {
                 self.packetLock.lock()
-                #if DEBUG
                 self.sentMicrophoneFrames += frames
-                #endif
                 let firstSend = !self.didReportSend
                 self.didReportSend = true
                 self.packetLock.unlock()
@@ -1086,12 +1230,15 @@ final class ViewerModel: ObservableObject {
             for index in 0..<Int(input.frameLength) { peak = max(peak, abs(Double(channel[index]) / 2147483648.0)) }
         }
         packetLock.lock()
+        let now = ProcessInfo.processInfo.systemUptime
+        microphoneCallbackAt = now
+        if peak > 0 { microphoneSilentSince = nil }
+        else if microphoneSilentSince == nil { microphoneSilentSince = now }
         #if DEBUG
         let firstNonSilentInput = peak > 0.002 && !didReportNonSilentInput
         if firstNonSilentInput { didReportNonSilentInput = true }
         #endif
         inputPeak = max(inputPeak, peak)
-        let now = ProcessInfo.processInfo.systemUptime
         let shouldReport = now - lastInputLevelReport >= 0.2
         if shouldReport { lastInputLevelReport = now }
         let heldPeak = inputPeak

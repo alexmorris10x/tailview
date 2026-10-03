@@ -32,6 +32,7 @@ struct ContentView: View {
 
             LabeledContent("Access", value: host.status)
             LabeledContent("Viewer", value: host.viewerStatus)
+            LabeledContent("Viewer link", value: host.linkStatus)
             LabeledContent("Microphone", value: host.microphoneStatus)
             LabeledContent("Mac sound", value: host.systemAudioStatus)
             LabeledContent("Mac audio routing", value: host.audioRoutingStatus)

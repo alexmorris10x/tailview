@@ -7,6 +7,7 @@ final class HostModel: ObservableObject {
     @Published private(set) var microphoneStatus = "Start sharing to receive the device microphone"
     @Published private(set) var systemAudioStatus = "Waiting for a trusted viewer"
     @Published private(set) var audioRoutingStatus = "Waiting for a paired viewer"
+    @Published private(set) var linkStatus = "No measurements yet"
     @Published private(set) var address = ""
     @Published private(set) var sessionCode = ""
     @Published private(set) var isSharing = false
@@ -93,6 +94,7 @@ final class HostModel: ObservableObject {
                         let count = server.viewerCount
                         self.viewerStatus = count == 0 ? "Disconnected" :
                             "\(count) viewer\(count == 1 ? "" : "s") connected"
+                        if count == 0 { self.linkStatus = "No measurements yet" }
                         self.audioRouting.setConnected(server.hasPairedViewer)
                         if let capture = self.capture {
                             self.updateSystemAudioCapture(server.hasPairedViewer, on: capture)
@@ -122,6 +124,9 @@ final class HostModel: ObservableObject {
                         let routing = sink == nil ? " · BlackHole 2ch needed for Mac input" : " · BlackHole 2ch"
                         self.microphoneStatus = "Voice \(decibels) dBFS · peak \(peak) dBFS\(routing)"
                     }
+                }
+                server.onLinkStats = { [weak self] summary in
+                    Task { @MainActor in self?.linkStatus = summary }
                 }
                 server.onError = { [weak self] message in
                     Task { @MainActor in self?.stop(); self?.status = message }
