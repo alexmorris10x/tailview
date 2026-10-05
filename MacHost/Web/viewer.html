@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en" data-same-mac="0">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TailView</title>
+<style>
+  :root {
+    --bg: #0c0d0f;
+    --bar: rgba(22, 24, 28, 0.92);
+    --line: rgba(255, 255, 255, 0.09);
+    --text: #e9eaee;
+    --muted: #9a9ea8;
+    --accent: #4f8cff;
+    --good: #3ecf8e;
+    --warn: #f5a524;
+    --bad: #f06363;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 10px; padding: 6px 12px; min-height: 44px;
+    background: var(--bar); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header .brand { font-weight: 600; letter-spacing: 0.01em; }
+  #status { display: flex; align-items: center; gap: 6px; color: var(--muted); min-width: 0; }
+  #status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+  body[data-state="live"] #status::before { background: var(--good); }
+  body[data-state="connecting"] #status::before { background: var(--warn); }
+  body[data-state="error"] #status::before { background: var(--bad); }
+  header .spacer { flex: 1; }
+  button { font: inherit; color: var(--text); background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 11px; cursor: pointer; }
+  button:hover { background: rgba(255, 255, 255, 0.12); }
+  button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.link { background: none; border: none; color: var(--muted); padding: 5px 6px; }
+  #stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  #screen { width: 100%; height: 100%; object-fit: contain; display: block; cursor: crosshair; outline: none;
+    touch-action: none; }
+  #banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: var(--bar);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; color: var(--muted); font-size: 13px;
+    pointer-events: none; }
+  #banner:empty { display: none; }
+  #pair { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; padding: 16px;
+    background: var(--bg); }
+  body[data-view="pair"] #pair { display: flex; }
+  .card { width: min(440px, 100%); background: #15171b; border: 1px solid var(--line); border-radius: 14px; padding: 22px; }
+  .card h1 { margin: 0 0 6px; font-size: 20px; }
+  .card p { margin: 0 0 16px; color: var(--muted); }
+  .card label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  .card input { width: 100%; font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text);
+    background: #0c0d0f; border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+  .card input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .card .actions { display: flex; justify-content: flex-end; margin-top: 18px; }
+  .card .actions button { background: var(--accent); border-color: var(--accent); color: #fff; padding: 8px 16px; }
+  #pairError { color: var(--bad); min-height: 1.4em; margin: 10px 0 0; }
+  @media (max-width: 560px) { header .brand { display: none; } }
+</style>
+</head>
+<body data-state="connecting" data-view="screen">
+<header>
+  <span class="brand">TailView</span>
+  <span id="status">Connecting…</span>
+  <span class="spacer"></span>
+  <button id="audio" type="button" aria-pressed="false" title="Play this Mac's sound here">Get audio</button>
+  <button id="mic" type="button" aria-pressed="false" hidden title="Send this browser's microphone to the Mac">Mic off</button>
+  <button id="fullscreen" type="button" title="Full screen also captures shortcuts like ⌘W in Chrome">Full screen</button>
+  <button id="forget" class="link" type="button" title="Remove this browser's saved pairing">Forget browser</button>
+</header>
+<main id="stage">
+  <canvas id="screen" tabindex="0" width="1280" height="800" aria-label="Mac screen"></canvas>
+  <div id="banner"></div>
+  <section id="pair">
+    <form class="card" id="pairForm" autocomplete="off">
+      <h1>Pair this browser</h1>
+      <p>On the Mac, open TailView and choose <strong>Pair a new device</strong>. Paste the pairing code here. This browser then reconnects without a code.</p>
+      <label for="code">Pairing code</label>
+      <input id="code" name="code" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" spellcheck="false" required>
+      <label for="name">Name on the Mac</label>
+      <input id="name" name="name" maxlength="16" spellcheck="false" required>
+      <p id="pairError"></p>
+      <div class="actions"><button type="submit">Pair and connect</button></div>
+    </form>
+  </section>
+</main>
+<script>
+"use strict";
+// Packet kinds, matching Shared/Packet.swift.
+const K = { jpeg: 1, microphone: 2, control: 3, controlState: 4, macAudio: 5, microphoneState: 6,
+  microphoneRequest: 7, videoFlow: 8 };
+const FLOW = { pause: 0, received: 1, resume: 2 };
+const STORE_KEY = "tailview.browserCredential";
+const sameMac = document.documentElement.dataset.sameMac === "1";
+
+const $ = (id) => document.getElementById(id);
+const canvas = $("screen");
+const context = canvas.getContext("2d");
+const ui = { status: $("status"), banner: $("banner"), audio: $("audio"), mic: $("mic"),
+  fullscreen: $("fullscreen"), forget: $("forget"), pairForm: $("pairForm"), code: $("code"),
+  name: $("name"), pairError: $("pairError") };
+
+let socket = null;
+let phase = "idle";          // idle → handshake → live
+let pendingPair = null;      // credential being paired
+let inbox = new Uint8Array(0);
+let controlEnabled = false;
+let ownsAudio = false;
+let wantsAudio = false;
+let retryDelay = 1;
+let retryTimer = null;
+let frameSeq = 0;
+let drawnSeq = 0;
+
+// MARK: Credential
+
+function loadCredential() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch { return null; }
+}
+function saveCredential(value) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(value)); } catch {}
+}
+function clearCredential() {
+  try { localStorage.removeItem(STORE_KEY); } catch {}
+}
+function newCredential() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  const token = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return { id: crypto.randomUUID().toLowerCase(), token };
+}
+function defaultName() {
+  const ua = navigator.userAgent;
+  const browser = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox"
+    : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Browser";
+  return (browser + " browser").slice(0, 16);
+}
+
+// MARK: Connection
+
+function setStatus(text, state) {
+  ui.status.textContent = text;
+  document.body.dataset.state = state;
+}
+function showPairing(message) {
+  document.body.dataset.view = "pair";
+  ui.pairError.textContent = message || "";
+  if (!ui.name.value) ui.name.value = defaultName();
+  setStatus("Not paired", "error");
+  setTimeout(() => ui.code.focus(), 0);
+}
+
+function connect() {
+  clearTimeout(retryTimer);
+  const credential = pendingPair ? pendingPair.credential : loadCredential();
+  if (!credential) { showPairing(); return; }
+  document.body.dataset.view = "screen";
+  setStatus("Connecting…", "connecting");
+  inbox = new Uint8Array(0);
+  phase = "handshake";
+  const ws = new WebSocket(`wss://${location.host}/ws`);
+  ws.binaryType = "arraybuffer";
+  socket = ws;
+  ws.onopen = () => {
+    let line;
+    if (pendingPair) {
+      const name = pendingPair.name.slice(0, 16);
+      const encoded = btoa(String.fromCharCode(...new TextEncoder().encode(name)));
+      line = `PAIR ${pendingPair.code} ${credential.id} ${credential.token} ${encoded}\n`;
+    } else {
+      line = `AUTH ${credential.id} ${credential.token}\n`;
+    }
+    ws.send(new TextEncoder().encode(line));
+  };
+  ws.onmessage = (event) => { if (socket === ws) receive(new Uint8Array(event.data)); };
+  ws.onclose = () => { if (socket === ws) closed(); };
+}
+
+function closed() {
+  const wasLive = phase === "live";
+  const wasPairing = !!pendingPair;
+  socket = null;
+  phase = "idle";
+  controlEnabled = false;
+  setOwnsAudio(false);
+  if (wasPairing && !wasLive) {
+    pendingPair = null;
+    showPairing("The Mac refused the code. Check that pairing is open and the code is current.");
+    return;
+  }
+  if (wasLive) retryDelay = 1;
+  setStatus(wasLive ? "Disconnected — reconnecting…" : `Mac unavailable — retrying in ${retryDelay}s`, "connecting");
+  retryTimer = setTimeout(connect, retryDelay * 1000);
+  retryDelay = Math.min(retryDelay * 2, 8);
+}
+
+function receive(bytes) {
+  inbox = inbox.length ? concat(inbox, bytes) : bytes;
+  if (phase === "handshake") {
+    const newline = inbox.indexOf(10);
+    if (newline < 0) { if (inbox.length > 16) socket.close(); return; }
+    const reply = new TextDecoder().decode(inbox.subarray(0, newline));
+    inbox = inbox.slice(newline + 1);
+    if (reply === "NO") {
+      clearCredential();
+      socket.onclose = null;
+      socket.close();
+      socket = null;
+      phase = "idle";
+      showPairing("This browser's pairing was revoked on the Mac. Pair again.");
+      return;
+    }
+    if (reply !== "OK" && reply !== "PAIRED") { socket.close(); return; }
+    if (pendingPair) { saveCredential(pendingPair.credential); pendingPair = null; }
+    phase = "live";
+    retryDelay = 1;
+    setStatus("Connected", "live");
+    sendPacket(K.videoFlow, [document.hidden ? FLOW.pause : FLOW.resume]);
+    canvas.focus();
+  }
+  while (inbox.length >= 5) {
+    const length = ((inbox[1] << 24) >>> 0) + (inbox[2] << 16) + (inbox[3] << 8) + inbox[4];
+    if (length > 2000000) { socket.close(); return; }
+    if (inbox.length < 5 + length) return;
+    const kind = inbox[0];
+    const payload = inbox.subarray(5, 5 + length);
+    inbox = inbox.subarray(5 + length);
+    handlePacket(kind, payload);
+  }
+}
+
+function concat(a, b) {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a); out.set(b, a.length);
+  return out;
+}
+
+function sendPacket(kind, payload) {
+  if (!socket || socket.readyState !== WebSocket.OPEN || phase !== "live") return;
+  const body = payload instanceof Uint8Array ? payload : new Uint8Array(payload);
+  const packet = new Uint8Array(5 + body.length);
+  packet[0] = kind;
+  new DataView(packet.buffer).setUint32(1, body.length);
+  packet.set(body, 5);
+  socket.send(packet);
+}
+
+function handlePacket(kind, payload) {
+  switch (kind) {
+    case K.jpeg: drawFrame(payload.slice()); break;
+    case K.controlState:
+      controlEnabled = payload[0] === 1;
+      updateBanner();
+      break;
+    case K.microphoneState: setOwnsAudio(payload[0] === 1); break;
+    case K.macAudio: playMacSound(payload); break;
+    default: break; // AAC and capability packets are never requested.
+  }
+}
+
+// MARK: Screen
+
+async function drawFrame(jpeg) {
+  const seq = ++frameSeq;
+  try {
+    const bitmap = await createImageBitmap(new Blob([jpeg], { type: "image/jpeg" }));
+    if (seq > drawnSeq) {
+      drawnSeq = seq;
+      if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+        canvas.width = bitmap.width; canvas.height = bitmap.height;
+      }
+      context.drawImage(bitmap, 0, 0);
+    }
+    bitmap.close();
+  } catch {}
+  // Acknowledge every frame, even one that failed to decode, so the Mac
+  // keeps sending; it keeps at most two in flight.
+  if (!document.hidden) sendPacket(K.videoFlow, [FLOW.received]);
+}
+
+document.addEventListener("visibilitychange", () => {
+  sendPacket(K.videoFlow, [document.hidden ? FLOW.pause : FLOW.resume]);
+});
+
+function updateBanner() {
+  if (phase !== "live") { ui.banner.textContent = ""; return; }
+  ui.banner.textContent = controlEnabled ? "" : "View only. Allow control in TailView on the Mac.";
+}
+
+// MARK: Control
+
+function control(command) {
+  if (!controlEnabled) return;
+  sendPacket(K.control, new TextEncoder().encode(JSON.stringify(command)));
+}
+
+function modifiers(event, extra) {
+  const list = [];
+  if (extra) list.push(extra);
+  if (event.ctrlKey) list.push("control");
+  if (event.altKey) list.push("option");
+  if (event.metaKey) list.push("command");
+  return list;
+}
+
+function withKeys(command, event, extra) {
+  const list = modifiers(event, extra);
+  if (list.length) command.modifiers = list;
+  if (event.shiftKey && command.kind !== "text") command.shift = true;
+  return command;
+}
+
+/// Maps a pointer to the Mac display in 0…1, accounting for letterboxing.
+function displayPoint(event) {
+  const rect = canvas.getBoundingClientRect();
+  const scale = Math.min(rect.width / canvas.width, rect.height / canvas.height);
+  const width = canvas.width * scale, height = canvas.height * scale;
+  const left = rect.left + (rect.width - width) / 2, top = rect.top + (rect.height - height) / 2;
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  return { x: clamp((event.clientX - left) / width), y: clamp((event.clientY - top) / height) };
+}
+
+let leftDown = false;
+let pendingMove = null;
+let moveScheduled = false;
+
+function flushMove() {
+  if (pendingMove) { control(pendingMove); pendingMove = null; }
+}
+
+canvas.addEventListener("pointermove", (event) => {
+  const point = displayPoint(event);
+  pendingMove = withKeys({ kind: leftDown ? "leftDrag" : "move", x: point.x, y: point.y }, event);
+  if (!moveScheduled) {
+    moveScheduled = true;
+    requestAnimationFrame(() => { moveScheduled = false; flushMove(); });
+  }
+});
+
+canvas.addEventListener("pointerdown", (event) => {
+  canvas.focus();
+  const point = displayPoint(event);
+  flushMove();
+  if (event.button === 0) {
+    leftDown = true;
+    canvas.setPointerCapture(event.pointerId);
+    control(withKeys({ kind: "leftDown", x: point.x, y: point.y }, event));
+  } else if (event.button === 2) {
+    control(withKeys({ kind: "rightClick", x: point.x, y: point.y }, event));
+  }
+  event.preventDefault();
+});
+
+function endPress(event) {
+  if (event.button !== 0 || !leftDown) return;
+  leftDown = false;
+  const point = displayPoint(event);
+  flushMove();
+  control(withKeys({ kind: "leftUp", x: point.x, y: point.y }, event));
+}
+canvas.addEventListener("pointerup", endPress);
+canvas.addEventListener("pointercancel", endPress);
+canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+// Pixel deltas accumulate into the Mac's line scroll units.
+const PIXELS_PER_LINE = 16;
+let scrollX = 0, scrollY = 0;
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? PIXELS_PER_LINE : event.deltaMode === 2 ? PIXELS_PER_LINE * 20 : 1;
+  scrollX += event.deltaX * unit;
+  scrollY += event.deltaY * unit;
+  const lines = (v) => Math.max(-20, Math.min(20, Math.trunc(v / PIXELS_PER_LINE)));
+  const vertical = lines(scrollY), horizontal = lines(scrollX);
+  if (!vertical && !horizontal) return;
+  scrollY -= vertical * PIXELS_PER_LINE;
+  scrollX -= horizontal * PIXELS_PER_LINE;
+  const command = { kind: "scroll" };
+  if (vertical) command.amount = -vertical;
+  if (horizontal) command.horizontalAmount = -horizontal;
+  flushMove();
+  control(withKeys(command, event));
+}, { passive: false });
+
+const SPECIAL_KEYS = { Enter: "returnKey", Tab: "tab", Backspace: "delete", Escape: "escape",
+  ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
+// The Mac applies its Fn layer to these; see MacHost/FunctionKeys.swift.
+const FN_KEYS = { Delete: "delete", Home: "left", End: "right", PageUp: "up", PageDown: "down" };
+const F_KEYS = { F1: "1", F2: "2", F3: "3", F4: "4", F5: "5", F6: "6", F7: "7", F8: "8", F9: "9",
+  F10: "0", F11: "-", F12: "=" };
+// Physical keys for shortcuts, where event.key holds an Option character.
+const CODE_CHARS = { Minus: "-_", Equal: "=+", BracketLeft: "[{", BracketRight: "]}", Backslash: "\\|",
+  Semicolon: ";:", Quote: "'\"", Comma: ",<", Period: ".>", Slash: "/?", Backquote: "`~", Space: "  " };
+for (let i = 0; i < 26; i++) {
+  const c = String.fromCharCode(97 + i);
+  CODE_CHARS["Key" + c.toUpperCase()] = c + c.toUpperCase();
+}
+"1!2@3#4$5%6^7&8*9(0)".match(/../g).forEach((pair) => { CODE_CHARS["Digit" + pair[0]] = pair; });
+
+document.addEventListener("keydown", (event) => {
+  if (phase !== "live" || document.body.dataset.view !== "screen" || event.isComposing) return;
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement) return;
+  if (["Shift", "Meta", "Control", "Alt", "CapsLock", "Fn", "Dead"].includes(event.key)) return;
+  let command = null;
+  if (SPECIAL_KEYS[event.key]) {
+    command = withKeys({ kind: "key", key: SPECIAL_KEYS[event.key] }, event);
+  } else if (FN_KEYS[event.key]) {
+    command = withKeys({ kind: "key", key: FN_KEYS[event.key] }, event, "function");
+  } else if (F_KEYS[event.key]) {
+    command = withKeys({ kind: "text", text: F_KEYS[event.key] }, event, "function");
+  } else if (event.metaKey || event.ctrlKey || event.altKey) {
+    const chars = CODE_CHARS[event.code];
+    if (chars) command = withKeys({ kind: "text", text: chars[event.shiftKey ? 1 : 0] }, event);
+  } else if ([...event.key].length === 1) {
+    command = { kind: "text", text: event.key };
+  }
+  if (!command) return;
+  event.preventDefault();
+  flushMove();
+  control(command);
+});
+
+// MARK: Audio
+
+let audioContext = null;
+let playHead = 0;
+let micStream = null;
+let micNode = null;
+let micChunk = new Int16Array(960);
+let micFill = 0;
+
+const WORKLET = `registerProcessor("tailview-mic", class extends AudioWorkletProcessor {
+  process(inputs) { const c = inputs[0] && inputs[0][0]; if (c) this.port.postMessage(c.slice(0)); return true; }
+});`;
+
+async function ensureAudioContext() {
+  if (!audioContext) {
+    audioContext = new AudioContext({ sampleRate: 48000, latencyHint: "interactive" });
+    const url = URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" }));
+    await audioContext.audioWorklet.addModule(url);
+    URL.revokeObjectURL(url);
+  }
+  if (audioContext.state !== "running") await audioContext.resume();
+  return audioContext;
+}
+
+// Mac sound arrives as 20 ms of 48 kHz stereo 16-bit PCM.
+function playMacSound(payload) {
+  if (!ownsAudio || !audioContext || audioContext.state !== "running") return;
+  const frames = payload.length >> 2;
+  if (!frames) return;
+  const view = new DataView(payload.buffer, payload.byteOffset, frames * 4);
+  const buffer = audioContext.createBuffer(2, frames, 48000);
+  const left = buffer.getChannelData(0), right = buffer.getChannelData(1);
+  for (let i = 0; i < frames; i++) {
+    left[i] = view.getInt16(i * 4, true) / 32768;
+    right[i] = view.getInt16(i * 4 + 2, true) / 32768;
+  }
+  const now = audioContext.currentTime;
+  // Refill a short buffer after a gap; drop sound that has fallen far behind.
+  if (playHead < now + 0.02) playHead = now + 0.12;
+  if (playHead > now + 0.8) return;
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(audioContext.destination);
+  source.start(playHead);
+  playHead += buffer.duration;
+}
+
+async function startMic() {
+  if (micStream || !ownsAudio) return;
+  try {
+    const ctx = await ensureAudioContext();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (!ownsAudio || !ui.mic.dataset.on) { stream.getTracks().forEach((t) => t.stop()); return; }
+    micStream = stream;
+    const source = ctx.createMediaStreamSource(stream);
+    micNode = new AudioWorkletNode(ctx, "tailview-mic");
+    const silent = ctx.createGain();
+    silent.gain.value = 0;
+    source.connect(micNode).connect(silent).connect(ctx.destination);
+    micNode.port.onmessage = (event) => sendMicSamples(event.data);
+  } catch (error) {
+    delete ui.mic.dataset.on;
+    updateAudioButtons();
+    ui.banner.textContent = "Microphone unavailable: " + (error.message || error.name);
+  }
+}
+
+function stopMic() {
+  if (micNode) { micNode.port.onmessage = null; micNode.disconnect(); micNode = null; }
+  if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
+  micFill = 0;
+}
+
+// The Mac expects 48 kHz mono 16-bit PCM, sent in 20 ms packets.
+function sendMicSamples(samples) {
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    micChunk[micFill++] = s < 0 ? s * 32768 : s * 32767;
+    if (micFill === micChunk.length) {
+      sendPacket(K.microphone, new Uint8Array(micChunk.buffer.slice(0)));
+      micFill = 0;
+    }
+  }
+}
+
+function setOwnsAudio(value) {
+  const lost = ownsAudio && !value && wantsAudio && phase === "live";
+  ownsAudio = value;
+  if (!value) { stopMic(); playHead = 0; }
+  if (value && !wantsAudio) sendPacket(K.microphoneRequest, [0]); // stale grant after a reload
+  if (value && wantsAudio && ui.mic.dataset.on) startMic();
+  if (lost) {
+    wantsAudio = false;
+    ui.banner.textContent = "Audio moved to another device.";
+    setTimeout(updateBanner, 4000);
+  }
+  updateAudioButtons();
+}
+
+function updateAudioButtons() {
+  ui.audio.setAttribute("aria-pressed", String(ownsAudio));
+  ui.audio.textContent = ownsAudio ? "Audio on" : wantsAudio ? "Getting audio…" : "Get audio";
+  ui.mic.hidden = !ownsAudio;
+  const on = !!ui.mic.dataset.on;
+  ui.mic.setAttribute("aria-pressed", String(on && !!micStream));
+  ui.mic.textContent = on ? "Mic on" : "Mic off";
+}
+
+ui.audio.addEventListener("click", async () => {
+  if (ownsAudio || wantsAudio) {
+    wantsAudio = false;
+    sendPacket(K.microphoneRequest, [0]);
+    setOwnsAudio(false);
+    return;
+  }
+  if (sameMac && !confirm("This browser is on the Mac itself, so Mac sound would play back into the capture and echo. Get audio anyway?")) return;
+  try { await ensureAudioContext(); } catch (error) {
+    ui.banner.textContent = "Audio unavailable: " + (error.message || error.name);
+    return;
+  }
+  wantsAudio = true;
+  updateAudioButtons();
+  sendPacket(K.microphoneRequest, [1]);
+});
+
+ui.mic.addEventListener("click", () => {
+  if (ui.mic.dataset.on) { delete ui.mic.dataset.on; stopMic(); }
+  else { ui.mic.dataset.on = "1"; startMic(); }
+  updateAudioButtons();
+});
+
+// MARK: Chrome
+
+ui.fullscreen.addEventListener("click", async () => {
+  if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+  try {
+    await document.documentElement.requestFullscreen();
+    // Chrome then delivers system shortcuts such as ⌘W and ⌘Q to the page.
+    if (navigator.keyboard && navigator.keyboard.lock) await navigator.keyboard.lock();
+  } catch {}
+  canvas.focus();
+});
+document.addEventListener("fullscreenchange", () => {
+  ui.fullscreen.textContent = document.fullscreenElement ? "Exit full screen" : "Full screen";
+});
+
+ui.forget.addEventListener("click", () => {
+  if (!confirm("Forget this browser's pairing? Also revoke it under Paired devices on the Mac.")) return;
+  clearCredential();
+  if (socket) { socket.onclose = null; socket.close(); socket = null; }
+  phase = "idle";
+  setOwnsAudio(false);
+  showPairing();
+});
+
+// Return keyboard focus to the Mac screen after using the toolbar.
+document.querySelector("header").addEventListener("click", () => {
+  if (document.body.dataset.view === "screen") setTimeout(() => canvas.focus(), 0);
+});
+
+ui.pairForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const code = ui.code.value.trim().toLowerCase();
+  const name = ui.name.value.trim().slice(0, 16);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(code)) {
+    ui.pairError.textContent = "That doesn't look like a TailView pairing code.";
+    return;
+  }
+  if (!name) { ui.pairError.textContent = "Give this browser a name."; return; }
+  pendingPair = { code, name, credential: newCredential() };
+  ui.code.value = "";
+  connect();
+});
+
+connect();
+</script>
+</body>
+</html>

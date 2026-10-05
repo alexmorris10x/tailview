@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -10,6 +11,12 @@ final class ControlInjector {
     private var mouseIsDown = false
     private var functionIsDown = false
     private var lastPoint = CGPoint.zero
+    // macOS recognizes double and triple clicks from the click state field,
+    // not from timing, so repeated presses count up like a physical mouse.
+    private var clickState: Int64 = 1
+    private var lastPressTime = 0.0
+    private var lastPressPoint = CGPoint(x: -1_000, y: -1_000)
+    private var lastPressButton = CGMouseButton.left
 
     static func hasPermission() -> Bool { CGPreflightPostEventAccess() }
 
@@ -41,7 +48,8 @@ final class ControlInjector {
 
     private func post(_ command: ControlCommand) {
         let point = command.x.flatMap { x in command.y.map { Self.displayPoint(x: x, y: $0) } }
-        let flags = Self.eventFlags(for: command.modifiers)
+        var flags = Self.eventFlags(for: command.modifiers)
+        if command.shift == true { flags.insert(.maskShift) }
         if let point { lastPoint = point }
         switch command.kind {
         case .move:
@@ -49,17 +57,20 @@ final class ControlInjector {
         case .leftClick:
             if let point {
                 releaseHeldMouse()
+                countPress(at: point, button: .left)
                 postMouse(.leftMouseDown, at: point, flags: flags)
                 postMouse(.leftMouseUp, at: point, flags: flags)
             }
         case .rightClick:
             if let point {
                 releaseHeldMouse()
+                countPress(at: point, button: .right)
                 postMouse(.rightMouseDown, at: point, button: .right, flags: flags)
                 postMouse(.rightMouseUp, at: point, button: .right, flags: flags)
             }
         case .leftDown:
             if let point, !mouseIsDown {
+                countPress(at: point, button: .left)
                 postMouse(.leftMouseDown, at: point, flags: flags)
                 mouseIsDown = true
             }
@@ -124,11 +135,24 @@ final class ControlInjector {
                        y: bounds.minY + y * max(0, bounds.height - 1))
     }
 
+    private func countPress(at point: CGPoint, button: CGMouseButton) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let nearby = abs(point.x - lastPressPoint.x) <= 4 && abs(point.y - lastPressPoint.y) <= 4
+        let quick = now - lastPressTime <= NSEvent.doubleClickInterval
+        clickState = nearby && quick && button == lastPressButton ? min(clickState + 1, 3) : 1
+        lastPressTime = now
+        lastPressPoint = point
+        lastPressButton = button
+    }
+
     private func postMouse(_ type: CGEventType, at point: CGPoint,
                            button: CGMouseButton = .left, flags: CGEventFlags = []) {
         guard let event = CGEvent(mouseEventSource: nil, mouseType: type,
                                   mouseCursorPosition: point, mouseButton: button) else { return }
         event.flags = flags
+        if [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .leftMouseDragged].contains(type) {
+            event.setIntegerValueField(.mouseEventClickState, value: clickState)
+        }
         event.post(tap: .cghidEventTap)
     }
 

@@ -67,7 +67,10 @@ struct TransportSmoke {
               ControlCommand(kind: .window, modifiers: [.control], window: .leftHalf).encoded() == nil,
               ControlCommand(kind: .key, key: .left, window: .fill).encoded() == nil,
               ControlCommand.decode(Data(#"{"kind":"window","window":"minimize"}"#.utf8)) == nil,
-              ControlCommand.decode(Data("bad JSON".utf8)) == nil else {
+              ControlCommand.decode(Data("bad JSON".utf8)) == nil,
+              ControlCommand(kind: .text, text: "a", shift: true).encoded() == nil,
+              ControlCommand(kind: .window, window: .fill, shift: true).encoded() == nil,
+              ControlCommand.decode(Data(#"{"kind":"key","key":"left","shift":false}"#.utf8)) == nil else {
             throw TestError.message("Invalid control command was accepted")
         }
         for layout in ControlCommand.WindowLayout.allCases {
@@ -75,6 +78,11 @@ struct TransportSmoke {
             guard let data = command.encoded(), ControlCommand.decode(data) == command else {
                 throw TestError.message("Window command did not round trip")
             }
+        }
+        let shiftedKey = ControlCommand(kind: .key, key: .left, modifiers: [.command], shift: true)
+        guard let shiftedData = shiftedKey.encoded(), ControlCommand.decode(shiftedData) == shiftedKey,
+              ControlCommand.decode(Data(#"{"kind":"leftDown","x":0.5,"y":0.5,"shift":true}"#.utf8)) != nil else {
+            throw TestError.message("Shifted key or click did not round trip")
         }
         let diagonalScroll = ControlCommand(kind: .scroll, amount: 2, horizontalAmount: -3)
         guard let scrollData = diagonalScroll.encoded(),
@@ -490,6 +498,57 @@ struct TransportSmoke {
         guard waitForViewerCount(server, 0) else {
             throw TestError.message("Flow-control viewer did not disconnect")
         }
+        // A browser bridged through a socket pair signs in like an app, never
+        // takes audio automatically, takes it on request and gives it back.
+        let browserID = UUID()
+        credentials.add(browserID, token: token)
+        let app = try connect(to: address)
+        guard writeExactly(app, Data(saved.line.utf8)), readExactly(app, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("App viewer could not authenticate beside a browser")
+        }
+        try expectState(app, allowed: true, phase: "app beside browser")
+        try expectMicrophoneState(app, allowed: true, phase: "app beside browser")
+        var pairFDs: [Int32] = [-1, -1]
+        guard socketpair(AF_UNIX, SOCK_STREAM, 0, &pairFDs) == 0, server.attachBrowserViewer(pairFDs[1]) else {
+            throw TestError.message("Browser viewer could not attach")
+        }
+        let browser = pairFDs[0]
+        let browserLine = PairingRequest.authenticate(id: browserID, token: token).line
+        guard writeExactly(browser, Data(browserLine.utf8)), readExactly(browser, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Browser viewer could not authenticate")
+        }
+        try expectState(browser, allowed: true, phase: "browser connect")
+        try expectMicrophoneState(browser, allowed: false, phase: "browser connect")
+        guard writeExactly(browser, Packet.encode(.microphoneRequest, Data([1]))) else {
+            throw TestError.message("Browser could not request audio")
+        }
+        try expectMicrophoneState(browser, allowed: true, phase: "browser takes audio")
+        try expectMicrophoneState(app, allowed: false, phase: "browser takes audio")
+        server.publishAudio(macAudio)
+        try expectPayload(browser, kind: .macAudio, payload: macAudio, phase: "browser Mac sound")
+        try expectNoAudio(app, phase: "browser owns audio")
+        guard writeExactly(browser, Packet.encode(.microphoneRequest, Data([0]))) else {
+            throw TestError.message("Browser could not release audio")
+        }
+        try expectMicrophoneState(browser, allowed: false, phase: "browser releases audio")
+        try expectMicrophoneState(app, allowed: true, phase: "browser releases audio")
+        // Only browsers may release; an app that sends it is disconnected.
+        guard writeExactly(app, Packet.encode(.microphoneRequest, Data([0]))), waitForViewerCount(server, 1) else {
+            throw TestError.message("App viewer was allowed to release audio")
+        }
+        Darwin.close(app)
+        guard !server.hasAudioViewer else {
+            throw TestError.message("A watching browser alone turned on Mac audio capture")
+        }
+        guard writeExactly(browser, Packet.encode(.microphoneRequest, Data([1]))) else {
+            throw TestError.message("Browser could not request audio when alone")
+        }
+        try expectMicrophoneState(browser, allowed: true, phase: "browser alone takes audio")
+        guard server.hasAudioViewer else { throw TestError.message("Browser audio did not start Mac audio capture") }
+        Darwin.shutdown(browser, SHUT_RDWR)
+        Darwin.close(browser)
+        guard waitForViewerCount(server, 0) else { throw TestError.message("Browser viewer did not disconnect") }
+
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
         server.stop()
@@ -497,7 +556,7 @@ struct TransportSmoke {
             Darwin.close(unexpected)
             throw TestError.message("Stopped server still accepted a viewer")
         }
-        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, stopped listener, session access denial, frame flow control, AAC audio both ways")
+        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, stopped listener, session access denial, frame flow control, AAC audio both ways, browser audio on request")
     }
 
     /// The next screen frame within 300 ms, skipping other packets.

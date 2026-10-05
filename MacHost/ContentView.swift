@@ -79,6 +79,37 @@ struct ContentView: View {
                 }
             }
 
+            GroupBox("Browser access") {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle("Allow a browser on your tailnet to view and control this Mac", isOn: Binding(
+                        get: { host.isBrowserAccessEnabled },
+                        set: { host.setBrowserAccess($0) }
+                    ))
+                    Text("Served only over this Mac's Tailscale HTTPS address, only to \(host.browserLogin.isEmpty ? "the Tailscale account that owns this Mac" : host.browserLogin). Each browser also pairs once with a pairing code and appears under Paired devices.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    LabeledContent("Browser", value: host.browserStatus)
+                    if !host.browserURL.isEmpty {
+                        HStack {
+                            Text(host.browserURL)
+                                .textSelection(.enabled)
+                                .font(.callout.monospaced())
+                            Spacer()
+                            Button("Copy") {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(host.browserURL, forType: .string)
+                            }
+                            Button("Open") {
+                                if let url = URL(string: host.browserURL) { NSWorkspace.shared.open(url) }
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
             GroupBox("Paired devices") {
                 if host.pairedDevices.isEmpty {
                     Text("No saved devices yet")

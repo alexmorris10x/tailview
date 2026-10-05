@@ -33,6 +33,10 @@ struct ControlCommand: Codable, Equatable {
     var key: Key? = nil
     var modifiers: [Modifier]? = nil
     var window: WindowLayout? = nil
+    /// Shift held on a hardware keyboard, sent only by the browser viewer for
+    /// keys and pointer actions. Text carries Shift in its characters. Hosts
+    /// before 0.6.0 ignore it.
+    var shift: Bool? = nil
 
     static let maximumBytes = 1_024
 
@@ -59,6 +63,10 @@ struct ControlCommand: Codable, Equatable {
            modifiers.isEmpty || modifiers.count > Modifier.allCases.count
             || Set(modifiers).count != modifiers.count { return false }
         if kind != .window && window != nil { return false }
+        if let shift {
+            guard shift, [.move, .leftClick, .rightClick, .leftDown, .leftDrag, .leftUp, .scroll, .key]
+                .contains(kind) else { return false }
+        }
         switch kind {
         case .move, .leftClick, .rightClick, .leftDown, .leftDrag, .leftUp:
             return hasPoint && amount == nil && horizontalAmount == nil && text == nil && key == nil

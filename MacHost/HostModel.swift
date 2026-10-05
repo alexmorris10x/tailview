@@ -18,6 +18,10 @@ final class HostModel: ObservableObject {
     @Published private(set) var isControlEnabled = false
     @Published private(set) var controlStatus = "Control is off"
     @Published private(set) var isPaused = false
+    @Published private(set) var isBrowserAccessEnabled = UserDefaults.standard.bool(forKey: "tailview.browserAccess")
+    @Published private(set) var browserStatus = "Off"
+    @Published private(set) var browserURL = ""
+    @Published private(set) var browserLogin = ""
 
     let display = DisplayControlModel()
 
@@ -26,6 +30,8 @@ final class HostModel: ObservableObject {
     private let audioRouting = AudioRoutingController()
     private var capture: ScreenCapture?
     private var server: VideoServer?
+    private var webServer: WebViewerServer?
+    private var browserGeneration: UInt64 = 0
     private var peakMicrophoneLevel = 0.0
     private var pairingWindowID = UUID()
     private var launchGeneration: UInt64 = 0
@@ -95,9 +101,9 @@ final class HostModel: ObservableObject {
                         self.viewerStatus = count == 0 ? "Disconnected" :
                             "\(count) viewer\(count == 1 ? "" : "s") connected"
                         if count == 0 { self.linkStatus = "No measurements yet" }
-                        self.audioRouting.setConnected(server.hasPairedViewer)
+                        self.audioRouting.setConnected(server.hasAudioViewer)
                         if let capture = self.capture {
-                            self.updateSystemAudioCapture(server.hasPairedViewer, on: capture)
+                            self.updateSystemAudioCapture(server.hasAudioViewer, on: capture)
                         }
                         self.isControlEnabled = server.isControlEnabled
                         self.controlStatus = count > 0
@@ -144,6 +150,7 @@ final class HostModel: ObservableObject {
                     status = "Sharing main display"
                     isSharing = true
                     server.start()
+                    if isBrowserAccessEnabled { startBrowserAccess(for: server) }
                 }
             } catch {
                 if generation == launchGeneration { status = "Could not start: \(error.localizedDescription)" }
@@ -157,6 +164,7 @@ final class HostModel: ObservableObject {
         launchGeneration &+= 1
         disableControl()
         server?.disablePairing()
+        stopBrowserAccess()
         server?.stop()
         server = nil
         audioRouting.setConnected(false)
@@ -218,7 +226,7 @@ final class HostModel: ObservableObject {
                 }
                 capture = replacement
                 status = "Sharing main display"
-                updateSystemAudioCapture(server.hasPairedViewer, on: replacement)
+                updateSystemAudioCapture(server.hasAudioViewer, on: replacement)
             } catch {
                 stop()
                 status = "Screen capture stopped: \(error.localizedDescription)"
@@ -306,6 +314,73 @@ final class HostModel: ObservableObject {
         }
     }
 
+    func setBrowserAccess(_ enabled: Bool) {
+        guard enabled != isBrowserAccessEnabled else { return }
+        isBrowserAccessEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "tailview.browserAccess")
+        if enabled {
+            if let server, isSharing { startBrowserAccess(for: server) }
+            else { browserStatus = "Starts when sharing starts" }
+        } else {
+            stopBrowserAccess()
+            browserURL = ""
+            Task.detached { _ = try? Self.runTailscale(["serve", "--https=\(WebViewerServer.port)", "off"]) }
+        }
+    }
+
+    /// Listens on 127.0.0.1 and publishes that port on this Mac's tailnet
+    /// HTTPS name with `tailscale serve`, which adds the identity header the
+    /// browser server requires. Nothing is reachable outside the tailnet.
+    private func startBrowserAccess(for server: VideoServer) {
+        stopBrowserAccess()
+        browserGeneration &+= 1
+        let generation = browserGeneration
+        browserStatus = "Starting…"
+        Task { [self] in
+            do {
+                guard let pageURL = Bundle.main.url(forResource: "viewer", withExtension: "html") else {
+                    throw HostError.message("The browser viewer page is missing from the app")
+                }
+                let page = try Data(contentsOf: pageURL)
+                let identity = try await Task.detached { try Self.tailscaleIdentity() }.value
+                let authority = "\(identity.dnsName):\(WebViewerServer.port)"
+                guard generation == browserGeneration, self.server === server, isBrowserAccessEnabled else { return }
+                let web = WebViewerServer(allowedLogin: identity.login, authority: authority,
+                                          ownAddress: address, page: page) {
+                    [weak server] fd in server?.attachBrowserViewer(fd) ?? false
+                }
+                web.onStatus = { [weak self] summary in
+                    Task { @MainActor in
+                        guard let self, self.webServer === web else { return }
+                        self.browserStatus = summary
+                    }
+                }
+                try web.start()
+                webServer = web
+                try await Task.detached {
+                    _ = try Self.runTailscale(["serve", "--bg", "--https=\(WebViewerServer.port)",
+                                               "http://127.0.0.1:\(WebViewerServer.port)"])
+                }.value
+                guard webServer === web else { return }
+                browserURL = "https://\(authority)/"
+                browserLogin = identity.login
+                browserStatus = "No browser connected"
+            } catch {
+                if generation == browserGeneration {
+                    stopBrowserAccess()
+                    browserStatus = "Could not start: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    private func stopBrowserAccess() {
+        browserGeneration &+= 1
+        webServer?.stop()
+        webServer = nil
+        browserStatus = isBrowserAccessEnabled ? "Starts when sharing starts" : "Off"
+    }
+
     private func reloadPairedDevices() {
         do { pairedDevices = try pairedStore.list() }
         catch { pairingStatus = "Could not read paired devices: \(error.localizedDescription)" }
@@ -348,6 +423,55 @@ final class HostModel: ObservableObject {
               let ip = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
               ip.hasPrefix("100.") else { throw HostError.message("Connect this Mac to Tailscale") }
         return ip
+    }
+
+    private struct TailscaleIdentity {
+        let dnsName: String
+        let login: String
+    }
+
+    /// This Mac's MagicDNS name and the login of the user who owns it.
+    private nonisolated static func tailscaleIdentity() throws -> TailscaleIdentity {
+        let output = try runTailscale(["status", "--json"])
+        guard let status = try JSONSerialization.jsonObject(with: output) as? [String: Any],
+              let me = status["Self"] as? [String: Any],
+              let dnsName = (me["DNSName"] as? String)?.trimmingCharacters(in: CharacterSet(charactersIn: ".")),
+              dnsName.hasSuffix(".ts.net"),
+              let userID = (me["UserID"] as? NSNumber)?.stringValue,
+              let users = status["User"] as? [String: Any],
+              let user = users[userID] as? [String: Any],
+              let login = user["LoginName"] as? String, !login.isEmpty else {
+            throw HostError.message("Tailscale did not report this Mac's name and owner; turn on MagicDNS and HTTPS")
+        }
+        return TailscaleIdentity(dnsName: dnsName.lowercased(), login: login)
+    }
+
+    @discardableResult
+    private nonisolated static func runTailscale(_ arguments: [String]) throws -> Data {
+        let paths = ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"]
+        guard let path = paths.first(where: FileManager.default.isExecutableFile(atPath:)) else {
+            throw HostError.message("Tailscale CLI is unavailable")
+        }
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: path)
+        process.arguments = arguments
+        let output = Pipe()
+        let errors = Pipe()
+        process.standardOutput = output
+        process.standardError = errors
+        try process.run()
+        // `tailscale serve` waits for consent if HTTPS is off for the tailnet.
+        let deadline = DispatchTime.now() + 20
+        DispatchQueue.global().asyncAfter(deadline: deadline) { if process.isRunning { process.terminate() } }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        let errorData = errors.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let message = String(data: errorData.isEmpty ? data : errorData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            throw HostError.message("tailscale \(arguments.first ?? "") failed\(message.isEmpty ? "" : ": " + message)")
+        }
+        return data
     }
 
     private enum HostError: LocalizedError {

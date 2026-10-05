@@ -25,6 +25,9 @@ final class VideoServer {
         let fd: Int32
         let pairedID: UUID?
         let prefersMicrophone: Bool
+        /// A browser bridged by WebViewerServer. It takes audio only when it
+        /// asks, and is never chosen as the automatic audio device.
+        let isBrowser: Bool
         let sendQueue: DispatchQueue
         var controlEnabled: Bool
         var framePending = false
@@ -47,11 +50,12 @@ final class VideoServer {
         // Used only by this viewer's reader thread.
         var microphoneDecoder: AACDecoder?
 
-        init(fd: Int32, pairedID: UUID?, controlEnabled: Bool, prefersMicrophone: Bool) {
+        init(fd: Int32, pairedID: UUID?, controlEnabled: Bool, prefersMicrophone: Bool, isBrowser: Bool) {
             self.fd = fd
             self.pairedID = pairedID
             self.controlEnabled = controlEnabled
             self.prefersMicrophone = prefersMicrophone
+            self.isBrowser = isBrowser
             sendQueue = DispatchQueue(label: "TailView.viewerSend.\(id.uuidString)")
         }
     }
@@ -143,6 +147,16 @@ final class VideoServer {
     var hasPairedViewer: Bool {
         lock.lock(); defer { lock.unlock() }
         return running && viewers.values.contains { $0.pairedID != nil }
+    }
+
+    /// A paired app viewer, or a browser that took audio. Mac sound capture
+    /// and audio routing follow this rather than every paired viewer, so a
+    /// browser that only watches leaves the Mac's audio devices alone.
+    var hasAudioViewer: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return running && viewers.values.contains {
+            $0.pairedID != nil && (!$0.isBrowser || $0.id == microphoneOwner)
+        }
     }
 
     var viewerCount: Int {
@@ -388,7 +402,34 @@ final class VideoServer {
         }
     }
 
-    private func handleViewer(_ fd: Int32) {
+    /// Accepts one end of a socket pair whose other end WebViewerServer
+    /// relays to a browser WebSocket. The browser speaks the same packet
+    /// protocol, including sign-in, as the iOS viewer.
+    func attachBrowserViewer(_ fd: Int32) -> Bool {
+        lock.lock()
+        let mayHandshake = running && pendingHandshakes < 4
+        if mayHandshake { pendingHandshakes += 1 }
+        lock.unlock()
+        guard mayHandshake else { return false }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self else { Darwin.close(fd); return }
+            self.handleViewer(fd, isBrowser: true)
+            self.lock.lock(); self.pendingHandshakes -= 1; self.lock.unlock()
+        }
+        return true
+    }
+
+    /// Call with the lock held. The automatic audio device after `excluded`
+    /// leaves: an explicit choice, then a preferred device, then any app
+    /// viewer. Browsers are never chosen automatically.
+    private func automaticMicrophoneOwner(excluding excluded: UUID?) -> ViewerConnection? {
+        let candidates = viewers.values.filter { $0.id != excluded && $0.pairedID != nil && !$0.isBrowser }
+        return candidates.first { $0.pairedID == manuallySelectedMicrophone }
+            ?? candidates.first { $0.prefersMicrophone }
+            ?? candidates.first
+    }
+
+    private func handleViewer(_ fd: Int32, isBrowser: Bool = false) {
         var admitted: ViewerConnection?
         // shutdown wakes recv; close only after the reader and queued writers
         // have finished, so a reused descriptor cannot receive stale work.
@@ -432,16 +473,23 @@ final class VideoServer {
         }
         let allowed = pairedID != nil && (authorizeTrustedControl?() == true)
         let viewer = ViewerConnection(fd: fd, pairedID: pairedID, controlEnabled: allowed,
-                                      prefersMicrophone: preferredMicrophone)
+                                      prefersMicrophone: preferredMicrophone, isBrowser: isBrowser)
         let previousMicrophone = microphoneOwner.flatMap { viewers[$0] }
         if let replacedViewer { viewers.removeValue(forKey: replacedViewer.id) }
         viewers[viewer.id] = viewer
-        if let replacedViewer, previousMicrophone === replacedViewer {
+        if isBrowser {
+            // A reloaded browser asks for audio again after a user gesture.
+            if let replacedViewer, previousMicrophone === replacedViewer {
+                microphoneOwner = automaticMicrophoneOwner(excluding: viewer.id)?.id
+            }
+        } else if let replacedViewer, previousMicrophone === replacedViewer {
             microphoneOwner = viewer.id
-        } else if pairedID != nil && (previousMicrophone == nil ||
-                                      manuallySelectedMicrophone == pairedID ||
-                                      (manuallySelectedMicrophone == nil && preferredMicrophone &&
-                                       previousMicrophone?.prefersMicrophone == false)) {
+        } else if pairedID != nil && previousMicrophone?.isBrowser != true &&
+                    (previousMicrophone == nil ||
+                     manuallySelectedMicrophone == pairedID ||
+                     (manuallySelectedMicrophone == nil && preferredMicrophone &&
+                      previousMicrophone?.prefersMicrophone == false)) {
+            // Audio a browser took stays there until it releases or leaves.
             microphoneOwner = viewer.id
         }
         let demotedMicrophone = previousMicrophone?.id == microphoneOwner ? nil : previousMicrophone
@@ -501,20 +549,30 @@ final class VideoServer {
                 lock.unlock()
                 if allowed { onControlCommand?(command) }
             case .microphoneRequest:
-                guard length == 1, let payload = Self.readExactly(fd, 1), payload == Data([1]) else { return }
+                // 1 takes audio. 0 gives it back, which only browsers send.
+                guard length == 1, let payload = Self.readExactly(fd, 1),
+                      payload == Data([1]) || (viewer.isBrowser && payload == Data([0])) else { return }
                 lock.lock()
                 let allowed = running && viewers[viewer.id] === viewer && viewer.pairedID != nil
                 let previous = microphoneOwner.flatMap { viewers[$0] }
-                if allowed {
-                    microphoneOwner = viewer.id
-                    manuallySelectedMicrophone = viewer.pairedID
+                var next = previous
+                if allowed && payload[0] == 1 {
+                    next = viewer
+                    // A browser's grab lasts only for its connection, so an
+                    // app device's explicit choice still returns afterwards.
+                    if !viewer.isBrowser { manuallySelectedMicrophone = viewer.pairedID }
+                } else if allowed && previous === viewer {
+                    next = automaticMicrophoneOwner(excluding: viewer.id)
                 }
-                let changed = allowed && previous?.id != viewer.id
+                microphoneOwner = next?.id
+                let changed = previous !== next
                 lock.unlock()
                 if changed {
                     audioSink?.clear()
                     if let previous { sendMicrophoneState(previous) }
-                    sendMicrophoneState(viewer)
+                    if let next { sendMicrophoneState(next) }
+                    // Mac sound capture and routing follow a browser's choice.
+                    if viewer.isBrowser { onViewerStatus?("Connected") }
                 }
             case .videoFlow:
                 guard length == 1, let payload = Self.readExactly(fd, 1),
@@ -597,9 +655,7 @@ final class VideoServer {
         let microphoneEnded = microphoneOwner == viewer.id
         var nextMicrophone: ViewerConnection?
         if microphoneEnded {
-            nextMicrophone = viewers.values.first { $0.pairedID == manuallySelectedMicrophone && $0.pairedID != nil }
-                ?? viewers.values.first { $0.pairedID != nil && $0.prefersMicrophone }
-                ?? viewers.values.first { $0.pairedID != nil }
+            nextMicrophone = automaticMicrophoneOwner(excluding: viewer.id)
             microphoneOwner = nextMicrophone?.id
         }
         let connected = !viewers.isEmpty
