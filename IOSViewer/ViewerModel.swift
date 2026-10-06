@@ -35,6 +35,10 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var macAudioSoftMuted = false
     @Published private(set) var savedMacs = [SavedMac]()
     @Published private(set) var savedCredentialRejected = false
+    /// Saved Macs whose credential the Mac rejected since launch.
+    @Published private(set) var rejectedMacIDs = Set<UUID>()
+    /// The saved Mac the current connection signed in with.
+    var connectedMacID: UUID? { isConnected && isPairedSession ? reconnectProfile?.id : nil }
 
     private enum Credential {
         case session(String)
@@ -270,6 +274,7 @@ final class ViewerModel: ObservableObject {
         reconnectProfile = profile
         reconnectBackoff.reset()
         savedCredentialRejected = false
+        rejectedMacIDs.remove(profile.id)
         beginConnection(host: profile.address, credential: .saved(profile),
                         startMicrophoneOnConnect: startMicrophoneOnConnect,
                         startMacAudioOnConnect: startMacAudioOnConnect)
@@ -282,6 +287,7 @@ final class ViewerModel: ObservableObject {
             try SavedMacStore.save(remaining)
             savedMacs = remaining
             savedCredentialRejected = false
+            rejectedMacIDs.remove(profile.id)
             status = "Profile removed from this device; revoke it on the Mac to remove access there"
         } catch {
             status = "Could not remove profile: \(error.localizedDescription)"
@@ -473,8 +479,10 @@ final class ViewerModel: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.connection === failed else { return }
             if rejected || self.reconnectProfile == nil {
+                let rejectedID = rejected ? self.reconnectProfile?.id : nil
                 self.disconnect()
                 self.savedCredentialRejected = rejected
+                if let rejectedID { self.rejectedMacIDs.insert(rejectedID) }
             } else {
                 let keepMicrophone = self.microphoneWanted && self.isMicrophoneOn && self.engine?.isRunning == true
                 if !keepMicrophone && !self.reconnectBackgroundTimeRequested {

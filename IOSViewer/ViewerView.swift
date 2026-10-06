@@ -110,9 +110,9 @@ struct ViewerView: View {
                 showPairing = false
                 automaticConnection = true
                 code = ""
-                if preferredMacID.isEmpty, let profile = viewer.savedMacs.last {
-                    preferredMacID = profile.id.uuidString
-                }
+                // Reconnect targets the Mac this device last signed in to, so a
+                // fresh pairing replaces an older, possibly revoked, profile.
+                if let id = viewer.connectedMacID { preferredMacID = id.uuidString }
             } else {
                 releaseFunctionKey()
                 modifierSelection.reset()
@@ -554,8 +554,15 @@ struct ViewerView: View {
         }
     }
 
+    /// The chosen Mac. If that Mac rejected this profile, the newest other
+    /// profile for the same address, which is usually the pairing that replaced
+    /// it; never a different Mac.
     private var preferredProfile: SavedMac? {
-        viewer.savedMacs.first { $0.id.uuidString == preferredMacID } ?? viewer.savedMacs.first
+        let chosen = viewer.savedMacs.first { $0.id.uuidString == preferredMacID } ?? viewer.savedMacs.first
+        guard let chosen, viewer.rejectedMacIDs.contains(chosen.id) else { return chosen }
+        return viewer.savedMacs.last {
+            $0.address == chosen.address && !viewer.rejectedMacIDs.contains($0.id)
+        } ?? chosen
     }
 
     private func connectPreferredIfNeeded() {
@@ -565,8 +572,8 @@ struct ViewerView: View {
         guard !ProcessInfo.processInfo.arguments.contains("--tailview-test-isolated-recorder") else { return }
         #endif
         guard scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
-              !viewer.isConnected, !viewer.isConnecting, !viewer.isReconnecting, !viewer.savedCredentialRejected,
-              let profile = preferredProfile else { return }
+              !viewer.isConnected, !viewer.isConnecting, !viewer.isReconnecting,
+              let profile = preferredProfile, !viewer.rejectedMacIDs.contains(profile.id) else { return }
         viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
                        startMacAudioOnConnect: macAudioOnConnect)
     }
