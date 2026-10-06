@@ -1,0 +1,14 @@
+[
+  [
+    "TailViewIOS",
+    "IOSViewer/Info.plist",
+    "com.10x.tailview.ios",
+    "TailView"
+  ],
+  [
+    "TailViewLiveActivity",
+    "LiveActivity/Info.plist",
+    "com.10x.tailview.ios.LiveActivity",
+    "TailView Controls"
+  ]
+]

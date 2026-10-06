@@ -53,6 +53,7 @@
 		E373B23CD90E4A0C6264A55F /* BacklightController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A18A3313347868348999728 /* BacklightController.swift */; };
 		E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */; };
 		E787339A2352E81E1A2BF5C5 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
+		EF259E62E76940465BEFB7A2 /* DevAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 590D18DC9D63B20A1C6CD689 /* DevAssets.xcassets */; };
 		F0AC032D5A673D0FD6936CC5 /* LocalInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7120797B5BA592ECF917EBD6 /* LocalInputController.swift */; };
 		F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
 		FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
@@ -100,6 +101,7 @@
 		49ACCAC73BE7A1A3BD8190B4 /* DisplayControlModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplayControlModel.swift; sourceTree = "<group>"; };
 		4BD5CCB624B37839736A66A9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		56F7A4A2A9085AF68C5BB785 /* PhysicalDisplayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhysicalDisplayController.swift; sourceTree = "<group>"; };
+		590D18DC9D63B20A1C6CD689 /* DevAssets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = DevAssets.xcassets; sourceTree = "<group>"; };
 		5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenViewport.swift; sourceTree = "<group>"; };
 		5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewIOSApp.swift; sourceTree = "<group>"; };
 		631DE9DE7174936614641B63 /* LiveControlsActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControlsActivity.swift; sourceTree = "<group>"; };
@@ -210,6 +212,7 @@
 			isa = PBXGroup;
 			children = (
 				2ED200EAE69D0972F6653D93 /* Assets.xcassets */,
+				590D18DC9D63B20A1C6CD689 /* DevAssets.xcassets */,
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
 				631DE9DE7174936614641B63 /* LiveControlsActivity.swift */,
 				0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */,
@@ -243,6 +246,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = AAD37363B33DB79EAED17927 /* Build configuration list for PBXNativeTarget "TailViewLiveActivity" */;
 			buildPhases = (
+				46045EC14230389FAB6CADA1 /* Validate build identity */,
 				3433D8A80A6E4AAD3584BD58 /* Sources */,
 			);
 			buildRules = (
@@ -278,6 +282,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 981ADACAEF12A74B7B1821E8 /* Build configuration list for PBXNativeTarget "TailViewIOS" */;
 			buildPhases = (
+				9EB256311F0ECA7869B1A2BA /* Validate build identity */,
 				77978292BA754EAA4AAE5D06 /* Sources */,
 				8302493F4403F7C49E4EEB7D /* Resources */,
 				C5A3D2B112C60E445AD85276 /* Embed Foundation Extensions */,
@@ -344,6 +349,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				750DF88B49955570BD944C02 /* Assets.xcassets in Resources */,
+				EF259E62E76940465BEFB7A2 /* DevAssets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,6 +362,49 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		46045EC14230389FAB6CADA1 /* Validate build identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/validate-ios-identity.sh",
+			);
+			name = "Validate build identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/validate-ios-identity.sh\"";
+		};
+		9EB256311F0ECA7869B1A2BA /* Validate build identity */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/validate-ios-identity.sh",
+			);
+			name = "Validate build identity";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/validate-ios-identity.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3433D8A80A6E4AAD3584BD58 /* Sources */ = {
@@ -439,7 +488,8 @@
 		26A150DB94D889CF8326687E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APP_DISPLAY_NAME = "TailView Dev";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
@@ -448,7 +498,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios;
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -457,6 +507,7 @@
 		38596A7F17A355D3697A5510 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = "TailView Controls";
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -492,6 +543,7 @@
 		7E4855D8FAFAF2E305BE36A0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = "TailView Controls Dev";
 				CODE_SIGN_STYLE = Automatic;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -500,7 +552,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.LiveActivity;
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev.LiveActivity;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -644,9 +696,11 @@
 		EDBF310758BF2DF5484324BB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = TailView;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				EXCLUDED_SOURCE_FILE_NAMES = DevAssets.xcassets;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (

@@ -9,7 +9,14 @@ struct SavedMac: Codable, Identifiable {
 }
 
 enum SavedMacStore {
-    private static let service = "com.10x.tailview.ios.saved-macs"
+    // Keep existing Release records; Dev has its own service and app access group.
+    private static let service: String = {
+        guard let bundleID = Bundle.main.bundleIdentifier,
+              ["com.10x.tailview.ios", "com.10x.tailview.ios.dev"].contains(bundleID) else {
+            preconditionFailure("Invalid TailView iOS identity configuration")
+        }
+        return bundleID + ".saved-macs"
+    }()
     private static let account = "saved-macs"
 
     static func newToken() throws -> String {
