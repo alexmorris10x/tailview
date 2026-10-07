@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
-		12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */; };
 		17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */; };
 		184CB899EB12E6B327C6EC5B /* TailViewLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
@@ -126,7 +125,6 @@
 		F54C4272B69B3D917AFDF90B /* ControlCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCommand.swift; sourceTree = "<group>"; };
 		FB734A9B934E848BE257E976 /* TailViewIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TailViewIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteScreenView.swift; sourceTree = "<group>"; };
-		FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteFallbackKeyboard.swift; sourceTree = "<group>"; };
 		FF5F28AE665343293EA19C0A /* SavedMacStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedMacStore.swift; sourceTree = "<group>"; };
 		FFAD381F1F4B2EF73F5FED87 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -216,7 +214,6 @@
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
 				631DE9DE7174936614641B63 /* LiveControlsActivity.swift */,
 				0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */,
-				FF194F89E59C3216C78B63B4 /* RemoteFallbackKeyboard.swift */,
 				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
 				FF5F28AE665343293EA19C0A /* SavedMacStore.swift */,
@@ -431,7 +428,6 @@
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,
 				FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */,
-				12981696B9A1691C93FA2BF7 /* RemoteFallbackKeyboard.swift in Sources */,
 				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,
 				7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */,

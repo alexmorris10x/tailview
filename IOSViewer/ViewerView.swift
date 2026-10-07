@@ -1,5 +1,6 @@
 import Combine
 import AVKit
+import GameController
 import SwiftUI
 
 struct ViewerView: View {
@@ -10,7 +11,6 @@ struct ViewerView: View {
     @AppStorage("reverseScrollDirection") private var reverseScrollDirection = false
     @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
     @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
-    @AppStorage("useTailViewTouchKeyboard") private var useTailViewTouchKeyboard = false
     @AppStorage("lockScreenControls") private var lockScreenControls = true
     @State private var code = ""
     @State private var profileName = "My Mac"
@@ -26,9 +26,7 @@ struct ViewerView: View {
     @State private var keyboardActive = false
     @State private var keyboardUserHidden = false
     @State private var keyboardFocusRequest = 0
-    @State private var keyboardOpenRequest = 0
     @State private var nativeKeyboardVisible = false
-    @State private var fallbackKeyboardVisible = false
     @State private var microphoneSessionEnabled = true
     @State private var macAudioSessionEnabled = true
     @State private var screenZoom: CGFloat = 1
@@ -53,32 +51,18 @@ struct ViewerView: View {
                 }
                 RemoteKeyboardInput(
                     isActive: keyboardActive && viewer.isControlAllowed && !showSettings,
-                    useTailViewKeyboard: useTailViewTouchKeyboard,
                     focusRequest: keyboardFocusRequest,
                     onText: sendText,
                     onDelete: { sendKey(.delete) },
                     onReturn: { sendKey(.returnKey) },
-                    onSoftwareKeyboardVisibilityChange: { visible in
-                        nativeKeyboardVisible = visible
-                        if visible { fallbackKeyboardVisible = false }
-                    }
+                    onSoftwareKeyboardVisibilityChange: { nativeKeyboardVisible = $0 }
                 )
                 .frame(width: 1, height: 1)
             }
             .background(.black)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if viewer.isConnected {
-                    VStack(spacing: 0) {
-                        if fallbackKeyboardVisible && viewer.isControlAllowed {
-                            RemoteFallbackKeyboard(
-                                onText: sendText,
-                                onDelete: { sendKey(.delete) },
-                                onReturn: { sendKey(.returnKey) },
-                                onDismiss: hideKeyboard
-                            )
-                        }
-                        controlBar
-                    }
+                    controlBar
                 }
             }
             .navigationTitle("TailView")
@@ -303,8 +287,7 @@ struct ViewerView: View {
                 } label: {
                     BarIcon("keyboard")
                 }
-                .accessibilityLabel(nativeKeyboardVisible || fallbackKeyboardVisible
-                                    ? "Hide keyboard" : "Show keyboard")
+                .accessibilityLabel(keyboardShown ? "Hide keyboard" : "Show keyboard")
                 .accessibilityIdentifier("tailview.keyboardButton")
                 .disabled(!viewer.isControlAllowed)
                 ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
@@ -539,8 +522,6 @@ struct ViewerView: View {
                     Text("Tap to click, slide one finger to move the Mac pointer, or press and hold then move to drag. Swipe two fingers to scroll the Mac. Pinch to zoom; while zoomed, use Pan view in the control bar to move the screen with two fingers.")
                 }
                 Section("Keyboard") {
-                    Toggle("Use TailView touch keyboard", isOn: $useTailViewTouchKeyboard)
-                    Text("The iOS keyboard is used by default. TailView shows touch keys if iPadOS hides it. Turn this on to use TailView's keys every time.")
                     Text("Tap Control, Option, or Command once for the next key or click. Tap twice quickly to hold it for multiple actions; tap a held modifier again to release it. Blue means next action and orange means held.")
                 }
                 #if DEBUG
@@ -634,36 +615,23 @@ struct ViewerView: View {
 
     private func showKeyboard() {
         keyboardUserHidden = false
-        keyboardOpenRequest += 1
-        if useTailViewTouchKeyboard {
-            keyboardActive = true
-            keyboardFocusRequest += 1
-            nativeKeyboardVisible = false
-            fallbackKeyboardVisible = true
-            return
-        }
         keyboardActive = true
         keyboardFocusRequest += 1
-        let request = keyboardOpenRequest
-        // An attached keyboard can give UIKit a first responder and a narrow
-        // accessory strip without showing the software keys. Offer our own
-        // remote keys if no full keyboard arrives after UIKit's transition.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-            guard request == keyboardOpenRequest, viewer.isControlAllowed,
-                  !showSettings, !nativeKeyboardVisible else { return }
-            fallbackKeyboardVisible = true
-        }
     }
 
     private func closeKeyboard() {
-        keyboardOpenRequest += 1
-        fallbackKeyboardVisible = false
         nativeKeyboardVisible = false
         keyboardActive = false
     }
 
+    /// With a hardware keyboard attached, iPadOS may show only a thin
+    /// accessory strip, so a focused input counts as the keyboard being on.
+    private var keyboardShown: Bool {
+        nativeKeyboardVisible || (keyboardActive && GCKeyboard.coalesced != nil)
+    }
+
     private func toggleKeyboard() {
-        if nativeKeyboardVisible || fallbackKeyboardVisible {
+        if keyboardShown {
             hideKeyboard()
         } else {
             showKeyboard()
