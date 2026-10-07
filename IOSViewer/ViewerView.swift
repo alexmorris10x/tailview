@@ -163,6 +163,7 @@ struct ViewerView: View {
         .onChange(of: scenePhase) { _, phase in
             viewer.setVideoActive(phase == .active)
             if phase == .active {
+                viewer.reloadSavedMacs()
                 connectPreferredIfNeeded()
                 viewer.resumeAudioAfterForeground()
                 if viewer.isControlAllowed && !showSettings && !keyboardUserHidden {
@@ -177,6 +178,7 @@ struct ViewerView: View {
             }
         }
         .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
+            if !viewer.savedMacsLoaded { viewer.reloadSavedMacs() }
             connectPreferredIfNeeded()
         }
         .task {
@@ -225,6 +227,12 @@ struct ViewerView: View {
                         automaticConnection = false
                         viewer.disconnect()
                     }
+                } else if !viewer.savedMacsLoaded && !showPairing {
+                    Button("Try again") { viewer.reloadSavedMacs() }
+                        .buttonStyle(.borderedProminent)
+                        .frame(maxWidth: .infinity)
+                    Button("Pair a new Mac") { showPairing = true }
+                        .frame(maxWidth: .infinity)
                 } else if !viewer.savedMacs.isEmpty && !showPairing {
                     Button("Reconnect to \(preferredProfile?.name ?? "Mac")") {
                         automaticConnection = true
@@ -241,7 +249,7 @@ struct ViewerView: View {
                     }
                     .frame(maxWidth: .infinity)
                 }
-                if viewer.savedMacs.isEmpty || showPairing {
+                if (viewer.savedMacsLoaded && viewer.savedMacs.isEmpty) || showPairing {
                     pairingForm
                 }
             }
@@ -276,6 +284,12 @@ struct ViewerView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(viewer.isConnecting || macAddress.isEmpty || code.isEmpty)
+            if showPairing && !viewer.savedMacs.isEmpty && !viewer.isConnecting {
+                Button("Back to saved Macs") {
+                    showPairing = false
+                    automaticConnection = true
+                }
+            }
         }
     }
 

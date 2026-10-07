@@ -54,6 +54,12 @@ enum SavedMacStore {
         }
     }
 
+    /// The device has not been unlocked since it started, so the Keychain is closed.
+    static func isLocked(_ error: Error) -> Bool {
+        if case StoreError.keychain(let status) = error { return status == errSecInteractionNotAllowed }
+        return false
+    }
+
     private static func query() -> [String: Any] {
         [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,

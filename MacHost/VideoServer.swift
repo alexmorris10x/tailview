@@ -62,7 +62,10 @@ final class VideoServer {
     var onMicrophoneLevel: ((Double) -> Void)?
     var onLinkStats: ((String) -> Void)?
     var onError: ((String) -> Void)?
-    var authenticateSaved: ((UUID, String) -> Bool)?
+    /// Whether a saved credential is valid. `unavailable` means the list could
+    /// not be read, so the device is not told it was revoked and retries.
+    enum SavedCredentialCheck { case accepted, rejected, unavailable }
+    var authenticateSaved: ((UUID, String) -> SavedCredentialCheck)?
     var isPreferredMicrophone: ((UUID) -> Bool)?
     var onPairingRequest: ((UUID, String, String) -> Bool)?
     var onPairingSuccess: ((UUID, String) -> Void)?
@@ -409,10 +412,15 @@ final class VideoServer {
         case .session(let suppliedCode):
             guard suppliedCode == code else { return }
         case .authenticate(let id, let token):
-            guard authenticateSaved?(id, token) == true else {
+            switch authenticateSaved?(id, token) ?? .rejected {
+            case .accepted: break
+            case .rejected:
                 // An explicit response distinguishes revocation from a dropped
                 // handshake or a temporarily full/unavailable host.
                 _ = Self.writeExactly(fd, Data("NO\n".utf8))
+                return
+            case .unavailable:
+                // The device keeps its profile and retries.
                 return
             }
             pairedID = id

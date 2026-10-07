@@ -490,6 +490,9 @@ struct TransportSmoke {
         guard waitForViewerCount(server, 0) else {
             throw TestError.message("Flow-control viewer did not disconnect")
         }
+        credentials.setUnavailable(true)
+        try expectClosedWithoutRejection(address, line: saved.line, reason: "unreadable saved devices")
+        credentials.setUnavailable(false)
         credentials.revoke(deviceID)
         try expectRejected(address, line: saved.line, reason: "revoked device")
         server.stop()
@@ -497,7 +500,7 @@ struct TransportSmoke {
             Darwin.close(unexpected)
             throw TestError.message("Stopped server still accepted a viewer")
         }
-        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, stopped listener, session access denial, frame flow control, AAC audio both ways")
+        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, unreadable credentials not reported as revoked, stopped listener, session access denial, frame flow control, AAC audio both ways")
     }
 
     /// The next screen frame within 300 ms, skipping other packets.
@@ -593,6 +596,16 @@ struct TransportSmoke {
             return
         }
         guard result == 0 else { throw TestError.message("Accepted \(reason) or timed out (recv=\(result), errno=\(errno))") }
+    }
+
+    /// A saved device the Mac cannot check must not be told it was revoked.
+    private static func expectClosedWithoutRejection(_ address: String, line: String, reason: String) throws {
+        let client = try connect(to: address)
+        defer { Darwin.close(client) }
+        guard writeExactly(client, Data(line.utf8)) else { throw TestError.message("Could not send \(reason)") }
+        var byte: UInt8 = 0
+        let result = Darwin.recv(client, &byte, 1, 0)
+        guard result == 0 else { throw TestError.message("Answered \(reason) instead of closing (recv=\(result), byte=\(byte))") }
     }
 
     private static func connect(to address: String, receiveBuffer: Int32? = nil) throws -> Int32 {
@@ -705,9 +718,16 @@ private final class CredentialStore {
         tokens[id] = token
     }
 
-    func authenticate(_ id: UUID, token: String) -> Bool {
+    private var unavailable = false
+
+    func authenticate(_ id: UUID, token: String) -> VideoServer.SavedCredentialCheck {
         lock.lock(); defer { lock.unlock() }
-        return tokens[id] == token
+        if unavailable { return .unavailable }
+        return tokens[id] == token ? .accepted : .rejected
+    }
+
+    func setUnavailable(_ value: Bool) {
+        lock.lock(); unavailable = value; lock.unlock()
     }
 
     func revoke(_ id: UUID) {

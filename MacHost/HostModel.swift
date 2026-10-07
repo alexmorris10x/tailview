@@ -61,7 +61,15 @@ final class HostModel: ObservableObject {
                 let server = try VideoServer(address: ip, code: code, audioSink: sink)
                 let store = pairedStore
                 let injector = controlInjector
-                server.authenticateSaved = { id, token in store.authenticate(id: id, token: token) }
+                server.authenticateSaved = { [weak self] id, token in
+                    let result = store.authenticate(id: id, token: token)
+                    if result == .unavailable {
+                        Task { @MainActor in
+                            self?.pairingStatus = "Could not read paired devices; they will retry"
+                        }
+                    }
+                    return result
+                }
                 server.isPreferredMicrophone = { id in
                     (try? store.list().first { $0.id == id })?.name
                         .localizedCaseInsensitiveContains("iPad") == true

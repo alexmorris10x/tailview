@@ -34,6 +34,9 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var microphoneSoftMuted = false
     @Published private(set) var macAudioSoftMuted = false
     @Published private(set) var savedMacs = [SavedMac]()
+    /// False until the saved Macs have been read. iOS keeps the Keychain closed
+    /// until the device is first unlocked, and an unread list is not an empty one.
+    @Published private(set) var savedMacsLoaded = false
     @Published private(set) var savedCredentialRejected = false
     /// Saved Macs whose credential the Mac rejected since launch.
     @Published private(set) var rejectedMacIDs = Set<UUID>()
@@ -100,6 +103,7 @@ final class ViewerModel: ObservableObject {
     private var engineChangeObserver: NSObjectProtocol?
     private var interruptionObserver: NSObjectProtocol?
     private var mediaResetObserver: NSObjectProtocol?
+    private var protectedDataObserver: NSObjectProtocol?
     private var audioInterrupted = false
     private var audioRecoveryAttempts = 0
     private var routeRecoveryWork: DispatchWorkItem?
@@ -149,8 +153,11 @@ final class ViewerModel: ObservableObject {
     private var inputRouteName = "iPhone microphone"
 
     init() {
-        do { savedMacs = try SavedMacStore.load() }
-        catch { status = "Could not load saved Macs: \(error.localizedDescription)" }
+        reloadSavedMacs()
+        // iOS can launch TailView at boot, before the Keychain opens.
+        protectedDataObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.reloadSavedMacs() }
         routeChangeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(), queue: .main
@@ -244,10 +251,27 @@ final class ViewerModel: ObservableObject {
         if let engineChangeObserver { NotificationCenter.default.removeObserver(engineChangeObserver) }
         if let interruptionObserver { NotificationCenter.default.removeObserver(interruptionObserver) }
         if let mediaResetObserver { NotificationCenter.default.removeObserver(mediaResetObserver) }
+        if let protectedDataObserver { NotificationCenter.default.removeObserver(protectedDataObserver) }
         routeRecoveryWork?.cancel()
         reconnectWork?.cancel()
         microphoneWatchdog?.invalidate()
         healthTimer?.invalidate()
+    }
+
+    func reloadSavedMacs() {
+        do {
+            savedMacs = try SavedMacStore.load()
+            if !savedMacsLoaded {
+                savedMacsLoaded = true
+                if connection == nil { status = "Looking for your Mac…" }
+            }
+        } catch {
+            // Keep the list already shown; an unreadable Keychain is not an empty one.
+            guard !savedMacsLoaded, connection == nil else { return }
+            status = SavedMacStore.isLocked(error)
+                ? "Unlock this device to load your saved Macs"
+                : "Could not load saved Macs: \(error.localizedDescription)"
+        }
     }
 
     func pair(host: String, code: String, name: String, startMicrophoneOnConnect: Bool = true,
@@ -283,7 +307,7 @@ final class ViewerModel: ObservableObject {
     func forget(profile: SavedMac) {
         if reconnectProfile?.id == profile.id { disconnect() }
         do {
-            let remaining = savedMacs.filter { $0.id != profile.id }
+            let remaining = try SavedMacStore.load().filter { $0.id != profile.id }
             try SavedMacStore.save(remaining)
             savedMacs = remaining
             savedCredentialRejected = false
@@ -528,6 +552,7 @@ final class ViewerModel: ObservableObject {
                             profiles.append(profile)
                             try SavedMacStore.save(profiles)
                             self.savedMacs = profiles
+                            self.savedMacsLoaded = true
                             self.reconnectProfile = profile
                         } catch {
                             self.disconnect()
