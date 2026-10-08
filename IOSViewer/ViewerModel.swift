@@ -153,6 +153,7 @@ final class ViewerModel: ObservableObject {
     private var inputRouteName = "iPhone microphone"
 
     init() {
+        DiagnosticLog.note("Launched \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"))")
         reloadSavedMacs()
         // iOS can launch TailView at boot, before the Keychain opens.
         protectedDataObserver = NotificationCenter.default.addObserver(
@@ -161,8 +162,11 @@ final class ViewerModel: ObservableObject {
         routeChangeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(), queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
             guard let self else { return }
+            let reason = (notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
+            let outputs = AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portName).joined(separator: ", ")
+            DiagnosticLog.note("Route changed (reason \(reason)) → \(outputs); engine running: \(self.engine?.isRunning == true)")
             self.refreshMacAudioOutput()
             #if DEBUG
             let session = AVAudioSession.sharedInstance()
@@ -187,6 +191,8 @@ final class ViewerModel: ObservableObject {
                   let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
                   let type = AVAudioSession.InterruptionType(rawValue: raw) else { return }
             if type == .began {
+                let reason = (notification.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt) ?? 0
+                DiagnosticLog.note("Audio interrupted (reason \(reason)); mic on: \(self.isMicrophoneOn), sound on: \(self.isMacAudioOn)")
                 self.audioInterrupted = true
                 self.routeRecoveryWork?.cancel()
                 self.resetAudioGraph()
@@ -199,6 +205,7 @@ final class ViewerModel: ObservableObject {
                 self.audioInterrupted = !AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume) &&
                     UIApplication.shared.applicationState != .active
                 self.audioRecoveryAttempts = 0
+                DiagnosticLog.note("Audio interruption ended; shouldResume: \(AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume)), connected: \(self.isConnected), waiting for user: \(self.audioInterrupted)")
                 if self.audioInterrupted {
                     self.microphoneStatus = "Return to TailView or tap Mic to resume audio"
                     self.macAudioStatus = "Return to TailView or tap Speaker to resume audio"
@@ -212,6 +219,7 @@ final class ViewerModel: ObservableObject {
             object: AVAudioSession.sharedInstance(), queue: .main
         ) { [weak self] _ in
             guard let self else { return }
+            DiagnosticLog.note("Media services were reset")
             self.resetAudioGraph()
             self.audioRecoveryAttempts = 0
             self.scheduleAudioRouteRecovery()
@@ -417,6 +425,7 @@ final class ViewerModel: ObservableObject {
         audioInterrupted = false
         tearDownConnection(keepingAudio: false)
         status = "Disconnected"
+        DiagnosticLog.note("Disconnected by the user")
     }
 
     private func tearDownConnection(keepingAudio: Bool) {
@@ -473,6 +482,7 @@ final class ViewerModel: ObservableObject {
                                  startMacAudioOnConnect: self.macAudioWanted)
         }
         reconnectWork = work
+        DiagnosticLog.note("Reconnect scheduled in \(delay)s; mic on: \(isMicrophoneOn), engine running: \(engine?.isRunning == true)")
         #if DEBUG
         print("TailView reconnect scheduled in \(delay)s; background=\(UIApplication.shared.applicationState != .active); microphone=\(isMicrophoneOn)")
         #endif
@@ -507,6 +517,7 @@ final class ViewerModel: ObservableObject {
     private func failConnection(_ failed: NWConnection, message: String, rejected: Bool = false) {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.connection === failed else { return }
+            DiagnosticLog.note("Connection failed: \(message)\(rejected ? " (credential rejected)" : "")")
             if rejected || self.reconnectProfile == nil {
                 let rejectedID = rejected ? self.reconnectProfile?.id : nil
                 self.disconnect()
@@ -573,6 +584,7 @@ final class ViewerModel: ObservableObject {
                     self.reconnectWork?.cancel()
                     self.reconnectWork = nil
                     self.reconnectBackoff.reset()
+                    DiagnosticLog.note("Connected to the Mac")
                     #if DEBUG
                     print("TailView authenticated; background=\(UIApplication.shared.applicationState != .active)")
                     #endif
@@ -799,6 +811,7 @@ final class ViewerModel: ObservableObject {
             activeRouteSignature = currentAudioRouteSignature()
             refreshMacAudioOutput()
         } catch {
+            DiagnosticLog.note("Mac sound failed to start: \(DiagnosticLog.describe(error))")
             macAudioStatus = "Could not play Mac sound: \(error.localizedDescription)"
             scheduleAudioRouteRecovery()
         }
@@ -978,6 +991,7 @@ final class ViewerModel: ObservableObject {
 
     private func performLiveControl(_ action: LiveControlAction) {
         let background = UIApplication.shared.applicationState != .active
+        DiagnosticLog.note("Lock-screen control: \(action)")
         switch action {
         case .microphone:
             if microphoneSoftMuted { setMicrophoneSoftMuted(false) }
@@ -1046,26 +1060,34 @@ final class ViewerModel: ObservableObject {
     private func keepAudioRunning() {
         guard engine == nil, isReconnecting || audioRouteAllowed,
               microphoneCanRecover || macAudioWanted else { return }
-        do { _ = try ensureAudioEngine(inputRequired: false) }
-        catch {
-            #if DEBUG
-            print("TailView could not keep audio running while reconnecting: \(error.localizedDescription)")
-            #endif
+        do {
+            _ = try ensureAudioEngine(inputRequired: false)
+            DiagnosticLog.note("Started silent playback to keep TailView running")
+        } catch {
+            DiagnosticLog.note("Could not keep audio running: \(DiagnosticLog.describe(error))")
         }
     }
 
+    /// Background retries: four quick ones, then every 15 s for about ten
+    /// minutes. iOS may refuse to restart recording in the background, but
+    /// another app's dictation can also still hold the microphone for a while.
+    private static let backgroundRecoveryAttempts = 40
+
     private func scheduleAudioRouteRecovery() {
-        // In the background iOS may refuse to start recording until the app
-        // returns, so stop after five attempts there. In the foreground keep
-        // retrying; resumeAudioAfterForeground resets the count.
+        // In the foreground keep retrying; resumeAudioAfterForeground resets the count.
         guard isConnected, audioRouteAllowed, !audioInterrupted,
-              microphoneCanRecover || macAudioWanted, audioNeedsRecovery,
-              audioRecoveryAttempts < 5 || UIApplication.shared.applicationState == .active else { return }
+              microphoneCanRecover || macAudioWanted, audioNeedsRecovery else { return }
+        guard audioRecoveryAttempts < Self.backgroundRecoveryAttempts ||
+                UIApplication.shared.applicationState == .active else {
+            DiagnosticLog.note("Stopped rebuilding audio in the background after \(audioRecoveryAttempts) attempts")
+            return
+        }
         routeRecoveryWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.recoverAudioRoute() }
         routeRecoveryWork = work
         // Let hardware settle; retry a failed rebuild without a notification storm.
-        let delay = audioRecoveryAttempts == 0 ? 0.25 : min(5, Double(audioRecoveryAttempts))
+        let delay = audioRecoveryAttempts == 0 ? 0.25 : audioRecoveryAttempts < 5 ? Double(audioRecoveryAttempts) :
+            UIApplication.shared.applicationState == .active ? 5 : 15
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
@@ -1097,10 +1119,13 @@ final class ViewerModel: ObservableObject {
         guard isConnected, audioRouteAllowed, !audioInterrupted,
               microphoneCanRecover || macAudioWanted, audioNeedsRecovery else { return }
         audioRecoveryAttempts += 1
+        DiagnosticLog.note("Rebuilding audio (attempt \(audioRecoveryAttempts)); mic wanted: \(microphoneCanRecover), sound wanted: \(macAudioWanted)")
         #if DEBUG
         print("TailView rebuilding audio after route change (attempt \(audioRecoveryAttempts))")
         #endif
-        resetAudioGraph()
+        let onlyMicrophoneMissing = engine?.isRunning == true && activeRouteSignature == currentAudioRouteSignature() &&
+            (!macAudioWanted || isMacAudioOn) && microphoneCanRecover && !isMicrophoneOn
+        if !onlyMicrophoneMissing { resetAudioGraph() }
         if microphoneCanRecover {
             beginCapture()
         }
@@ -1131,6 +1156,7 @@ final class ViewerModel: ObservableObject {
 
     private func restartMicrophone(reason: String) {
         print("TailView \(reason)")
+        DiagnosticLog.note(reason)
         resetAudioGraph()
         audioRecoveryAttempts = 0
         microphoneStatus = reason
@@ -1307,9 +1333,11 @@ final class ViewerModel: ObservableObject {
             reconnectBackgroundTimeRequested = false
             activeRouteSignature = currentAudioRouteSignature()
             refreshMacAudioOutput()
+            DiagnosticLog.note("Microphone started: \(inputRouteName)")
             microphoneStatus = "Waiting for samples from \(inputRouteName)…"
             inputLevelStatus = "Input peak: waiting for samples"
         } catch {
+            DiagnosticLog.note("Microphone failed to start: \(DiagnosticLog.describe(error))")
             stopMicrophoneCapture()
             microphoneStatus = "Microphone failed: \(error.localizedDescription)"
             scheduleAudioRouteRecovery()

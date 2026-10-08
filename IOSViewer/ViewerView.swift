@@ -145,6 +145,7 @@ struct ViewerView: View {
             else { viewer.stopMacAudio() }
         }
         .onChange(of: scenePhase) { _, phase in
+            DiagnosticLog.note("Scene phase: \(phase)")
             viewer.setVideoActive(phase == .active)
             if phase == .active {
                 viewer.reloadSavedMacs()
