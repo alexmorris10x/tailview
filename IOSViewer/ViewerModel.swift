@@ -202,7 +202,9 @@ final class ViewerModel: ObservableObject {
                 if self.audioInterrupted {
                     self.microphoneStatus = "Return to TailView or tap Mic to resume audio"
                     self.macAudioStatus = "Return to TailView or tap Speaker to resume audio"
-                } else { self.scheduleAudioRouteRecovery() }
+                } else if self.isConnected {
+                    self.scheduleAudioRouteRecovery()
+                } else { self.keepAudioRunning() }
             }
         }
         mediaResetObserver = NotificationCenter.default.addObserver(
@@ -221,6 +223,8 @@ final class ViewerModel: ObservableObject {
             .sink { [weak self] _ in DispatchQueue.main.async { self?.refreshLiveControls() } }
         microphoneWatchdog = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             self?.checkMicrophoneHealth()
+            // Also re-confirms the lock-screen controls before they go stale.
+            self?.refreshLiveControls()
         }
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--tailview-health") || arguments.contains("--tailview-test-locked-audio") {
@@ -411,11 +415,11 @@ final class ViewerModel: ObservableObject {
         setMicrophoneSoftMuted(false)
         macAudioSoftMuted = false
         audioInterrupted = false
-        tearDownConnection(keepingMicrophone: false)
+        tearDownConnection(keepingAudio: false)
         status = "Disconnected"
     }
 
-    private func tearDownConnection(keepingMicrophone: Bool) {
+    private func tearDownConnection(keepingAudio: Bool) {
         routeRecoveryWork?.cancel()
         routeRecoveryWork = nil
         audioRecoveryAttempts = 0
@@ -431,13 +435,14 @@ final class ViewerModel: ObservableObject {
         image = nil
         startMicrophoneAfterConnect = false
         startMacAudioAfterConnect = false
-        // Discard pending playback and microphone sends. Keep an already active,
-        // user-requested mic running so a locked phone can reconnect. Samples
+        // Discard pending playback and microphone sends. Keep already running,
+        // user-requested audio going: iOS suspends a background app with no
+        // active audio, which would stop the reconnect. Microphone samples
         // during the outage have no destination and are discarded immediately.
         macAudioGeneration &+= 1
         macAudioPlayer?.stop()
         queuedMacAudioFrames = 0
-        if !keepingMicrophone {
+        if !keepingAudio {
             #if DEBUG
             stopDiagnostic()
             #endif
@@ -508,8 +513,9 @@ final class ViewerModel: ObservableObject {
                 self.savedCredentialRejected = rejected
                 if let rejectedID { self.rejectedMacIDs.insert(rejectedID) }
             } else {
-                let keepMicrophone = self.microphoneWanted && self.isMicrophoneOn && self.engine?.isRunning == true
-                if !keepMicrophone && !self.reconnectBackgroundTimeRequested {
+                let keepAudio = self.engine?.isRunning == true &&
+                    ((self.microphoneWanted && self.isMicrophoneOn) || (self.macAudioWanted && self.isMacAudioOn))
+                if !keepAudio && !self.reconnectBackgroundTimeRequested {
                     self.reconnectBackgroundTimeRequested = true
                     self.reconnectBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Reconnect TailView") { [weak self] in
                         // iOS grants limited extra time for playback-only sessions.
@@ -517,8 +523,9 @@ final class ViewerModel: ObservableObject {
                         self?.endReconnectBackgroundTask()
                     }
                 }
-                self.tearDownConnection(keepingMicrophone: keepMicrophone)
+                self.tearDownConnection(keepingAudio: keepAudio)
                 self.scheduleReconnect()
+                if !self.audioInterrupted { self.keepAudioRunning() }
             }
             self.status = message
         }
@@ -809,7 +816,10 @@ final class ViewerModel: ObservableObject {
         queuedMacAudioFrames = 0
         isMacAudioOn = false
         macAudioOutputStatus = "Output: off"
-        if !isMicrophoneOn { stopAudioEngine() }
+        if !isMicrophoneOn {
+            stopAudioEngine()
+            keepAudioRunning()
+        }
     }
 
     private func playMacAudio(_ payload: Data) {
@@ -898,15 +908,18 @@ final class ViewerModel: ObservableObject {
             // Without defaultToSpeaker, starting the mic switches an iPhone's
             // playback to its quiet receiver. Headphones still take precedence.
             try session.setCategory(.playAndRecord, mode: .default,
-                                    options: [.allowBluetoothA2DP, .defaultToSpeaker])
+                                    options: [.allowBluetoothA2DP, .defaultToSpeaker, .mixWithOthers])
             // iOS silences haptics while recording unless the session allows
             // them; the fn hold confirms itself with one.
             try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
         } else {
             // Playback routes to selected A2DP devices automatically. Do not
             // keep playAndRecord active on the viewer that does not own the mic.
-            try session.setCategory(.playback, mode: .default)
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
         }
+        // Mixable, so another app's audio (dictation, a voice reply) plays
+        // alongside instead of interrupting TailView. An interrupted
+        // background app is suspended five seconds later, dropping the Mac.
         try session.setActive(true)
         if let engine {
             if !engine.isRunning { try engine.start() }
@@ -1023,6 +1036,22 @@ final class ViewerModel: ObservableObject {
 
     private var microphoneCanRecover: Bool {
         microphoneWanted && AVAudioApplication.shared.recordPermission == .granted
+    }
+
+    /// iOS suspends a background app within seconds once its audio stops,
+    /// which drops the Mac. That happens when iOS wakes TailView after another
+    /// app's interruption (its connection has usually died meanwhile), or when
+    /// it refuses to restart the microphone in the background. Keep silent
+    /// playback running while audio is wanted and this device may own it.
+    private func keepAudioRunning() {
+        guard engine == nil, isReconnecting || audioRouteAllowed,
+              microphoneCanRecover || macAudioWanted else { return }
+        do { _ = try ensureAudioEngine(inputRequired: false) }
+        catch {
+            #if DEBUG
+            print("TailView could not keep audio running while reconnecting: \(error.localizedDescription)")
+            #endif
+        }
     }
 
     private func scheduleAudioRouteRecovery() {
@@ -1169,6 +1198,9 @@ final class ViewerModel: ObservableObject {
         audioRouteAllowed = allowed
         microphoneGate.setConnection(allowed ? connection : nil)
         if allowed {
+            // Audio kept running through the outage may have stopped, and
+            // recovery waits for a connection. Rebuild it rather than trust it.
+            if (isMacAudioOn || isMicrophoneOn) && engine?.isRunning != true { resetAudioGraph() }
             if macAudioWanted { startMacAudio(userInitiated: false) }
             // A capture kept running across a reconnect resumes sending now.
             if isMicrophoneOn { microphoneStatus = "Audio packets sent to Mac · \(inputRouteName)" }
@@ -1224,6 +1256,7 @@ final class ViewerModel: ObservableObject {
             }
         } else if !isMacAudioOn {
             stopAudioEngine()
+            keepAudioRunning()
         }
     }
 
