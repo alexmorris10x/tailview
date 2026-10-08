@@ -916,6 +916,15 @@ final class ViewerModel: ObservableObject {
 
     private func ensureAudioEngine(inputRequired: Bool) throws -> AVAudioEngine {
         let session = AVAudioSession.sharedInstance()
+        if let engine, engine.isRunning, UIApplication.shared.applicationState != .active,
+           session.category == .playAndRecord || (!inputRequired && session.category == .playback) {
+            // Already configured and active. In the background iOS refuses
+            // to re-activate ('!int'), so doing it anyway right after a
+            // dictation interruption failed Mac sound and the recovery then
+            // stopped the microphone that had just resumed. In the foreground
+            // re-activate as before, in case iOS deactivated the session.
+            return engine
+        }
         if inputRequired {
             // A2DP permits Bluetooth output while the built-in mic is active.
             // Without defaultToSpeaker, starting the mic switches an iPhone's
@@ -1068,26 +1077,23 @@ final class ViewerModel: ObservableObject {
         }
     }
 
-    /// Background retries: four quick ones, then every 15 s for about ten
-    /// minutes. iOS may refuse to restart recording in the background, but
-    /// another app's dictation can also still hold the microphone for a while.
-    private static let backgroundRecoveryAttempts = 40
+    /// In the background iOS lets TailView restart recording only just after
+    /// another app's interruption ends; later attempts fail with '!int'.
+    private static let backgroundRecoveryAttempts = 5
 
     private func scheduleAudioRouteRecovery() {
-        // In the foreground keep retrying; resumeAudioAfterForeground resets the count.
+        // In the background stop after a few attempts, since each failed
+        // microphone start also restarts Mac sound. In the foreground keep
+        // retrying; resumeAudioAfterForeground resets the count.
         guard isConnected, audioRouteAllowed, !audioInterrupted,
-              microphoneCanRecover || macAudioWanted, audioNeedsRecovery else { return }
-        guard audioRecoveryAttempts < Self.backgroundRecoveryAttempts ||
-                UIApplication.shared.applicationState == .active else {
-            DiagnosticLog.note("Stopped rebuilding audio in the background after \(audioRecoveryAttempts) attempts")
-            return
-        }
+              microphoneCanRecover || macAudioWanted, audioNeedsRecovery,
+              audioRecoveryAttempts < Self.backgroundRecoveryAttempts ||
+                UIApplication.shared.applicationState == .active else { return }
         routeRecoveryWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.recoverAudioRoute() }
         routeRecoveryWork = work
         // Let hardware settle; retry a failed rebuild without a notification storm.
-        let delay = audioRecoveryAttempts == 0 ? 0.25 : audioRecoveryAttempts < 5 ? Double(audioRecoveryAttempts) :
-            UIApplication.shared.applicationState == .active ? 5 : 15
+        let delay = audioRecoveryAttempts == 0 ? 0.25 : min(5, Double(audioRecoveryAttempts))
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
@@ -1123,16 +1129,20 @@ final class ViewerModel: ObservableObject {
         #if DEBUG
         print("TailView rebuilding audio after route change (attempt \(audioRecoveryAttempts))")
         #endif
-        let onlyMicrophoneMissing = engine?.isRunning == true && activeRouteSignature == currentAudioRouteSignature() &&
-            (!macAudioWanted || isMacAudioOn) && microphoneCanRecover && !isMicrophoneOn
-        if !onlyMicrophoneMissing { resetAudioGraph() }
+        resetAudioGraph()
         if microphoneCanRecover {
             beginCapture()
         }
         if macAudioWanted { startMacAudio(userInitiated: false) }
         if engine?.isRunning == true && (!microphoneCanRecover || isMicrophoneOn) && (!macAudioWanted || isMacAudioOn) {
             audioRecoveryAttempts = 0
-        } else { scheduleAudioRouteRecovery() }
+        } else {
+            if audioRecoveryAttempts >= Self.backgroundRecoveryAttempts,
+               UIApplication.shared.applicationState != .active {
+                DiagnosticLog.note("Stopped rebuilding audio in the background; it resumes when TailView opens")
+            }
+            scheduleAudioRouteRecovery()
+        }
     }
 
     /// The engine can keep reporting that it runs after iOS stops feeding

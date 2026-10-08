@@ -54,7 +54,10 @@ enum DiagnosticLog {
            size + data.count > maximumBytes {
             // Keep the newer half instead of growing without bound.
             if let old = try? Data(contentsOf: url) {
-                try? old.suffix(maximumBytes / 2).write(to: url)
+                let tail = old.suffix(maximumBytes / 2)
+                // Start at a whole line, never inside a multi-byte character.
+                let start = tail.firstIndex(of: UInt8(ascii: "\n")).map { tail.index(after: $0) } ?? tail.startIndex
+                try? tail[start...].write(to: url)
             }
         }
         if let handle = try? FileHandle(forWritingTo: url) {
