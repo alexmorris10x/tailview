@@ -1018,6 +1018,10 @@ final class ViewerModel: ObservableObject {
             } else { stopMacAudio() }
         case .function:
             setFunctionLatched(!functionHeld)
+        case .returnKey:
+            // With Fn down the Mac would get fn-Return, and a dictation tool
+            // still needs Fn's release to paste before Return submits.
+            if !functionHeld { sendControl(ControlCommand(kind: .key, key: .returnKey)) }
         }
         refreshLiveControls()
     }

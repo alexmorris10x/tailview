@@ -19,7 +19,7 @@ struct TailViewControlsAttributes: ActivityAttributes {
 }
 
 enum LiveControlAction {
-    case microphone, macSound, function
+    case microphone, macSound, function, returnKey
 }
 
 enum LiveControls {
@@ -60,6 +60,18 @@ struct ToggleFunctionHoldIntent: LiveActivityIntent {
 
     func perform() async throws -> some IntentResult {
         await LiveControls.perform(.function)
+        return .result()
+    }
+}
+
+/// Sends Return to the Mac, for example to submit dictated text once Fn
+/// is released.
+struct PressReturnIntent: LiveActivityIntent {
+    static var title: LocalizedStringResource = "Press Return"
+    static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+    func perform() async throws -> some IntentResult {
+        await LiveControls.perform(.returnKey)
         return .result()
     }
 }

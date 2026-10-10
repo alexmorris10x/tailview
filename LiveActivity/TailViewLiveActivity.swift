@@ -92,32 +92,42 @@ private enum MicrophoneSymbol {
     }
 }
 
+/// Four buttons fit across the lock screen and the Dynamic Island only as
+/// icons; each keeps its name for VoiceOver.
 private struct ControlButtons: View {
     let state: TailViewControlsAttributes.ContentState
 
     var body: some View {
         HStack(spacing: 10) {
             Button(intent: ToggleMicrophoneIntent()) {
-                Label(state.microphoneOn ? "Mic on" : "Mic off", systemImage: MicrophoneSymbol.name(state))
+                Image(systemName: MicrophoneSymbol.name(state))
                     .frame(maxWidth: .infinity)
             }
             .tint(MicrophoneSymbol.color(state))
+            .accessibilityLabel(state.microphoneOn ? "Mute microphone" : "Unmute microphone")
             Button(intent: ToggleMacSoundIntent()) {
-                Label(state.macSoundOn ? "Sound on" : "Sound off",
-                      systemImage: state.macSoundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                Image(systemName: state.macSoundOn ? "speaker.wave.2.fill" : "speaker.slash.fill")
                     .frame(maxWidth: .infinity)
             }
             .tint(state.macSoundOn ? .primary : .red)
+            .accessibilityLabel(state.macSoundOn ? "Mute Mac sound" : "Unmute Mac sound")
             Button(intent: ToggleFunctionHoldIntent()) {
-                Text(state.functionHeld ? "Release fn" : "Hold fn")
-                    .fontWeight(.semibold)
+                Text("fn")
+                    .fontWeight(.bold)
                     .frame(maxWidth: .infinity)
             }
             .tint(state.functionHeld ? .green : .primary)
             .disabled(!state.controlAvailable && !state.functionHeld)
+            .accessibilityLabel(state.functionHeld ? "Release fn" : "Hold fn")
+            Button(intent: PressReturnIntent()) {
+                Image(systemName: "return")
+                    .frame(maxWidth: .infinity)
+            }
+            .tint(.primary)
+            .disabled(!state.controlAvailable || state.functionHeld)
+            .accessibilityLabel("Press Return")
         }
-        .font(.caption)
-        .labelStyle(.titleAndIcon)
+        .font(.body)
         .buttonStyle(.bordered)
     }
 }
