@@ -9,6 +9,8 @@ struct RemoteKeyboardInput: UIViewRepresentable {
     let onText: (String) -> Void
     let onDelete: () -> Void
     let onReturn: () -> Void
+    /// Command-V or a Paste menu. Returns false to insert the text as typing.
+    let onPaste: () -> Bool
     let onSoftwareKeyboardVisibilityChange: (Bool) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
@@ -32,6 +34,10 @@ struct RemoteKeyboardInput: UIViewRepresentable {
         field.onDeleteBackward = { [weak coordinator = context.coordinator] in
             guard let parent = coordinator?.parent, parent.isActive else { return }
             parent.onDelete()
+        }
+        field.onPaste = { [weak coordinator = context.coordinator] in
+            guard let parent = coordinator?.parent, parent.isActive else { return true }
+            return parent.onPaste()
         }
         return field
     }
@@ -76,6 +82,7 @@ final class RemoteTextField: UITextField {
     var desiredActive = false
     var onSoftwareKeyboardVisibilityChange: ((Bool) -> Void)?
     var onDeleteBackward: (() -> Void)?
+    var onPaste: (() -> Bool)?
     private var focusGeneration = 0
     private var pendingRefocusGeneration: Int?
     private var softwareKeyboardVisible = false
@@ -87,6 +94,12 @@ final class RemoteTextField: UITextField {
     /// each auto-repeat while the key is held, even though the field is empty.
     override func deleteBackward() {
         onDeleteBackward?()
+    }
+
+    /// A hardware Command-V or a Paste menu. Handled pastes go to the Mac in
+    /// one piece; otherwise UIKit inserts the text and it is typed as before.
+    override func paste(_ sender: Any?) {
+        if onPaste?() != true { super.paste(sender) }
     }
 
     deinit {

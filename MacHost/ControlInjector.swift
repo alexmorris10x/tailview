@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -37,6 +38,39 @@ final class ControlInjector {
             guard self.enabled, self.generation == acceptedGeneration else { return }
             self.post(command)
         }
+    }
+
+    /// Puts text on the Mac clipboard as plain text and presses Command-V in
+    /// the focused app; the bar's modifiers never apply. It shares the queue
+    /// with other actions, so text typed around a paste keeps its order.
+    func paste(_ text: String) {
+        lock.lock()
+        let acceptedGeneration = enabled ? generation : nil
+        lock.unlock()
+        guard let acceptedGeneration else { return }
+        queue.async { [weak self] in
+            guard let self, self.isCurrent(acceptedGeneration) else { return }
+            // AppKit on the main thread, without holding the lock that
+            // setEnabled takes.
+            DispatchQueue.main.sync {
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(text, forType: .string)
+            }
+            self.lock.lock()
+            defer { self.lock.unlock() }
+            guard self.enabled, self.generation == acceptedGeneration else { return }
+            for isDown in [true, false] {
+                guard let event = CGEvent(keyboardEventSource: nil, virtualKey: 9, keyDown: isDown) else { continue }
+                event.flags = .maskCommand
+                event.post(tap: .cghidEventTap)
+            }
+        }
+    }
+
+    private func isCurrent(_ acceptedGeneration: UInt64) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return enabled && generation == acceptedGeneration
     }
 
     private func post(_ command: ControlCommand) {

@@ -17,6 +17,30 @@ enum PacketKind: UInt8 {
     case microphoneAAC = 10
     /// One AAC packet of stereo Mac sound, after both sides offered AAC.
     case macAudioAAC = 11
+    /// Viewer to Mac: text to paste; see ClipboardPaste.
+    case paste = 12
+}
+
+/// Text from the viewer's clipboard, which the Mac puts on its own clipboard
+/// as plain text and pastes with Command-V. Typing long text key by key is
+/// slow and can garble it. Macs that accept it set `capability` in their
+/// capabilities reply; older Macs close the connection on an unknown packet,
+/// so a viewer never sends one to a Mac that didn't offer it.
+enum ClipboardPaste {
+    static let capability: UInt8 = 2
+    static let maximumBytes = 1_048_576
+
+    /// UTF-8 text, or nil if it is empty or over the size cap.
+    static func encode(_ text: String) -> Data? {
+        let data = Data(text.utf8)
+        guard !data.isEmpty, data.count <= maximumBytes else { return nil }
+        return data
+    }
+
+    static func decode(_ payload: Data) -> String? {
+        guard !payload.isEmpty, payload.count <= maximumBytes else { return nil }
+        return String(data: payload, encoding: .utf8)
+    }
 }
 
 /// A viewer that sends any videoFlow packet receives screen frames only
@@ -66,6 +90,7 @@ final class PacketParser {
             case .videoFlow: limit = 1
             case .capabilities: limit = 1
             case .microphoneAAC, .macAudioAAC: limit = UInt32(AACAudio.maximumPacketBytes)
+            case .paste: limit = UInt32(ClipboardPaste.maximumBytes)
             }
             guard length > 0, length <= limit else { throw PacketError.invalidLength }
             let total = 5 + Int(length)

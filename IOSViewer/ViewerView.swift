@@ -32,6 +32,8 @@ struct ViewerView: View {
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
     @State private var modifierSelection = ModifierSelection()
+    @State private var notice: String?
+    @State private var noticeGeneration = 0
     @StateObject private var viewer = ViewerModel()
 
     var body: some View {
@@ -55,6 +57,7 @@ struct ViewerView: View {
                     onText: sendText,
                     onDelete: { sendKey(.delete) },
                     onReturn: { sendKey(.returnKey) },
+                    onPaste: { pasteClipboard(fromKeyboard: true) },
                     onSoftwareKeyboardVisibilityChange: { nativeKeyboardVisible = $0 }
                 )
                 .frame(width: 1, height: 1)
@@ -291,6 +294,13 @@ struct ViewerView: View {
                 .accessibilityLabel(keyboardShown ? "Hide keyboard" : "Show keyboard")
                 .accessibilityIdentifier("tailview.keyboardButton")
                 .disabled(!viewer.isControlAllowed)
+                Button { pasteClipboard() } label: {
+                    BarIcon("doc.on.clipboard")
+                }
+                .accessibilityLabel("Paste from this device")
+                .accessibilityHint("Pastes the text you copied into the focused Mac app")
+                .accessibilityIdentifier("tailview.pasteButton")
+                .disabled(!viewer.isControlAllowed)
                 ForEach(ControlCommand.Modifier.allCases, id: \.self) { modifier in
                     modifierButton(modifier)
                 }
@@ -350,8 +360,74 @@ struct ViewerView: View {
         .buttonStyle(.bordered)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        // Above the bar without resizing the Mac screen.
+        .overlay(alignment: .top) {
+            if let notice {
+                Text(notice)
+                    .font(.footnote.weight(.medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.regularMaterial, in: Capsule())
+                    .alignmentGuide(.top) { $0[.bottom] + 6 }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+                    .transition(.opacity)
+            }
+        }
         .padding(.horizontal, 12)
         .padding(.bottom, 6)
+    }
+
+    /// Sends the copied text to the Mac in one piece, where it is pasted with
+    /// Command-V. The bar's modifiers don't apply and stay selected. Returns
+    /// false only for a keyboard paste to a Mac without paste support, which
+    /// UIKit then types as before.
+    @discardableResult
+    private func pasteClipboard(fromKeyboard: Bool = false) -> Bool {
+        guard viewer.isControlAllowed else { return true }
+        guard viewer.macAcceptsPaste else {
+            if fromKeyboard { return false }
+            showNotice("Update TailView on the Mac to paste")
+            return true
+        }
+        let pasteboard = UIPasteboard.general
+        // These checks don't read the clipboard, so iOS doesn't ask first.
+        guard pasteboard.numberOfItems > 0 else {
+            showNotice("Clipboard is empty")
+            return true
+        }
+        guard pasteboard.hasStrings || pasteboard.hasURLs else {
+            showNotice("Clipboard has no text")
+            return true
+        }
+        // Reading it may ask to allow pasting from another app.
+        guard let text = pasteboard.hasStrings ? pasteboard.string : pasteboard.url?.absoluteString,
+              !text.isEmpty else {
+            showNotice("Could not read the clipboard")
+            return true
+        }
+        guard text.utf8.count <= ClipboardPaste.maximumBytes else {
+            showNotice("Clipboard text is over 1 MB")
+            return true
+        }
+        if viewer.sendPaste(text) {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } else {
+            showNotice("Could not paste on the Mac")
+        }
+        return true
+    }
+
+    private func showNotice(_ message: String) {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        UIAccessibility.post(notification: .announcement, argument: message)
+        noticeGeneration += 1
+        let generation = noticeGeneration
+        withAnimation { notice = message }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            guard noticeGeneration == generation else { return }
+            withAnimation { notice = nil }
+        }
     }
 
     /// Control-arrow shortcuts for Spaces, Mission Control, and App windows.

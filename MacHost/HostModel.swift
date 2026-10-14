@@ -118,6 +118,7 @@ final class HostModel: ObservableObject {
                     }
                 }
                 server.onControlCommand = { command in injector.submit(command) }
+                server.onPaste = { text in injector.paste(text) }
                 server.onMicrophonePacket = { [weak self] in
                     Task { @MainActor in
                         self?.microphoneStatus = sink == nil ? "Receiving voice; install BlackHole 2ch to route it" : "Receiving voice through BlackHole 2ch"

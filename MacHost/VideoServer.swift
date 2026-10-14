@@ -70,6 +70,8 @@ final class VideoServer {
     var onPairingRequest: ((UUID, String, String) -> Bool)?
     var onPairingSuccess: ((UUID, String) -> Void)?
     var onControlCommand: ((ControlCommand) -> Void)?
+    /// Clipboard text from a viewer with control, to paste; see ClipboardPaste.
+    var onPaste: ((String) -> Void)?
     /// Called under the server lock only after a saved credential or a new pairing succeeds.
     /// The host enables its input injector here so the first control packet is safe to accept.
     var authorizeTrustedControl: (() -> Bool)?
@@ -496,8 +498,8 @@ final class VideoServer {
                 guard length == 1, let payload = Self.readExactly(fd, 1) else { return }
                 let aac = AACAudio.isAvailable && payload[0] & AACAudio.capability != 0
                 lock.lock(); viewer.aacAudio = aac; lock.unlock()
-                enqueue(Packet.encode(.capabilities, Data([AACAudio.isAvailable ? AACAudio.capability : 0])),
-                        to: viewer)
+                let capabilities = (AACAudio.isAvailable ? AACAudio.capability : 0) | ClipboardPaste.capability
+                enqueue(Packet.encode(.capabilities, Data([capabilities])), to: viewer)
             case .control:
                 guard length > 0, length <= ControlCommand.maximumBytes,
                       let payload = Self.readExactly(fd, Int(length)),
@@ -508,6 +510,14 @@ final class VideoServer {
                 if command.kind == .functionUp { viewer.functionHeld = false }
                 lock.unlock()
                 if allowed { onControlCommand?(command) }
+            case .paste:
+                guard length > 0, length <= ClipboardPaste.maximumBytes,
+                      let payload = Self.readExactly(fd, Int(length)),
+                      let text = ClipboardPaste.decode(payload) else { return }
+                lock.lock()
+                let allowed = running && viewers[viewer.id] === viewer && viewer.controlEnabled
+                lock.unlock()
+                if allowed { onPaste?(text) }
             case .microphoneRequest:
                 guard length == 1, let payload = Self.readExactly(fd, 1), payload == Data([1]) else { return }
                 lock.lock()

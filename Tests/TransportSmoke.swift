@@ -21,6 +21,8 @@ struct TransportSmoke {
         server.onPairingRequest = { credentials.add($0, token: $2); return true }
         server.authorizeTrustedControl = { true }
         server.onControlCommand = { delivered.append($0) }
+        let pastes = PasteRecorder()
+        server.onPaste = { pastes.append($0) }
         server.onMicrophonePacket = { microphones.increment() }
         server.onMicrophoneLevel = { _ in microphoneLevels.increment() }
         let connected = DispatchSemaphore(value: 0)
@@ -92,8 +94,19 @@ struct TransportSmoke {
         guard writeExactly(client, Packet.encode(.control, clickData)) else {
             throw TestError.message("Session-only control packet could not be sent")
         }
+        guard let sessionPaste = ClipboardPaste.encode("session paste"),
+              writeExactly(client, Packet.encode(.paste, sessionPaste)) else {
+            throw TestError.message("Session-only paste packet could not be sent")
+        }
         Thread.sleep(forTimeInterval: 0.1)
         guard delivered.count == 0 else { throw TestError.message("Session-code viewer controlled the Mac") }
+        guard pastes.texts.isEmpty else { throw TestError.message("Session-code viewer pasted on the Mac") }
+        let maximumPaste = String(repeating: "a", count: ClipboardPaste.maximumBytes)
+        guard ClipboardPaste.encode("") == nil, ClipboardPaste.encode(maximumPaste + "a") == nil,
+              ClipboardPaste.encode(maximumPaste) != nil, ClipboardPaste.decode(Data([0xff, 0xfe])) == nil,
+              ClipboardPaste.decode(Data("é".utf8)) == "é" else {
+            throw TestError.message("Paste size or encoding limits were not enforced")
+        }
 
         let jpeg = Data([0xff, 0xd8, 0xff, 0xd9])
         server.publish(jpeg)
@@ -141,13 +154,30 @@ struct TransportSmoke {
         guard delivered.waitForCount(1), delivered.count == 1 else {
             throw TestError.message("Trusted paired control did not reach the Mac automatically")
         }
+        // Long text arrives in one piece, newlines and all.
+        let pasted = ["Line one\nLine two\twith tab · 日本語 🙂\n",
+                      String(repeating: "0123456789abcdef\n", count: 12_000)]
+        for text in pasted {
+            guard let payload = ClipboardPaste.encode(text),
+                  writeExactly(pairedClient, Packet.encode(.paste, payload)) else {
+                throw TestError.message("Paste packet could not be sent")
+            }
+        }
+        guard pastes.waitForCount(2), pastes.texts == pasted else {
+            throw TestError.message("Trusted paired paste did not reach the Mac intact")
+        }
         server.setControlEnabled(false)
         try expectState(pairedClient, allowed: false, phase: "paired disable")
         guard writeExactly(pairedClient, Packet.encode(.control, clickData)) else {
             throw TestError.message("Control revoke packet could not be sent")
         }
+        guard let revokedPaste = ClipboardPaste.encode("after revoke"),
+              writeExactly(pairedClient, Packet.encode(.paste, revokedPaste)) else {
+            throw TestError.message("Paste revoke packet could not be sent")
+        }
         Thread.sleep(forTimeInterval: 0.1)
         guard delivered.count == 1 else { throw TestError.message("Control worked after Mac revoked it") }
+        guard pastes.texts.count == 2 else { throw TestError.message("Paste worked after Mac revoked control") }
         Darwin.shutdown(pairedClient, SHUT_RDWR)
         Darwin.close(pairedClient)
         try expectRejected(address, line: pair.line, reason: "pairing window reused")
@@ -450,7 +480,9 @@ struct TransportSmoke {
         guard writeExactly(flowClient, Packet.encode(.capabilities, Data([AACAudio.capability]))) else {
             throw TestError.message("Could not send capabilities")
         }
-        try expectPayload(flowClient, kind: .capabilities, payload: Data([AACAudio.capability]),
+        // The reply also offers paste, which viewers send only to Macs that offer it.
+        try expectPayload(flowClient, kind: .capabilities,
+                          payload: Data([AACAudio.capability | ClipboardPaste.capability]),
                           phase: "capabilities reply")
         func tone(channels: Int, frames: Int, offset: Int) -> Data {
             var pcm = Data(capacity: frames * channels * 2)
@@ -500,7 +532,7 @@ struct TransportSmoke {
             Darwin.close(unexpected)
             throw TestError.message("Stopped server still accepted a viewer")
         }
-        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, unreadable credentials not reported as revoked, stopped listener, session access denial, frame flow control, AAC audio both ways")
+        print("Transport smoke passed: pairing consent, two simultaneous viewers, isolated frames, single audio owner, audio takeover and handoff across reconnects, trusted control, revocation, unreadable credentials not reported as revoked, stopped listener, session access denial, frame flow control, AAC audio both ways, clipboard paste only with control")
     }
 
     /// The next screen frame within 300 ms, skipping other packets.
@@ -663,6 +695,29 @@ struct TransportSmoke {
     private enum TestError: LocalizedError {
         case message(String)
         var errorDescription: String? { if case .message(let value) = self { return value }; return nil }
+    }
+}
+
+private final class PasteRecorder {
+    private let lock = NSLock()
+    private let signal = DispatchSemaphore(value: 0)
+    private var received = [String]()
+
+    var texts: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return received
+    }
+
+    func append(_ text: String) {
+        lock.lock(); received.append(text); lock.unlock()
+        signal.signal()
+    }
+
+    func waitForCount(_ wanted: Int) -> Bool {
+        while texts.count < wanted {
+            if signal.wait(timeout: .now() + 2) != .success { return false }
+        }
+        return true
     }
 }
 

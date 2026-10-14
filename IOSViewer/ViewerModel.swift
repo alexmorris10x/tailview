@@ -20,6 +20,8 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var isMicrophoneOn = false
     @Published private(set) var isMacAudioOn = false
     @Published private(set) var isPairedSession = false
+    /// The Mac offered ClipboardPaste; older Macs drop a viewer that sends it.
+    @Published private(set) var macAcceptsPaste = false
     @Published private(set) var isControlAllowed = false {
         // The Mac releases a held Fn when control ends.
         didSet { if !isControlAllowed { functionHeld = false; functionLatched = false } }
@@ -445,6 +447,7 @@ final class ViewerModel: ObservableObject {
         isConnecting = false
         isControlAllowed = false
         isPairedSession = false
+        macAcceptsPaste = false
         audioRouteAllowed = false
         image = nil
         startMicrophoneAfterConnect = false
@@ -738,6 +741,10 @@ final class ViewerModel: ObservableObject {
                         if AACAudio.isAvailable && payload[0] & AACAudio.capability != 0 {
                             self.packetLock.lock(); self.aacConnection = connection; self.packetLock.unlock()
                         }
+                        let paste = payload[0] & ClipboardPaste.capability != 0
+                        DispatchQueue.main.async {
+                            if self.connection === connection { self.macAcceptsPaste = paste }
+                        }
                     case .microphoneState:
                         guard payload.count == 1, payload[0] <= 1 else { return }
                         DispatchQueue.main.async {
@@ -745,7 +752,7 @@ final class ViewerModel: ObservableObject {
                                 self.setAudioRouteAllowed(payload[0] == 1)
                             }
                         }
-                    case .microphone, .control, .microphoneRequest, .videoFlow, .microphoneAAC:
+                    case .microphone, .control, .microphoneRequest, .videoFlow, .microphoneAAC, .paste:
                         return
                     }
                 }
@@ -766,6 +773,16 @@ final class ViewerModel: ObservableObject {
                 self.failConnection(connection, message: "Mac connection lost while sending control")
             }
         })
+    }
+
+    /// Sends text for the Mac to paste with Command-V. False when the Mac
+    /// can't take it: control is off, the text is empty or over the cap, or
+    /// the Mac predates paste and would drop the connection.
+    func sendPaste(_ text: String) -> Bool {
+        guard isConnected, isPairedSession, isControlAllowed, macAcceptsPaste,
+              let connection, let payload = ClipboardPaste.encode(text) else { return false }
+        send(.paste, payload, on: connection)
+        return true
     }
 
     /// Pauses screen frames while the app is not active, leaving a locked
