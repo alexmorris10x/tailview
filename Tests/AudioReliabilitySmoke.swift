@@ -80,6 +80,22 @@ struct AudioReliabilitySmoke {
         precondition((0..<7).map { _ in backoff.nextDelay() } == [1, 2, 4, 8, 8, 8, 8])
         backoff.reset()
         precondition(backoff.nextDelay() == 1, "A successful connection must reset retry delay")
+        let lost = Date()
+        let grace = ReconnectBackoff.backgroundGracePeriod
+        precondition(grace >= 60 && grace <= 300, "Background retries must be bounded to a few minutes")
+        precondition(!backoff.backgroundGraceExpired(at: lost + 3_600), "No outage, nothing to pause")
+        backoff.connectionLost(at: lost)
+        backoff.connectionLost(at: lost + grace - 1)
+        precondition(!backoff.backgroundGraceExpired(at: lost + grace),
+                     "Brief outages and dictation interruptions must keep retrying")
+        precondition(backoff.backgroundGraceExpired(at: lost + grace + 1),
+                     "Later failures must not restart the grace period")
+        backoff.reset()
+        precondition(!backoff.backgroundGraceExpired(at: lost + grace + 1),
+                     "A reconnect inside the grace period must restart it")
+        backoff.connectionLost(at: lost + grace + 1)
+        precondition(!backoff.backgroundGraceExpired(at: lost + 2 * grace) &&
+                     backoff.backgroundGraceExpired(at: lost + 2 * grace + 2))
 
         let ok = Data("OK\n".utf8)
         func reply(_ text: String, ended: Bool = false) -> AuthenticationReply {
@@ -92,6 +108,6 @@ struct AudioReliabilitySmoke {
         precondition(reply("N") == .pending && reply("NO") == .pending)
         precondition(reply("NO\n") == .rejected && reply("NO\n", ended: true) == .rejected)
         precondition(reply("NO", ended: true) == .unavailable && reply("BAD") == .invalid)
-        print("Audio reliability smoke passed: startup/refill, 20s burst jitter, fades, bounded backlog, owner reset, reauthorized microphone retargeting, bounded retry delays, fragmented auth and transient disconnects")
+        print("Audio reliability smoke passed: startup/refill, 20s burst jitter, fades, bounded backlog, owner reset, reauthorized microphone retargeting, bounded retry delays, bounded background retries, fragmented auth and transient disconnects")
     }
 }

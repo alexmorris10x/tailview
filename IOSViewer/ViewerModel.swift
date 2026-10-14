@@ -93,6 +93,10 @@ final class ViewerModel: ObservableObject {
     private var reconnectGeneration: UInt64 = 0
     private var reconnectBackgroundTask = UIBackgroundTaskIdentifier.invalid
     private var reconnectBackgroundTimeRequested = false
+    /// Retries and audio stopped after the background grace period; still
+    /// reconnecting, so returning to the foreground resumes both.
+    private var reconnectPaused = false
+    private static let pausedStatus = "Paused – open TailView to reconnect"
     private var engine: AVAudioEngine?
     private var macAudioPlayer: AVAudioPlayerNode?
     private var inputTapInstalled = false
@@ -415,6 +419,7 @@ final class ViewerModel: ObservableObject {
         reconnectWork = nil
         reconnectProfile = nil
         isReconnecting = false
+        reconnectPaused = false
         reconnectBackoff.reset()
         endReconnectBackgroundTask()
         reconnectBackgroundTimeRequested = false
@@ -448,6 +453,7 @@ final class ViewerModel: ObservableObject {
         // user-requested audio going: iOS suspends a background app with no
         // active audio, which would stop the reconnect. Microphone samples
         // during the outage have no destination and are discarded immediately.
+        // pauseReconnecting bounds this in the background.
         macAudioGeneration &+= 1
         macAudioPlayer?.stop()
         queuedMacAudioFrames = 0
@@ -489,6 +495,23 @@ final class ViewerModel: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
     }
 
+    /// The Mac stayed unreachable for the whole background grace period.
+    /// Stop retrying and release audio, including the silent playback, so the
+    /// microphone indicator goes off and iOS can suspend TailView. What the
+    /// user wants stays set, and resumeAudioAfterForeground restarts it all.
+    private func pauseReconnecting() {
+        reconnectGeneration &+= 1
+        reconnectWork?.cancel()
+        reconnectWork = nil
+        reconnectPaused = true
+        tearDownConnection(keepingAudio: false)
+        endReconnectBackgroundTask()
+        reconnectBackgroundTimeRequested = false
+        status = Self.pausedStatus
+        DiagnosticLog.note("Mac unreachable for over \(Int(ReconnectBackoff.backgroundGracePeriod))s in the background; paused reconnecting and released audio until TailView opens (mic wanted: \(microphoneWanted), sound wanted: \(macAudioWanted))")
+        refreshLiveControls()
+    }
+
     func resumeAudioAfterForeground() {
         // Back in the app, lock-screen mutes become ordinary mutes, so the
         // microphone indicator turns off.
@@ -502,6 +525,14 @@ final class ViewerModel: ObservableObject {
             macAudioPlayer?.volume = 1
         }
         if isReconnecting, connection == nil {
+            if reconnectPaused {
+                reconnectPaused = false
+                // The pause released audio; a foreground app may restart it.
+                audioInterrupted = false
+                status = "Reconnecting…"
+                DiagnosticLog.note("TailView opened; resuming reconnect and audio after the background pause")
+            }
+            // Also restarts the background grace period.
             reconnectBackoff.reset()
             scheduleReconnect()
             return
@@ -524,6 +555,12 @@ final class ViewerModel: ObservableObject {
                 self.savedCredentialRejected = rejected
                 if let rejectedID { self.rejectedMacIDs.insert(rejectedID) }
             } else {
+                self.reconnectBackoff.connectionLost()
+                if UIApplication.shared.applicationState == .background,
+                   self.reconnectBackoff.backgroundGraceExpired() {
+                    self.pauseReconnecting()
+                    return
+                }
                 let keepAudio = self.engine?.isRunning == true &&
                     ((self.microphoneWanted && self.isMicrophoneOn) || (self.macAudioWanted && self.isMacAudioOn))
                 if !keepAudio && !self.reconnectBackgroundTimeRequested {
@@ -1032,13 +1069,14 @@ final class ViewerModel: ObservableObject {
             liveControls.end()
             return
         }
+        // A pause stays true while iOS suspends TailView, so it doesn't expire.
         liveControls.update(macName: profile.name, state: TailViewControlsAttributes.ContentState(
-            status: isConnected ? "Connected" : "Reconnecting…",
+            status: isConnected ? "Connected" : reconnectPaused ? Self.pausedStatus : "Reconnecting…",
             microphoneOn: microphoneEnabled,
             microphoneNeedsAttention: microphoneNeedsAttention,
             macSoundOn: macAudioEnabled,
             functionHeld: functionHeld,
-            controlAvailable: isConnected && isControlAllowed))
+            controlAvailable: isConnected && isControlAllowed), expires: !reconnectPaused)
     }
 
     private func stopAudioEngine() {
@@ -1069,9 +1107,10 @@ final class ViewerModel: ObservableObject {
     /// which drops the Mac. That happens when iOS wakes TailView after another
     /// app's interruption (its connection has usually died meanwhile), or when
     /// it refuses to restart the microphone in the background. Keep silent
-    /// playback running while audio is wanted and this device may own it.
+    /// playback running while audio is wanted and this device may own it,
+    /// until a long background outage pauses reconnecting.
     private func keepAudioRunning() {
-        guard engine == nil, isReconnecting || audioRouteAllowed,
+        guard engine == nil, !reconnectPaused, isReconnecting || audioRouteAllowed,
               microphoneCanRecover || macAudioWanted else { return }
         do {
             _ = try ensureAudioEngine(inputRequired: false)
