@@ -129,6 +129,7 @@ final class ViewerModel: ObservableObject {
     /// The lock screen shows the orange Mic only once it has lasted; moving
     /// audio here passes through it while the microphone starts.
     private var liveMicrophoneAttention = SustainedFlag(delay: 5)
+    private var liveControlRepeats = RepeatFilter<LiveControlAction>(window: 0.5)
     // Mirrors microphoneSoftMuted for the tap thread, under packetLock.
     private var microphoneSendMuted = false
     // The connection whose Mac accepted AAC audio, under packetLock.
@@ -1086,6 +1087,10 @@ final class ViewerModel: ObservableObject {
     // MARK: Lock-screen controls
 
     private func performLiveControl(_ action: LiveControlAction) {
+        guard liveControlRepeats.accept(action) else {
+            DiagnosticLog.note("Lock-screen control: \(action) repeated within 0.5 s; ignored")
+            return
+        }
         let background = UIApplication.shared.applicationState != .active
         DiagnosticLog.note("Lock-screen control: \(action)")
         // Nothing to act on until TailView opens and connects, as on controls
@@ -1156,12 +1161,14 @@ final class ViewerModel: ObservableObject {
     }
 
     /// Called on entering the background and when audio moves to another
-    /// device. Without running audio iOS suspends TailView within seconds,
-    /// and the controls would go stale, so end them; they return once
-    /// TailView opens and connects.
+    /// device. Without audio iOS suspends TailView within seconds, and the
+    /// controls would go stale, so end them; they return once TailView opens
+    /// and connects. Audio keepAudioRunning would keep going counts.
     private func endLiveControlsIfSuspending() {
         guard UIApplication.shared.applicationState == .background, liveControls.shown != nil,
               !LiveControlsRules.stayUpInBackground(audioRunning: engine?.isRunning == true,
+                                                    audioWanted: microphoneCanRecover || macAudioWanted,
+                                                    mayOwnAudio: isReconnecting || audioRouteAllowed,
                                                     paused: reconnectPaused || liveControlsPausedUntilOpen)
         else { return }
         DiagnosticLog.note("No audio running in the background; ended the lock-screen controls until TailView opens")

@@ -5,10 +5,34 @@ import Foundation
 enum LiveControlsRules {
     /// iOS suspends a background TailView within seconds unless its audio
     /// runs, as on a viewer while another device owns audio, and a suspended
-    /// TailView can't confirm its controls, so they would go stale. A pause
+    /// TailView can't confirm its controls, so they would go stale. Audio
+    /// that is wanted on a device that may own it counts as running: an
+    /// interruption, a microphone restart or a reconnect stops it only for a
+    /// moment, and silent playback keeps TailView running meanwhile. A pause
     /// is meant to outlast the suspension, so it stays up.
-    static func stayUpInBackground(audioRunning: Bool, paused: Bool) -> Bool {
-        audioRunning || paused
+    static func stayUpInBackground(audioRunning: Bool, audioWanted: Bool, mayOwnAudio: Bool,
+                                   paused: Bool) -> Bool {
+        audioRunning || (audioWanted && mayOwnAudio) || paused
+    }
+}
+
+/// Drops a repeat of the same lock-screen action that arrives within
+/// `window` of the one it accepted. On 15 Oct iOS ran TailView's intent
+/// twice, 1–30 ms apart, for clicks on the copy of the controls in the Mac's
+/// menu bar, so a toggle undid itself; taps on the iPhone came once. A real
+/// second tap comes later.
+struct RepeatFilter<Action: Equatable> {
+    let window: TimeInterval
+    private var accepted: (action: Action, at: Date)?
+
+    init(window: TimeInterval) { self.window = window }
+
+    mutating func accept(_ action: Action, at now: Date = Date()) -> Bool {
+        if let accepted, accepted.action == action, now.timeIntervalSince(accepted.at) < window {
+            return false
+        }
+        accepted = (action, now)
+        return true
     }
 }
 

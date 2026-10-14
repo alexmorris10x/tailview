@@ -3,13 +3,30 @@ import Foundation
 @main
 struct LiveControlsSmoke {
     static func main() {
-        // Entering the background: only running audio keeps TailView awake.
-        precondition(!LiveControlsRules.stayUpInBackground(audioRunning: false, paused: false),
-                     "A viewer without audio, or with both directions off, must end its controls")
-        precondition(LiveControlsRules.stayUpInBackground(audioRunning: true, paused: false),
-                     "The audio owner keeps running, so its controls stay up")
-        precondition(LiveControlsRules.stayUpInBackground(audioRunning: false, paused: true),
-                     "A pause is shown on purpose and must outlast the suspension")
+        // Entering the background: only audio that runs, or will run, keeps TailView awake.
+        func stays(running: Bool = false, wanted: Bool = false, mayOwn: Bool = false, paused: Bool = false) -> Bool {
+            LiveControlsRules.stayUpInBackground(audioRunning: running, audioWanted: wanted,
+                                                 mayOwnAudio: mayOwn, paused: paused)
+        }
+        precondition(!stays(wanted: true), "A viewer while another device owns audio must end its controls")
+        precondition(!stays(mayOwn: true), "An audio owner with both directions off must end its controls")
+        precondition(stays(running: true, wanted: true, mayOwn: true), "The running audio owner keeps them")
+        precondition(stays(wanted: true, mayOwn: true),
+                     "An owner whose audio is briefly down (interruption, mic restart) keeps them")
+        precondition(stays(paused: true), "A pause is shown on purpose and must outlast the suspension")
+
+        // A repeated delivery of one tap within 0.5 s toggles once; a real second tap still counts.
+        var repeats = RepeatFilter<String>(window: 0.5)
+        let tap = Date(timeIntervalSince1970: 100)
+        precondition(repeats.accept("mic", at: tap))
+        precondition(!repeats.accept("mic", at: tap.addingTimeInterval(0.001)), "A pair 1 ms apart must toggle once")
+        precondition(!repeats.accept("mic", at: tap.addingTimeInterval(0.03)))
+        precondition(repeats.accept("sound", at: tap.addingTimeInterval(0.04)), "A different button is a new tap")
+        precondition(repeats.accept("mic", at: tap.addingTimeInterval(0.1)), "Mic after Sound is a new tap")
+        precondition(repeats.accept("mic", at: tap.addingTimeInterval(0.7)), "A second tap after 0.5 s must work")
+        precondition(!repeats.accept("mic", at: tap.addingTimeInterval(0.72)))
+        precondition(repeats.accept("mic", at: tap.addingTimeInterval(1.21)),
+                     "Dropped repeats must not extend the window")
 
         // The lock screen's orange Mic waits five seconds; a brief state never shows.
         let start = Date(timeIntervalSince1970: 0)
@@ -27,6 +44,6 @@ struct LiveControlsSmoke {
         precondition(attention.update(true, at: start.addingTimeInterval(60)))
         precondition(!attention.update(false, at: start.addingTimeInterval(61)) && attention.trueSince == nil)
 
-        print("Live controls smoke passed: background lifetime and the delayed orange Mic")
+        print("Live controls smoke passed: background lifetime, repeated taps, and the delayed orange Mic")
     }
 }
