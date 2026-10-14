@@ -6,8 +6,8 @@
 <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.4.34</string>
-<key>CFBundleVersion</key><string>58</string>
+<key>CFBundleShortVersionString</key><string>0.4.35</string>
+<key>CFBundleVersion</key><string>59</string>
 <key>LSRequiresIPhoneOS</key><true/>
 <key>NSSupportsLiveActivities</key><true/>
 <key>NSMicrophoneUsageDescription</key><string>Send your voice to the Mac while viewing its screen.</string>

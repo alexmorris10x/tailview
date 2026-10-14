@@ -16,6 +16,24 @@ enum LiveControlsRules {
     }
 }
 
+/// The pause a lock-screen tap shows when it finds nothing to act on, as on
+/// controls left by a run iOS ended. It lasts until TailView is open or
+/// connected, so it never sits on a working session.
+struct TapPause {
+    private(set) var isShown = false
+
+    /// Whether the tap shows the pause instead of acting.
+    mutating func tap(active: Bool, hasSession: Bool) -> Bool {
+        guard !active, !hasSession else { return false }
+        isShown = true
+        return true
+    }
+
+    mutating func update(active: Bool, connected: Bool) {
+        if active || connected { isShown = false }
+    }
+}
+
 /// Drops a repeat of the same lock-screen action that arrives within
 /// `window` of the one it accepted. On 15 Oct iOS ran TailView's intent
 /// twice, 1–30 ms apart, for clicks on the copy of the controls in the Mac's

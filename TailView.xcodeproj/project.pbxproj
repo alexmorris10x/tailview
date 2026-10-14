@@ -42,11 +42,13 @@
 		A72E9B7166FDCD924F02F920 /* TailViewIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */; };
 		A783C36DF12F342C9E17E7BC /* AudioJitterBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */; };
 		AF62EE973A7949C2F309F1EB /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
+		BB4EAA6F73E4B18B7F8CC67F /* PendingTaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0C94E51C0739995CBF94FF /* PendingTaps.swift */; };
 		BCB7CB384D8E59BD21A672FC /* LiveControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C84D54F79A82CF02DA3433FB /* LiveControls.swift */; };
 		BF2F93D2904B5C1F4D415953 /* ControlInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */; };
 		C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */; };
 		C0DEFAEBDD2EBE85678E9CD1 /* AudioConnectionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */; };
 		C4FFE508A3EDFA633B05317F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 228BA387B565D9B98B1F35FA /* Assets.xcassets */; };
+		CB800F966C1E83DCC2D4EF30 /* PendingTaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0C94E51C0739995CBF94FF /* PendingTaps.swift */; };
 		CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */; };
 		D0FFBA182CEF11EA7E2B83FF /* TailViewLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
@@ -86,6 +88,7 @@
 
 /* Begin PBXFileReference section */
 		0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierSelection.swift; sourceTree = "<group>"; };
+		0B0C94E51C0739995CBF94FF /* PendingTaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTaps.swift; sourceTree = "<group>"; };
 		10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewMacApp.swift; sourceTree = "<group>"; };
 		1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewLiveActivity.swift; sourceTree = "<group>"; };
 		1E90C7F0AF464E7238A871F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -138,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				C84D54F79A82CF02DA3433FB /* LiveControls.swift */,
+				0B0C94E51C0739995CBF94FF /* PendingTaps.swift */,
 			);
 			path = LiveControls;
 			sourceTree = "<group>";
@@ -415,6 +419,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BCB7CB384D8E59BD21A672FC /* LiveControls.swift in Sources */,
+				CB800F966C1E83DCC2D4EF30 /* PendingTaps.swift in Sources */,
 				D0FFBA182CEF11EA7E2B83FF /* TailViewLiveActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -435,6 +440,7 @@
 				66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */,
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,
+				BB4EAA6F73E4B18B7F8CC67F /* PendingTaps.swift in Sources */,
 				FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */,
 				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,

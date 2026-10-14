@@ -28,6 +28,33 @@ struct LiveControlsSmoke {
         precondition(repeats.accept("mic", at: tap.addingTimeInterval(1.21)),
                      "Dropped repeats must not extend the window")
 
+        // A tap with nothing to act on shows the pause until TailView is open or connected.
+        var pause = TapPause()
+        precondition(!pause.tap(active: false, hasSession: true) && !pause.isShown,
+                     "A tap during a session or reconnect acts instead")
+        precondition(!pause.tap(active: true, hasSession: false) && !pause.isShown, "An open TailView never pauses")
+        precondition(pause.tap(active: false, hasSession: false) && pause.isShown)
+        pause.update(active: false, connected: false)
+        precondition(pause.isShown, "The pause lasts while TailView stays closed and unconnected")
+        pause.update(active: true, connected: false)
+        precondition(!pause.isShown, "Opening TailView, also on a cold launch, clears the pause")
+        _ = pause.tap(active: false, hasSession: false)
+        pause.update(active: false, connected: true)
+        precondition(!pause.isShown, "A connection clears the pause")
+
+        // Taps queued before the handler exists expire after ten seconds.
+        var pending = PendingTaps<String>(lifetime: 10)
+        precondition(pending.isEmpty && pending.take().isEmpty)
+        pending.add("mic", at: tap)
+        pending.add("sound", at: tap.addingTimeInterval(4))
+        precondition(pending.take(at: tap.addingTimeInterval(9)) == ["mic", "sound"], "Fresh taps run in order")
+        precondition(pending.isEmpty, "Taking empties the queue")
+        pending.add("mic", at: tap)
+        pending.add("sound", at: tap.addingTimeInterval(8))
+        precondition(pending.take(at: tap.addingTimeInterval(12)) == ["sound"], "A tap older than ten seconds is dropped")
+        pending.add("mic", at: tap)
+        precondition(pending.take(at: tap.addingTimeInterval(300)).isEmpty, "A tap from minutes ago never applies")
+
         // The lock screen's orange Mic waits five seconds; a brief state never shows.
         let start = Date(timeIntervalSince1970: 0)
         var attention = SustainedFlag(delay: 5)
@@ -44,6 +71,6 @@ struct LiveControlsSmoke {
         precondition(attention.update(true, at: start.addingTimeInterval(60)))
         precondition(!attention.update(false, at: start.addingTimeInterval(61)) && attention.trueSince == nil)
 
-        print("Live controls smoke passed: background lifetime, repeated taps, and the delayed orange Mic")
+        print("Live controls smoke passed: background lifetime, repeated taps, tap pause, queued tap expiry, and the delayed orange Mic")
     }
 }

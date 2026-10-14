@@ -25,21 +25,22 @@ enum LiveControlAction {
 enum LiveControls {
     /// Set by the app on the main thread and called there. The widget
     /// extension never runs these intents. A tap that launches TailView can
-    /// arrive before the app has set it; it waits and runs once it is set.
+    /// arrive before the app has set it; it waits up to ten seconds and runs
+    /// once it is set. iOS may start TailView for a tap without its window,
+    /// and then nothing sets it until TailView opens.
     static var handler: ((LiveControlAction) -> Void)? {
         didSet {
             guard let handler, !pending.isEmpty else { return }
-            let waiting = pending
-            pending = []
+            let waiting = pending.take()
             // After the setter's caller (the view model's init) finishes.
             DispatchQueue.main.async { waiting.forEach(handler) }
         }
     }
-    private static var pending = [LiveControlAction]()
+    private static var pending = PendingTaps<LiveControlAction>(lifetime: 10)
 
     static func perform(_ action: LiveControlAction) async {
         await MainActor.run {
-            if let handler { handler(action) } else { pending.append(action) }
+            if let handler { handler(action) } else { pending.add(action) }
         }
     }
 }

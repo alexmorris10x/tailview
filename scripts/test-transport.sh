@@ -14,5 +14,5 @@ swiftc -parse-as-library MacHost/DisplayControl/BacklightController.swift MacHos
 DerivedData/Tests/DisplayControlSmoke
 swiftc -parse-as-library MacHost/AudioRoutingController.swift Tests/AudioRoutingSmoke.swift -o DerivedData/Tests/AudioRoutingSmoke
 DerivedData/Tests/AudioRoutingSmoke
-swiftc IOSViewer/LiveControlsRules.swift Tests/LiveControlsSmoke.swift -o DerivedData/Tests/LiveControlsSmoke
+swiftc IOSViewer/LiveControlsRules.swift LiveControls/PendingTaps.swift Tests/LiveControlsSmoke.swift -o DerivedData/Tests/LiveControlsSmoke
 DerivedData/Tests/LiveControlsSmoke

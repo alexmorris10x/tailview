@@ -124,8 +124,8 @@ final class ViewerModel: ObservableObject {
     private var liveControlsUpdates: AnyCancellable?
     /// A lock-screen tap woke TailView in the background with no connection
     /// to act on, on controls left by a run iOS ended (an install, for one).
-    /// They show the pause until TailView opens.
-    private var liveControlsPausedUntilOpen = false
+    /// They show the pause until TailView is open or connected.
+    private var liveControlsTapPause = TapPause()
     /// The lock screen shows the orange Mic only once it has lasted; moving
     /// audio here passes through it while the microphone starts.
     private var liveMicrophoneAttention = SustainedFlag(delay: 5)
@@ -548,10 +548,8 @@ final class ViewerModel: ObservableObject {
     }
 
     func resumeAudioAfterForeground() {
-        // Back in the app, controls a tap paused follow the connection again.
-        liveControlsPausedUntilOpen = false
-        // Lock-screen mutes become ordinary mutes, so the microphone
-        // indicator turns off.
+        // Back in the app, lock-screen mutes become ordinary mutes, so the
+        // microphone indicator turns off.
         if microphoneSoftMuted {
             setMicrophoneSoftMuted(false)
             stopMicrophone()
@@ -1095,11 +1093,11 @@ final class ViewerModel: ObservableObject {
         DiagnosticLog.note("Lock-screen control: \(action)")
         // Nothing to act on until TailView opens and connects, as on controls
         // left by a run iOS ended. Show the pause rather than ignore the tap.
-        if background, connection == nil, !isReconnecting {
-            if !liveControlsPausedUntilOpen {
+        let alreadyPaused = liveControlsTapPause.isShown
+        if liveControlsTapPause.tap(active: !background, hasSession: connection != nil || isReconnecting) {
+            if !alreadyPaused {
                 DiagnosticLog.note("Lock-screen control with no connection; showing the pause until TailView opens")
             }
-            liveControlsPausedUntilOpen = true
             stayAwake("Pause TailView controls") { done in refreshLiveControls(sent: done) }
             return
         }
@@ -1134,7 +1132,11 @@ final class ViewerModel: ObservableObject {
     func refreshLiveControls(sent: (() -> Void)? = nil) {
         let enabled = UserDefaults.standard.object(forKey: "lockScreenControls") as? Bool ?? true
         let microphoneAttention = liveMicrophoneAttention.update(microphoneNeedsAttention)
-        if enabled, liveControlsPausedUntilOpen, let shown = liveControls.shown {
+        // Open or connected, the controls follow the session again; a queued
+        // tap on a cold launch could otherwise leave a working session paused.
+        liveControlsTapPause.update(active: UIApplication.shared.applicationState == .active,
+                                    connected: isConnected)
+        if enabled, liveControlsTapPause.isShown, let shown = liveControls.shown {
             // Mic and Sound stay as shown, since taps change nothing until
             // TailView opens.
             var state = shown.state
@@ -1165,12 +1167,19 @@ final class ViewerModel: ObservableObject {
     /// controls would go stale, so end them; they return once TailView opens
     /// and connects. Audio keepAudioRunning would keep going counts.
     private func endLiveControlsIfSuspending() {
-        guard UIApplication.shared.applicationState == .background, liveControls.shown != nil,
+        guard UIApplication.shared.applicationState == .background,
               !LiveControlsRules.stayUpInBackground(audioRunning: engine?.isRunning == true,
                                                     audioWanted: microphoneCanRecover || macAudioWanted,
                                                     mayOwnAudio: isReconnecting || audioRouteAllowed,
-                                                    paused: reconnectPaused || liveControlsPausedUntilOpen)
+                                                    paused: reconnectPaused || liveControlsTapPause.isShown)
         else { return }
+        // Nothing would be left to release a latched Fn, which the Mac keeps
+        // down while the connection lasts.
+        if functionLatched {
+            DiagnosticLog.note("Released the latched Fn before TailView is suspended")
+            setFunctionLatched(false)
+        }
+        guard liveControls.shown != nil else { return }
         DiagnosticLog.note("No audio running in the background; ended the lock-screen controls until TailView opens")
         stayAwake("End TailView controls") { done in liveControls.end(sent: done) }
     }

@@ -55,10 +55,12 @@ final class LiveControlsActivity {
             if changed { scheduleRepush() }
             return
         }
-        end()
         defer { sent?() }
-        guard UIApplication.shared.applicationState == .active,
-              ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        // Only a foreground app may start one, and the watchdog asks every
+        // second in the background.
+        guard UIApplication.shared.applicationState == .active else { return }
+        end()
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         do {
             activity = try Activity.request(attributes: TailViewControlsAttributes(macName: macName),
                                             content: ActivityContent(state: state,
