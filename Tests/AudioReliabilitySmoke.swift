@@ -83,19 +83,38 @@ struct AudioReliabilitySmoke {
         let lost = Date()
         let grace = ReconnectBackoff.backgroundGracePeriod
         precondition(grace >= 60 && grace <= 300, "Background retries must be bounded to a few minutes")
+        precondition(ReconnectBackoff.backgroundGraceFailures >= 2)
+        func fail(_ backoff: inout ReconnectBackoff, times: Int, at time: Date) {
+            for _ in 0..<times { backoff.connectionLost(at: time) }
+        }
         precondition(!backoff.backgroundGraceExpired(at: lost + 3_600), "No outage, nothing to pause")
+        backoff.restartBackgroundGrace(at: lost + 3_000)
+        precondition(backoff.graceStart == nil, "Going to the background while connected starts nothing")
         backoff.connectionLost(at: lost)
-        backoff.connectionLost(at: lost + grace - 1)
+        fail(&backoff, times: 5, at: lost + grace - 1)
         precondition(!backoff.backgroundGraceExpired(at: lost + grace),
                      "Brief outages and dictation interruptions must keep retrying")
         precondition(backoff.backgroundGraceExpired(at: lost + grace + 1),
                      "Later failures must not restart the grace period")
+        // An outage watched in the foreground gets the full allowance once
+        // TailView goes to the background, and an interruption wake restarts it.
+        let backgrounded = lost + 3 * grace
+        backoff.restartBackgroundGrace(at: backgrounded)
+        fail(&backoff, times: 10, at: backgrounded + 1)
+        precondition(!backoff.backgroundGraceExpired(at: backgrounded + grace),
+                     "Moving to the background must restart the grace period")
+        precondition(backoff.backgroundGraceExpired(at: backgrounded + grace + 1))
+        let woken = backgrounded + 2 * grace
+        backoff.restartBackgroundGrace(at: woken)
+        fail(&backoff, times: ReconnectBackoff.backgroundGraceFailures - 1, at: woken + grace + 1)
+        precondition(!backoff.backgroundGraceExpired(at: woken + grace + 1),
+                     "A wake that fails at once while the network returns must not pause")
+        backoff.connectionLost(at: woken + grace + 1)
+        precondition(backoff.backgroundGraceExpired(at: woken + grace + 1),
+                     "Enough failures after the allowance must pause")
         backoff.reset()
-        precondition(!backoff.backgroundGraceExpired(at: lost + grace + 1),
-                     "A reconnect inside the grace period must restart it")
-        backoff.connectionLost(at: lost + grace + 1)
-        precondition(!backoff.backgroundGraceExpired(at: lost + 2 * grace) &&
-                     backoff.backgroundGraceExpired(at: lost + 2 * grace + 2))
+        precondition(!backoff.backgroundGraceExpired(at: woken + 10 * grace) && backoff.graceStart == nil,
+                     "A reconnect must restart the grace period")
 
         let ok = Data("OK\n".utf8)
         func reply(_ text: String, ended: Bool = false) -> AuthenticationReply {

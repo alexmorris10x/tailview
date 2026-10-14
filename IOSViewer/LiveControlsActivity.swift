@@ -23,19 +23,28 @@ final class LiveControlsActivity {
     }
 
     /// `expires: false` is for a state that stays true while iOS suspends
-    /// TailView, such as a pause that waits for the app to open.
-    func update(macName: String, state: TailViewControlsAttributes.ContentState, expires: Bool = true) {
+    /// TailView, such as a pause that waits for the app to open. `sent` runs
+    /// on the main queue once the update is delivered, or at once if none is.
+    func update(macName: String, state: TailViewControlsAttributes.ContentState, expires: Bool = true,
+                sent: (() -> Void)? = nil) {
         let staleDate = expires ? Self.staleDate() : nil
         // A stale activity is still live; a fresh update clears the stale state.
         if let activity, activity.activityState == .active || activity.activityState == .stale,
            activity.attributes.macName == macName {
-            guard state != lastState || Date().timeIntervalSince(lastPush) >= Self.confirmInterval else { return }
+            guard state != lastState || Date().timeIntervalSince(lastPush) >= Self.confirmInterval else {
+                sent?()
+                return
+            }
             lastState = state
             lastPush = Date()
-            Task { await activity.update(ActivityContent(state: state, staleDate: staleDate)) }
+            Task {
+                await activity.update(ActivityContent(state: state, staleDate: staleDate))
+                if let sent { DispatchQueue.main.async { sent() } }
+            }
             return
         }
         end()
+        defer { sent?() }
         guard UIApplication.shared.applicationState == .active,
               ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         do {
