@@ -56,6 +56,7 @@
 		EF259E62E76940465BEFB7A2 /* DevAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 590D18DC9D63B20A1C6CD689 /* DevAssets.xcassets */; };
 		F0AC032D5A673D0FD6936CC5 /* LocalInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7120797B5BA592ECF917EBD6 /* LocalInputController.swift */; };
 		F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
+		F97B9CB834975C3E4D3C9C5A /* LiveControlsRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */; };
 		FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
 /* End PBXBuildFile section */
 
@@ -117,6 +118,7 @@
 		93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRoutingController.swift; sourceTree = "<group>"; };
 		97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationReply.swift; sourceTree = "<group>"; };
 		B0783290D5A919CD6310B9B9 /* FunctionKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionKeys.swift; sourceTree = "<group>"; };
+		B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControlsRules.swift; sourceTree = "<group>"; };
 		B2FB29C814C93650C267420E /* HostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostModel.swift; sourceTree = "<group>"; };
 		BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSink.swift; sourceTree = "<group>"; };
 		C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioJitterBuffer.swift; sourceTree = "<group>"; };
@@ -216,6 +218,7 @@
 				46D423DC3388C7632ABFA92C /* DiagnosticLog.swift */,
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
 				631DE9DE7174936614641B63 /* LiveControlsActivity.swift */,
+				B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */,
 				0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */,
 				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
@@ -428,6 +431,7 @@
 				3A5EA7D320A37B0FA8568E20 /* DiagnosticLog.swift in Sources */,
 				55FA5B9A380E2C6BD8A38909 /* LiveControls.swift in Sources */,
 				950ADC23CFFBDA653A6BD1EF /* LiveControlsActivity.swift in Sources */,
+				F97B9CB834975C3E4D3C9C5A /* LiveControlsRules.swift in Sources */,
 				66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */,
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,

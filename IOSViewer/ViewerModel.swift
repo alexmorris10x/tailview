@@ -122,6 +122,13 @@ final class ViewerModel: ObservableObject {
     private var videoActive = true
     private let liveControls = LiveControlsActivity()
     private var liveControlsUpdates: AnyCancellable?
+    /// A lock-screen tap woke TailView in the background with no connection
+    /// to act on, on controls left by a run iOS ended (an install, for one).
+    /// They show the pause until TailView opens.
+    private var liveControlsPausedUntilOpen = false
+    /// The lock screen shows the orange Mic only once it has lasted; moving
+    /// audio here passes through it while the microphone starts.
+    private var liveMicrophoneAttention = SustainedFlag(delay: 5)
     // Mirrors microphoneSoftMuted for the tap thread, under packetLock.
     private var microphoneSendMuted = false
     // The connection whose Mac accepted AAC audio, under packetLock.
@@ -171,7 +178,10 @@ final class ViewerModel: ObservableObject {
         // in the foreground still gets all of it once the phone locks.
         backgroundObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main
-        ) { [weak self] _ in self?.reconnectBackoff.restartBackgroundGrace() }
+        ) { [weak self] _ in
+            self?.reconnectBackoff.restartBackgroundGrace()
+            self?.endLiveControlsIfSuspending()
+        }
         routeChangeObserver = NotificationCenter.default.addObserver(
             forName: AVAudioSession.routeChangeNotification,
             object: AVAudioSession.sharedInstance(), queue: .main
@@ -537,8 +547,10 @@ final class ViewerModel: ObservableObject {
     }
 
     func resumeAudioAfterForeground() {
-        // Back in the app, lock-screen mutes become ordinary mutes, so the
-        // microphone indicator turns off.
+        // Back in the app, controls a tap paused follow the connection again.
+        liveControlsPausedUntilOpen = false
+        // Lock-screen mutes become ordinary mutes, so the microphone
+        // indicator turns off.
         if microphoneSoftMuted {
             setMicrophoneSoftMuted(false)
             stopMicrophone()
@@ -1076,6 +1088,16 @@ final class ViewerModel: ObservableObject {
     private func performLiveControl(_ action: LiveControlAction) {
         let background = UIApplication.shared.applicationState != .active
         DiagnosticLog.note("Lock-screen control: \(action)")
+        // Nothing to act on until TailView opens and connects, as on controls
+        // left by a run iOS ended. Show the pause rather than ignore the tap.
+        if background, connection == nil, !isReconnecting {
+            if !liveControlsPausedUntilOpen {
+                DiagnosticLog.note("Lock-screen control with no connection; showing the pause until TailView opens")
+            }
+            liveControlsPausedUntilOpen = true
+            stayAwake("Pause TailView controls") { done in refreshLiveControls(sent: done) }
+            return
+        }
         switch action {
         case .microphone:
             if microphoneSoftMuted { setMicrophoneSoftMuted(false) }
@@ -1106,6 +1128,18 @@ final class ViewerModel: ObservableObject {
     /// `sent` runs once the lock screen has the update, or at once if none.
     func refreshLiveControls(sent: (() -> Void)? = nil) {
         let enabled = UserDefaults.standard.object(forKey: "lockScreenControls") as? Bool ?? true
+        let microphoneAttention = liveMicrophoneAttention.update(microphoneNeedsAttention)
+        if enabled, liveControlsPausedUntilOpen, let shown = liveControls.shown {
+            // Mic and Sound stay as shown, since taps change nothing until
+            // TailView opens.
+            var state = shown.state
+            state.status = Self.pausedStatus
+            state.microphoneNeedsAttention = false
+            state.functionHeld = false
+            state.controlAvailable = false
+            liveControls.update(macName: shown.macName, state: state, expires: false, sent: sent)
+            return
+        }
         guard enabled, isPairedSession || isReconnecting, let profile = reconnectProfile else {
             liveControls.end()
             sent?()
@@ -1115,10 +1149,36 @@ final class ViewerModel: ObservableObject {
         liveControls.update(macName: profile.name, state: TailViewControlsAttributes.ContentState(
             status: isConnected ? "Connected" : reconnectPaused ? Self.pausedStatus : "Reconnecting…",
             microphoneOn: microphoneEnabled,
-            microphoneNeedsAttention: microphoneNeedsAttention,
+            microphoneNeedsAttention: microphoneAttention,
             macSoundOn: macAudioEnabled,
             functionHeld: functionHeld,
             controlAvailable: isConnected && isControlAllowed), expires: !reconnectPaused, sent: sent)
+    }
+
+    /// Called on entering the background and when audio moves to another
+    /// device. Without running audio iOS suspends TailView within seconds,
+    /// and the controls would go stale, so end them; they return once
+    /// TailView opens and connects.
+    private func endLiveControlsIfSuspending() {
+        guard UIApplication.shared.applicationState == .background, liveControls.shown != nil,
+              !LiveControlsRules.stayUpInBackground(audioRunning: engine?.isRunning == true,
+                                                    paused: reconnectPaused || liveControlsPausedUntilOpen)
+        else { return }
+        DiagnosticLog.note("No audio running in the background; ended the lock-screen controls until TailView opens")
+        stayAwake("End TailView controls") { done in liveControls.end(sent: done) }
+    }
+
+    /// Holds a background task until `work` calls its argument, so iOS
+    /// doesn't suspend TailView before the lock screen has the change.
+    private func stayAwake(_ name: String, until work: (@escaping () -> Void) -> Void) {
+        var task = UIBackgroundTaskIdentifier.invalid
+        let done = {
+            guard task != .invalid else { return }
+            UIApplication.shared.endBackgroundTask(task)
+            task = .invalid
+        }
+        task = UIApplication.shared.beginBackgroundTask(withName: name) { done() }
+        work(done)
     }
 
     private func stopAudioEngine() {
@@ -1336,6 +1396,7 @@ final class ViewerModel: ObservableObject {
             endReconnectBackgroundTask()
             reconnectBackgroundTimeRequested = false
         }
+        if !allowed { endLiveControlsIfSuspending() }
     }
 
     private func stopMicrophoneCapture() {
