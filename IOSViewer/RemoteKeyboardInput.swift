@@ -26,6 +26,12 @@ struct RemoteKeyboardInput: UIViewRepresentable {
         field.spellCheckingType = .no
         field.smartQuotesType = .no
         field.smartDashesType = .no
+        // Keyboard extensions delete through UITextDocumentProxy. An empty
+        // document can swallow that request before deleteBackward is called.
+        // Keep one private character and reject local edits below so every
+        // repeated deletion still has a character to target.
+        field.text = "\u{200B}"
+        field.selectedTextRange = field.textRange(from: field.endOfDocument, to: field.endOfDocument)
         field.accessibilityElementsHidden = true
         field.accessibilityIdentifier = "tailview.remoteKeyboardInput"
         field.onSoftwareKeyboardVisibilityChange = { [weak coordinator = context.coordinator] visible in
@@ -64,10 +70,15 @@ struct RemoteKeyboardInput: UIViewRepresentable {
 
         func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange,
                        replacementString string: String) -> Bool {
-            // Backspace never reaches here: the field is always empty, so
-            // UIKit has nothing to replace. RemoteTextField forwards it.
-            guard parent.isActive, !string.isEmpty else { return false }
-            parent.onText(string)
+            guard parent.isActive else { return false }
+            if string.isEmpty {
+                // Some keyboards replace a range instead of calling the
+                // field's deleteBackward override. Forward either path once.
+                if range.length > 0 { parent.onDelete() }
+            } else {
+                parent.onText(string)
+            }
+            // Never send or remove the private placeholder.
             return false
         }
 
@@ -90,8 +101,8 @@ final class RemoteTextField: UITextField {
     private var keyboardShowObserver: NSObjectProtocol?
     private var keyboardHideObserver: NSObjectProtocol?
 
-    /// The software and hardware keyboards call this for Backspace, including
-    /// each auto-repeat while the key is held, even though the field is empty.
+    /// Direct Backspace events, including hardware auto-repeat. Do not call
+    /// super: that would also reach the delegate and delete the placeholder.
     override func deleteBackward() {
         onDeleteBackward?()
     }
