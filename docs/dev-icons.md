@@ -2,7 +2,7 @@
 
 ## App icon
 
-The icon is drawn in [AppIcon.svg](AppIcon.svg): a Mac display with an iPad in front showing the same screen and pointer, on a deep blue background. Edit the SVG, then render the iOS and Mac icons (needs `rsvg-convert` and `magick` from Homebrew):
+The icon is drawn in [AppIcon.svg](AppIcon.svg): an iPad in landscape with the Mac pointer on it, on a violet background. Edit the SVG, then render the iOS and Mac icons (needs `rsvg-convert` and `magick` from Homebrew):
 
 ```sh
 rsvg-convert -w 1024 -h 1024 docs/AppIcon.svg | magick - -background black -alpha remove -alpha off PNG24:IOSViewer/Assets.xcassets/AppIcon.appiconset/TailViewIcon.png

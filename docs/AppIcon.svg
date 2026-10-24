@@ -1,81 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1D3AA8"/>
-      <stop offset="1" stop-color="#0A0F45"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="520" cy="500" r="460" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#4FE0FF" stop-opacity="0.42"/>
-      <stop offset="1" stop-color="#3FD8FF" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2BD9F5"/>
-      <stop offset="0.5" stop-color="#3366F0"/>
-      <stop offset="1" stop-color="#6A2FD8"/>
-    </linearGradient>
-    <radialGradient id="blobA" cx="480" cy="60" r="260" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#7CF5FF" stop-opacity="0.7"/>
-      <stop offset="1" stop-color="#7CF5FF" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="bezel" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2A3044"/>
-      <stop offset="1" stop-color="#151926"/>
-    </linearGradient>
-    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#D5DAE6"/>
-      <stop offset="1" stop-color="#8A92A8"/>
-    </linearGradient>
-    <clipPath id="screenClip"><rect width="600" height="372" rx="22"/></clipPath>
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="20"/>
-      <feOffset dx="0" dy="20" result="b"/>
-      <feFlood flood-color="#020418" flood-opacity="0.6"/>
-      <feComposite in2="b" operator="in"/>
-      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <g id="desk">
-      <g clip-path="url(#screenClip)">
-        <rect width="600" height="372" fill="url(#wall)"/>
-        <rect width="600" height="372" fill="url(#blobA)"/>
-        <rect width="600" height="26" fill="#FFFFFF" fill-opacity="0.28"/>
-        <rect x="70" y="66" width="300" height="214" rx="18" fill="#F7F9FF"/>
-        <circle cx="96" cy="92" r="8" fill="#FF5F57"/>
-        <circle cx="120" cy="92" r="8" fill="#FEBC2E"/>
-        <circle cx="144" cy="92" r="8" fill="#28C840"/>
-        <g fill="#C9D3EA">
-          <rect x="96" y="126" width="200" height="14" rx="7"/>
-          <rect x="96" y="156" width="244" height="14" rx="7"/>
-          <rect x="96" y="186" width="170" height="14" rx="7"/>
-          <rect x="96" y="216" width="222" height="14" rx="7"/>
-          <rect x="96" y="246" width="120" height="14" rx="7"/>
-        </g>
-        <rect x="170" y="316" width="260" height="42" rx="15" fill="#FFFFFF" fill-opacity="0.32"/>
-        <rect x="187" y="324" width="26" height="26" rx="7" fill="#22D3EE"/>
-        <rect x="237" y="324" width="26" height="26" rx="7" fill="#FFFFFF"/>
-        <rect x="287" y="324" width="26" height="26" rx="7" fill="#A855F7"/>
-        <rect x="337" y="324" width="26" height="26" rx="7" fill="#F59E0B"/>
-        <rect x="387" y="324" width="26" height="26" rx="7" fill="#10B981"/>
-        <path transform="translate(440 150) scale(1.5)" d="M0 0 L0 58 L14 45 L24 68 L34 64 L24 41 L42 41 Z" fill="#FFFFFF" stroke="#111827" stroke-width="4" stroke-linejoin="round"/>
-      </g>
-    </g>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#8B6CFF"/><stop offset="1" stop-color="#5A3BE0"/></linearGradient></defs><rect width="1024" height="1024" fill="url(#bg)"/>
+  
+  <!-- iPad in landscape -->
+  <rect x="192" y="272" width="640" height="460" rx="64" fill="none" stroke="#FFFFFF" stroke-width="44"/>
+  
+  <!-- The Mac pointer -->
+  <path transform="translate(432 372)" d="M0 0 L0 236 L58 180 L100 270 L146 250 L104 162 L184 162 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="24" stroke-linejoin="round"/>
 
-  <rect width="1024" height="1024" fill="url(#bg)"/>
-  <rect width="1024" height="1024" fill="url(#glow)"/>
-
-  <!-- Mac display -->
-  <g filter="url(#shadow)">
-    <path d="M370 600 H442 L454 676 H358 Z" fill="url(#metal)"/>
-    <rect x="300" y="668" width="210" height="22" rx="11" fill="url(#metal)"/>
-    <rect x="110" y="228" width="590" height="372" rx="38" fill="url(#bezel)"/>
-    <rect x="111" y="229" width="588" height="370" rx="37" fill="none" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="2"/>
-    <use xlink:href="#desk" transform="translate(128 246) scale(0.9233)"/>
-  </g>
-
-  <!-- iPad -->
-  <g filter="url(#shadow)">
-    <rect x="452" y="486" width="460" height="300" rx="42" fill="url(#bezel)"/>
-    <rect x="453" y="487" width="458" height="298" rx="41" fill="none" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="2"/>
-    <use xlink:href="#desk" transform="translate(470 504) scale(0.7067)"/>
-  </g>
 </svg>
