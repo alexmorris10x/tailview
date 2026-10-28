@@ -8,9 +8,11 @@
 
 /* Begin PBXBuildFile section */
 		083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
+		14CEFCD5FC87C9109BB0D015 /* WidgetRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */; };
 		17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */; };
 		184CB899EB12E6B327C6EC5B /* TailViewLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
+		1FB87D9CD8678B4D95A68164 /* TailViewConnectWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E788ACC17DF6F0A7E39E049E /* TailViewConnectWidget.swift */; };
 		2178E26CCCB3A482B962C4E8 /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
 		23CC289FC1E2FCAAF5E1D344 /* DisplayControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49ACCAC73BE7A1A3BD8190B4 /* DisplayControlModel.swift */; };
 		2C3138630F878A33B50EA70F /* AudioRoutingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */; };
@@ -51,6 +53,7 @@
 		CB800F966C1E83DCC2D4EF30 /* PendingTaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0C94E51C0739995CBF94FF /* PendingTaps.swift */; };
 		CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */; };
 		D0FFBA182CEF11EA7E2B83FF /* TailViewLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */; };
+		D532889CD858A358B807E9A4 /* WidgetRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
 		E373B23CD90E4A0C6264A55F /* BacklightController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A18A3313347868348999728 /* BacklightController.swift */; };
 		E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */; };
@@ -124,10 +127,12 @@
 		B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControlsRules.swift; sourceTree = "<group>"; };
 		B2FB29C814C93650C267420E /* HostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostModel.swift; sourceTree = "<group>"; };
 		BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSink.swift; sourceTree = "<group>"; };
+		C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRoute.swift; sourceTree = "<group>"; };
 		C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioJitterBuffer.swift; sourceTree = "<group>"; };
 		C84D54F79A82CF02DA3433FB /* LiveControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControls.swift; sourceTree = "<group>"; };
 		E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRequest.swift; sourceTree = "<group>"; };
 		E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TailViewLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E788ACC17DF6F0A7E39E049E /* TailViewConnectWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewConnectWidget.swift; sourceTree = "<group>"; };
 		EC989BE803A21C343E9BFBCD /* SessionLockController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLockController.swift; sourceTree = "<group>"; };
 		F54C4272B69B3D917AFDF90B /* ControlCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlCommand.swift; sourceTree = "<group>"; };
 		FB734A9B934E848BE257E976 /* TailViewIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = TailViewIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -150,6 +155,7 @@
 			isa = PBXGroup;
 			children = (
 				29E91D2E3D60149D11B48E21 /* Info.plist */,
+				E788ACC17DF6F0A7E39E049E /* TailViewConnectWidget.swift */,
 				1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */,
 			);
 			path = LiveActivity;
@@ -165,6 +171,14 @@
 				EC989BE803A21C343E9BFBCD /* SessionLockController.swift */,
 			);
 			path = DisplayControl;
+			sourceTree = "<group>";
+		};
+		591647ACF9A907BCAB6C2965 /* WidgetSupport */ = {
+			isa = PBXGroup;
+			children = (
+				C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */,
+			);
+			path = WidgetSupport;
 			sourceTree = "<group>";
 		};
 		77A8FEB6220A7E844073C981 /* MacHost */ = {
@@ -242,6 +256,7 @@
 				060BA4452FF12CA95F178CDD /* LiveControls */,
 				77A8FEB6220A7E844073C981 /* MacHost */,
 				8C10591072A0B1C8A842CE2C /* Shared */,
+				591647ACF9A907BCAB6C2965 /* WidgetSupport */,
 				8ED3EE00A99C0096796D770A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -330,7 +345,6 @@
 				};
 			};
 			buildConfigurationList = 0D51D1AB76DD75DD3AF81412 /* Build configuration list for PBXProject "TailView" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -340,12 +354,13 @@
 			mainGroup = F53259DFD54C0492E87AFB9E;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			productRefGroup = 8ED3EE00A99C0096796D770A /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				3651267505B69BEE22499B6B /* TailViewMac */,
 				750556B4F082C572763AD138 /* TailViewIOS */,
 				3368BAAAE4FFA486E1010BFF /* TailViewLiveActivity */,
-				3651267505B69BEE22499B6B /* TailViewMac */,
 			);
 		};
 /* End PBXProject section */
@@ -420,7 +435,9 @@
 			files = (
 				BCB7CB384D8E59BD21A672FC /* LiveControls.swift in Sources */,
 				CB800F966C1E83DCC2D4EF30 /* PendingTaps.swift in Sources */,
+				1FB87D9CD8678B4D95A68164 /* TailViewConnectWidget.swift in Sources */,
 				D0FFBA182CEF11EA7E2B83FF /* TailViewLiveActivity.swift in Sources */,
+				D532889CD858A358B807E9A4 /* WidgetRoute.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -449,6 +466,7 @@
 				A72E9B7166FDCD924F02F920 /* TailViewIOSApp.swift in Sources */,
 				48E9D18EFF50F2B35287C264 /* ViewerModel.swift in Sources */,
 				8BB8A9D5564AA07A9A3EC708 /* ViewerView.swift in Sources */,
+				14CEFCD5FC87C9109BB0D015 /* WidgetRoute.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -502,6 +520,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 63;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -510,6 +529,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev;
 				SDKROOT = iphoneos;
+				TAILVIEW_URL_SCHEME = "tailview-dev";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -519,6 +539,7 @@
 			buildSettings = {
 				APP_DISPLAY_NAME = "TailView Controls";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 63;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -555,6 +576,7 @@
 			buildSettings = {
 				APP_DISPLAY_NAME = "TailView Controls Dev";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 63;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -710,6 +732,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 63;
 				EXCLUDED_SOURCE_FILE_NAMES = DevAssets.xcassets;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -719,6 +742,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios;
 				SDKROOT = iphoneos;
+				TAILVIEW_URL_SCHEME = tailview;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;

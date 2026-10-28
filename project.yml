@@ -22,13 +22,15 @@ targets:
     type: application
     platform: iOS
     deploymentTarget: "17.0"
-    sources: [IOSViewer, Shared, LiveControls]
+    sources: [IOSViewer, Shared, LiveControls, WidgetSupport]
     dependencies:
       - target: TailViewLiveActivity
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios
+        CURRENT_PROJECT_VERSION: 63
         APP_DISPLAY_NAME: TailView
+        TAILVIEW_URL_SCHEME: tailview
         INFOPLIST_FILE: IOSViewer/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
@@ -37,6 +39,7 @@ targets:
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios.dev
           APP_DISPLAY_NAME: TailView Dev
+          TAILVIEW_URL_SCHEME: tailview-dev
           ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Dev
         Release:
           EXCLUDED_SOURCE_FILE_NAMES: DevAssets.xcassets
@@ -50,10 +53,11 @@ targets:
     type: app-extension
     platform: iOS
     deploymentTarget: "17.0"
-    sources: [LiveActivity, LiveControls]
+    sources: [LiveActivity, LiveControls, WidgetSupport]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios.LiveActivity
+        CURRENT_PROJECT_VERSION: 63
         APP_DISPLAY_NAME: TailView Controls
         INFOPLIST_FILE: LiveActivity/Info.plist
         CODE_SIGN_STYLE: Automatic

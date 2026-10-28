@@ -6,6 +6,7 @@ import WidgetKit
 @main
 struct TailViewWidgets: WidgetBundle {
     var body: some Widget {
+        TailViewConnectWidget()
         TailViewControlsLiveActivity()
     }
 }

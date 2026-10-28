@@ -72,13 +72,7 @@ struct ViewerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        releaseHeldMouse()
-                        releaseFunctionKey()
-                        modifierSelection.reset()
-                        closeKeyboard()
-                        showSettings = true
-                    } label: {
+                    Button(action: openSettings) {
                         Label("Settings", systemImage: "gearshape")
                     }
                     .accessibilityIdentifier("tailview.settings")
@@ -89,6 +83,20 @@ struct ViewerView: View {
             }) {
                 settingsView
             }
+        }
+        .onOpenURL { url in
+            guard let route = WidgetRoute(url: url) else { return }
+            if route == .settings {
+                openSettings()
+                return
+            }
+            showSettings = false
+            showPairing = false
+            automaticConnection = true
+            if route == .keyboard { keyboardUserHidden = false }
+            viewer.reloadSavedMacs()
+            connectPreferredIfNeeded()
+            if route == .keyboard && viewer.isControlAllowed { showKeyboard() }
         }
         .onChange(of: viewer.isConnected) { _, connected in
             if connected {
@@ -200,6 +208,14 @@ struct ViewerView: View {
             #endif
             connectPreferredIfNeeded()
         }
+    }
+
+    private func openSettings() {
+        releaseHeldMouse()
+        releaseFunctionKey()
+        modifierSelection.reset()
+        closeKeyboard()
+        showSettings = true
     }
 
     private var connectionView: some View {
