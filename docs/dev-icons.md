@@ -2,7 +2,9 @@
 
 ## App icon
 
-The icon is drawn in [AppIcon.svg](AppIcon.svg): an iPad in landscape with the Mac pointer on it, on a violet background. Edit the SVG, then render the iOS and Mac icons (needs `rsvg-convert` and `magick` from Homebrew):
+The icon is drawn in [AppIcon.svg](AppIcon.svg): a close-up violet screen with a pearl frame and a substantial white Mac pointer, on dark ink. The screen runs beyond the right edge; the pointer overlaps its frame. Like Memex's page and bookmark, solid surfaces, soft shadows and a restrained accent give it depth and a recognizable silhouette at Home Screen size. The pointer stays above the Dev banner. iOS supplies the outer mask.
+
+Edit the SVG, then render the iOS and Mac icons (needs `rsvg-convert` and `magick` from Homebrew):
 
 ```sh
 rsvg-convert -w 1024 -h 1024 docs/AppIcon.svg | magick - -background black -alpha remove -alpha off PNG24:IOSViewer/Assets.xcassets/AppIcon.appiconset/TailViewIcon.png
@@ -22,7 +24,7 @@ Then regenerate the Dev icon below.
 
 Debug uses the original app logo plus Memex's exact orange bottom DEV banner.
 The banner is 230 pixels high on a 1024px icon, with centered white DEV text.
-Release artwork and build identity are unchanged.
+Release and Dev use the same artwork; only Dev adds the banner. Bundle identities are unchanged.
 
 Regenerate from the original artwork with the shared [ios-dev-icons skill](https://github.com/alexmorris10x/10x-home/tree/main/.agents/skills/ios-dev-icons):
 
