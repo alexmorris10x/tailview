@@ -1,6 +1,6 @@
 # TailView App Store metadata draft
 
-**Status (2026-10-30):** Reviewer-owned Mac instructions are saved in App Store Connect. Corrected build `20261030110510` is processed, has its export-compliance answer saved, and is selected for version 1.0. The Developer Program agreement is accepted, and Paid Apps and Free Apps agreements are Active. Sandbox validation, clean customer setup, exercised review access, and required screenshots remain unfinished; no submission or approval is claimed.
+**Status (2026-10-30):** Build `20261030110510`, required iPhone/iPad screenshots, and both purchase-review images are processed and attached. Version 1.0, the free trial, and lifetime unlock passed Add for Review validation and share one unsubmitted draft. Agreements are Active and release remains manual. Visible local StoreKit purchase, restore, and active-session expiry checks passed on the physical iPhone. Actual reinstall/restore, declined Ask to Buy retry, and full setup with the distributed Mac app remain unresolved; see [the remaining work](../TODO.md). No submission or approval is claimed.
 
 ## Listing
 
@@ -61,7 +61,7 @@ https://alexmorris10x.github.io/tailview/
 | Reference | Product ID | Type | English display name | Price | Description |
 | --- | --- | --- | --- | --- | --- |
 | Seven-day trial | `com.10x.tailview.ios.trial7` | Non-consumable | `7-day Trial` | Free / Price Tier 0 | `7 days of screen, control, and audio. No auto-charge.` |
-| Lifetime | `com.10x.tailview.ios.lifetime` | Non-consumable | `Lifetime Unlock` | US base price $9.99 | `One-time unlock for your iPhone and iPad.` |
+| Lifetime | `com.10x.tailview.ios.lifetime` | Non-consumable | `Lifetime Unlock` | US base price $9.99 | `Permanent remote access. One-time purchase.` |
 
 Use Apple's permitted non-subscription trial model. Do not create an auto-renewable subscription, subscription introductory offer, server license key, or external checkout. The app must show trial duration, the functions that stop, and the local lifetime price before starting the trial. A restored trial keeps its original start date and does not restart. Configure availability and localizations for both products, attach their review screenshots, and include them with the first app submission.
 
