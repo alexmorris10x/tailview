@@ -10,7 +10,7 @@ import XCTest
 @MainActor
 final class PurchaseAccessStoreKitTests: XCTestCase {
     func testExplicitTrialAndRestorationKeepOriginalDeadline() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         let access = try await makeAccess()
         XCTAssertEqual(access.state, .trialAvailable)
@@ -18,10 +18,10 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
         XCTAssertTrue(session.allTransactions().isEmpty)
 
         await access.startTrial()
-        print("Trial result: state=\(access.state), message=\(access.message ?? "none"), error=\(access.messageIsError), pending=\(access.pendingProductID ?? "none"), testTransactions=\(session.allTransactions().count)")
         try await eventually { access.expirationDate != nil }
         let deadline = try XCTUnwrap(access.expirationDate)
         XCTAssertTrue(access.streamAllowed)
+        try await eventually { await self.hasEntitlement(TrialAccessRules.trialProductID) }
 
         let restored = PurchaseAccess()
         await restored.restore()
@@ -32,12 +32,13 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
     }
 
     func testPermanentUnlockRestoresAndRefundRevokesRunningAccess() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         let access = try await makeAccess()
         await access.buyLifetime()
         try await eventually { access.state == .lifetime }
         XCTAssertTrue(access.streamAllowed)
+        try await eventually { await self.hasEntitlement(TrialAccessRules.lifetimeProductID) }
 
         let restored = PurchaseAccess()
         await restored.restore()
@@ -50,7 +51,7 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
     }
 
     func testAskToBuyDoesNotGrantAccessUntilApproved() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         session.askToBuyEnabled = true
         let access = try await makeAccess()
@@ -64,7 +65,7 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
     }
 
     func testCancellationDoesNotGrantAccessOrLeaveBusyState() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         let access = try await makeAccess()
         try await session.setSimulatedError(.generic(.userCancelled), forAPI: .purchase)
@@ -78,7 +79,7 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
     }
 
     func testDeclinedAskToBuyCanBeRecheckedAndRetried() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         session.askToBuyEnabled = true
         let access = try await makeAccess()
@@ -88,13 +89,18 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
         await access.restore()
         XCTAssertFalse(access.streamAllowed)
         XCTAssertFalse(access.purchaseInProgress)
-        session.askToBuyEnabled = false
         await access.buyLifetime()
+        XCTAssertEqual(access.pendingProductID, TrialAccessRules.lifetimeProductID)
+        XCTAssertFalse(access.streamAllowed)
+        let retry = try XCTUnwrap(session.allTransactions().first {
+            $0.identifier != pending.identifier && $0.state == .deferred
+        })
+        try session.approveAskToBuyTransaction(identifier: retry.identifier)
         try await eventually { access.state == .lifetime }
     }
 
     func testVerifiedAccessSurvivesUnavailableProductCatalog() async throws {
-        let session = try makeSession()
+        let session = try await makeSession()
         defer { session.clearTransactions() }
         _ = try await session.buyProduct(identifier: TrialAccessRules.lifetimeProductID)
         try await session.setSimulatedError(.generic(.networkError(URLError(.notConnectedToInternet))), forAPI: .loadProducts)
@@ -106,12 +112,19 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
         XCTAssertTrue(access.streamAllowed)
     }
 
-    private func makeSession() throws -> SKTestSession {
+    private func makeSession() async throws -> SKTestSession {
         let configuration = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TailView", withExtension: "storekit"))
         let session = try SKTestSession(contentsOf: configuration)
         session.resetToDefaultState()
         session.clearTransactions()
         session.disableDialogs = true
+        // Local StoreKit mutations return before StoreKit 2's entitlement
+        // snapshot catches up. Do not let a previous case leak into this one.
+        try await eventually {
+            for await _ in StoreKit.Transaction.all { return false }
+            for await _ in StoreKit.Transaction.currentEntitlements { return false }
+            return true
+        }
         return session
     }
 
@@ -151,9 +164,19 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
         return access
     }
 
-    private func eventually(_ condition: @MainActor () -> Bool, file: StaticString = #filePath, line: UInt = #line) async throws {
+    private func hasEntitlement(_ productID: String) async -> Bool {
+        for await result in StoreKit.Transaction.currentEntitlements {
+            if case .verified(let transaction) = result,
+               transaction.productID == productID, transaction.revocationDate == nil {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func eventually(_ condition: @MainActor () async -> Bool, file: StaticString = #filePath, line: UInt = #line) async throws {
         for _ in 0..<100 {
-            if condition() { return }
+            if await condition() { return }
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         XCTFail("StoreKit did not reach the expected state within five seconds", file: file, line: line)
