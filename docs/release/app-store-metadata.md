@@ -1,6 +1,6 @@
 # TailView App Store metadata draft
 
-**Status:** Prepared text and product configuration; not an App Store submission or evidence of approval. Replace the review-demo placeholders privately in App Store Connect before submission. Product availability and screenshots still need to match the selected build.
+**Status (2026-10-30):** Reviewer-owned Mac instructions are saved in App Store Connect. Corrected build `20261030110510` is processed, has its export-compliance answer saved, and is selected for version 1.0. The Developer Program agreement is accepted, and Paid Apps and Free Apps agreements are Active. Sandbox validation, clean customer setup, exercised review access, and required screenshots remain unfinished; no submission or approval is claimed.
 
 ## Listing
 
@@ -73,7 +73,7 @@ The source currently sends session data between user-selected devices; it has no
 
 Screen, microphone, clipboard, paired-device records, and local diagnostics are explained in the public privacy policy. The privacy manifest and required-reason API declarations must match the shipped source. No sensitive screen or customer material belongs in screenshots or review attachments.
 
-## App Review notes draft
+## App Review notes and saved setup
 
 TailView is a general remote-desktop client for a Mac owned or administered by the user. It mirrors the whole Mac desktop; the host application and processing remain on that Mac. The iOS client does not download or execute Mac applications. The separate free Mac host is distributed directly with Developer ID signing and notarization.
 
@@ -83,9 +83,18 @@ The iOS app is free to download. `com.10x.tailview.ios.trial7` is a free non-con
 
 Background audio is used for an ongoing user-started remote audio session, including microphone return if enabled. Lock-screen controls are optional session controls. The Mac companion includes advanced display-management controls; those Mac-only private system interfaces are not part of the iOS client.
 
-Review setup: [FILL PRIVATELY: a usable isolated review Mac and Tailscale access route, setup instructions, how a reviewer obtains a fresh pairing code, and a live contact who can resolve access problems]. The review Mac must contain only synthetic data and have no access to the developer's personal accounts or wider private network. Keep it available during review. Never copy real credentials, tailnet auth keys, or pairing secrets into this repository.
+The following reviewer-owned Mac setup was saved in App Store Connect on 2026-10-30. It does not provide access to the developer's desktop or network. The flow has not been independently exercised or accepted by App Review.
 
-An expired five-minute code in review notes is not a working demonstration. Provide a renewable access mechanism coordinated with the reviewer or a documented setup on the reviewer's own Mac, and attach a short recording showing the full connection and purchase flow as supporting context. A recording alone does not replace functional review access.
+1. Use a Mac running macOS 14 or later. Download the free, Developer ID-signed and notarized companion from [the Mac release](https://github.com/alexmorris10x/tailview/releases/tag/v1.0.0-mac), open its DMG, drag TailView Mac into Applications, and launch it.
+2. Install Tailscale on the Mac and review iPhone/iPad, and connect both to a network you control. Permit the review device to reach the Mac on TCP port 47820. There is no TailView login.
+3. Allow Screen Recording, reopen TailView Mac if macOS requests it, and choose **Start sharing**. Keep the Mac awake and signed in. Open a harmless TextEdit document for the interaction test.
+4. Choose **Pair a new device** on the Mac. Enter its displayed address and current code in the iOS app, then choose **Pair Mac**. Codes are single-use and expire after five minutes; generate another on the Mac when needed. Pairing does not start the trial.
+5. Choose **Start 7-day free trial** and confirm the free **7-day Trial** item in Apple's review purchase environment. It never renews or charges automatically. **Lifetime Unlock** is a separate one-time non-consumable, with a US base price of $9.99. **Restore Purchases** preserves the original entitlement and does not restart an expired trial.
+6. For keyboard and pointer control, enable remote-control consent in both apps and grant TailView Mac Accessibility permission. Type into the harmless document. Viewing works with control disabled.
+7. Test Mac audio with a harmless audio file. Optional microphone return additionally requires BlackHole 2ch, iOS microphone consent, and the Mac app's audio-routing option or manual input selection; it is not needed for viewing, remote input, or Mac-to-device audio.
+8. Disconnect and reconnect to the saved Mac. **Pause Access** disconnects all viewers, **Resume Access** permits saved-device connections, and **Revoke** requires fresh pairing.
+
+[Full setup instructions](https://alexmorris10x.github.io/tailview/setup.html). If a prerequisite prevents review, use the contact listed in the submission. Never put real credentials, tailnet auth keys, or pairing secrets in this repository. A supporting recording does not replace functional review access.
 
 ## Before Alex submits
 
@@ -94,6 +103,6 @@ An expired five-minute code in review notes is not a working demonstration. Prov
 3. Configure both products and verify the release build's trial, expiry, purchase, and restore behavior in StoreKit testing and the available Apple test environment.
 4. Supply real iPhone and iPad screenshots in the sizes App Store Connect currently requests, using an isolated demo desktop. Show connection/setup, remote view and controls, and the trial/unlock screen. Do not present the website illustration as an app screenshot.
 5. Complete age-rating, export-compliance, content-rights, availability, contact, and privacy forms truthfully for this build; no guessed account answers.
-6. Fill the private review access details and attach the build and first in-app purchases. Alex handles TestFlight/App Store submission and the release decision.
+6. Exercise the documented reviewer-owned Mac setup and attach the corrected build and first in-app purchases. Alex handles TestFlight/App Store submission and the release decision.
 
 References: [App Review Guidelines 3.1.1 and 4.2.7](https://developer.apple.com/app-store/review/guidelines/), [Apple app privacy details](https://developer.apple.com/app-store/app-privacy-details/).
