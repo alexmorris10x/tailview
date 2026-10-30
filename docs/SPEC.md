@@ -73,7 +73,7 @@ A fresh setup must pair without spending trial time, disclose each permission, a
 | Dev/production; XcodeGen | Separate identities and schemes; implemented |
 | Payments | Direct StoreKit non-consumables; deliberate exception to subscription defaults |
 | Internal accounts; transactional email | No account or email backend; Dev access is not customer revenue |
-| Public page | Prepared; final live artifacts/links tracked in TODO |
+| Public page | Live on GitHub Pages; notarized Mac download published; App Store link pending |
 | Analytics; feedback pass; waitlist | No tracking SDK or waitlist; explicit free trial supplies evaluation access |
 | Referrals; affiliates | Not now |
 | Blueprint and backlog | This file and TODO are canonical |
