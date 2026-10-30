@@ -9,6 +9,18 @@ import XCTest
 /// never fabricate verified receipts or contact a production purchase account.
 @MainActor
 final class PurchaseAccessStoreKitTests: XCTestCase {
+    override func tearDown() async throws {
+        let configuration = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "TailView", withExtension: "storekit"))
+        let session = try SKTestSession(contentsOf: configuration)
+        session.resetToDefaultState()
+        session.clearTransactions()
+        session.disableDialogs = false
+        try await session.setSimulatedError(nil, forAPI: .loadProducts)
+        try await session.setSimulatedError(nil, forAPI: .purchase)
+        try await session.setSimulatedError(nil, forAPI: .appStoreSync)
+        try await super.tearDown()
+    }
+
     func testExplicitTrialAndRestorationKeepOriginalDeadline() async throws {
         let session = try await makeSession()
         defer { session.clearTransactions() }
