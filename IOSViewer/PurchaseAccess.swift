@@ -85,12 +85,7 @@ final class PurchaseAccess: ObservableObject {
                 case .verified(let transaction):
                     guard TrialAccessRules.productIDs.contains(transaction.productID) else { continue }
                     self.pendingProductID = nil
-                    if transaction.revocationDate != nil, let record = self.record(transaction) {
-                        self.entitlements.removeAll { $0.productID == transaction.productID }
-                        self.history.append(record)
-                        self.reevaluate()
-                    }
-                    await self.refresh()
+                    self.applyVerifiedTransaction(transaction)
                     await transaction.finish()
                 case .unverified(let transaction, _):
                     guard TrialAccessRules.productIDs.contains(transaction.productID) else { continue }
@@ -232,7 +227,7 @@ final class PurchaseAccess: ObservableObject {
                         showMessage("The App Store returned a different purchase. Restore purchases to check your access.", error: true)
                         return
                     }
-                    await refresh()
+                    applyVerifiedTransaction(transaction)
                     await transaction.finish()
                     if streamAllowed { showMessage(product.id == TrialAccessRules.trialProductID ? "Your seven-day trial has started. No automatic charge." : "TailView is permanently unlocked.") }
                     else { showMessage("Purchase received, but no active access was found. Try Restore Purchases.", error: true) }
@@ -258,6 +253,20 @@ final class PurchaseAccess: ObservableObject {
         return .init(productID: transaction.productID, purchaseDate: transaction.purchaseDate,
                      originalPurchaseDate: transaction.originalPurchaseDate,
                      revocationDate: transaction.revocationDate)
+    }
+
+    /// A verified purchase result or update is itself the current entitlement
+    /// event. Deliver it before finishing; a separate StoreKit enumeration can
+    /// still reflect the snapshot from before this transaction.
+    private func applyVerifiedTransaction(_ transaction: StoreKit.Transaction) {
+        guard let purchase = record(transaction) else { return }
+        // A refresh begun before this event must not overwrite the new result.
+        refreshGeneration += 1
+        history.append(purchase)
+        entitlements.removeAll { $0.productID == purchase.productID }
+        if purchase.revocationDate == nil { entitlements.append(purchase) }
+        hasLoadedEntitlements = true
+        reevaluate()
     }
 
     private func reevaluate() {

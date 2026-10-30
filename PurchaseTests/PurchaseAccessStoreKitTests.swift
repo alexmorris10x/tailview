@@ -1,6 +1,7 @@
 import Foundation
 import StoreKit
 import StoreKitTest
+import UIKit
 import XCTest
 @testable import TailViewIOS
 
@@ -17,6 +18,7 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
         XCTAssertTrue(session.allTransactions().isEmpty)
 
         await access.startTrial()
+        print("Trial result: state=\(access.state), message=\(access.message ?? "none"), error=\(access.messageIsError), pending=\(access.pendingProductID ?? "none"), testTransactions=\(session.allTransactions().count)")
         try await eventually { access.expirationDate != nil }
         let deadline = try XCTUnwrap(access.expirationDate)
         XCTAssertTrue(access.streamAllowed)
@@ -114,6 +116,29 @@ final class PurchaseAccessStoreKitTests: XCTestCase {
     }
 
     private func makeAccess() async throws -> PurchaseAccess {
+        // Product.purchase requires a foreground scene even when the local
+        // StoreKit session suppresses purchase dialogs.
+        try await eventually {
+            UIApplication.shared.connectedScenes.contains { scene in
+                guard let windowScene = scene as? UIWindowScene else { return false }
+                return scene.activationState == .foregroundActive
+                    && windowScene.windows.contains { $0.isKeyWindow && !$0.isHidden }
+            }
+        }
+        // Allow Apple's local service to apply the new session before the app
+        // makes its first StoreKit request. This checks the real catalog rather
+        // than replacing purchases with a test double.
+        var catalog: [Product] = []
+        for _ in 0..<20 {
+            catalog = try await Product.products(for: TrialAccessRules.productIDs)
+            if Set(catalog.map(\.id)) == Set(TrialAccessRules.productIDs) { break }
+            try await Task.sleep(nanoseconds: 200_000_000)
+        }
+        guard Set(catalog.map(\.id)) == Set(TrialAccessRules.productIDs) else {
+            let returned = catalog.map { "\($0.id): \($0.type), \($0.price)" }.joined(separator: ", ")
+            XCTFail("Local StoreKit catalog unavailable for \(Bundle.main.bundleIdentifier ?? "unknown"). Returned products: [\(returned)]")
+            throw TestEnvironmentUnavailable()
+        }
         let access = PurchaseAccess()
         await access.refresh()
         try await eventually { access.state != .loading && !access.productsLoading }

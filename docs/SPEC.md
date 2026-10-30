@@ -21,6 +21,7 @@ The first audience is Mac owners already comfortable with Tailscale. The key res
 - Explicit free non-consumable `com.10x.tailview.ios.trial7`, named **7-day Trial**. It starts on the original verified transaction, lasts seven days, and never auto-charges.
 - Non-consumable `com.10x.tailview.ios.lifetime`, **Lifetime Unlock**, $9.99 US base price; use Apple's localized price in the app.
 - Expiry stops viewing, remote input, and audio, including an active session. Saved configuration, pairing, help, purchase, and restore remain available. Restore never restarts the trial; refunded/revoked access must not remain unlocked.
+- Verified purchase results and transaction updates change access before the transaction is finished. A refresh started before that event cannot overwrite it. Launch, foreground, and restore still reconcile with Apple's current entitlements; historical purchases alone never grant access.
 - Free Mac companion. No subscription, RevenueCat, external checkout, or custom license service. Development access is separate and must not enter the release entitlement path. Family Sharing is not promised.
 
 ## 4. Unit costs and margin
@@ -64,7 +65,7 @@ Mac setup shows Tailscale, Screen Recording, **Start sharing**, control consent,
 
 ## 12. Quality bar
 
-A fresh setup must pair without spending trial time, disclose each permission, and stop sessions on pause/revoke/expiry. Purchase cancellation, pending approval, verification failure, restore, and revocation must not grant unintended access. Pure trial/consent/transport/audio checks passed for this change; simulator compilation passed. StoreKit runtime tests could not initialize the system sandbox and do not count as purchase acceptance. Real customer setup, purchase/restore, screenshots, and isolated review access remain in [TODO](TODO.md). No repeated simulator run is required until that environment changes.
+A fresh setup must pair without spending trial time, disclose each permission, and stop sessions on pause/revoke/expiry. Purchase cancellation, pending approval, verification failure, restore, and revocation must not grant unintended access. Pure trial/consent/transport/audio checks passed; simulator and physical-device test builds compile. A physical test reached a verified trial purchase and exposed a stale entitlement-snapshot bug. The fix compiles, but its runtime rerun was blocked by the locked iPhone, so purchase acceptance remains incomplete. Real customer setup, purchase/restore, screenshots, and isolated review access remain in [TODO](TODO.md). Both the shared and a fresh simulator overloaded the Mac; no repeated run is required until that runtime changes.
 
 ## 13. Standard parts
 
