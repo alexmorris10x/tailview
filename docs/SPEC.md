@@ -61,7 +61,7 @@ Sharing starts only after Mac consent; remote control also requires explicit con
 
 ## 11. Screens
 
-Mac setup shows Tailscale, Screen Recording, **Start sharing**, control consent, optional audio routing, and paired-device revocation. iOS setup permits **Pair Mac** before access purchase. **TailView Access** contains trial, localized permanent price, and **Restore Purchases**. The connected viewer has the remote screen, toolbar, and audio controls; Settings owns consent, automatic audio, and lock-screen preferences.
+Mac setup shows Tailscale, Screen Recording, **Start sharing**, control consent, optional audio routing, and paired-device revocation. iOS setup permits **Pair Mac** before access purchase. **TailView Access** contains trial, localized permanent price, and **Restore Purchases**. The connected viewer has the remote screen, toolbar, and audio controls; Settings owns consent, automatic audio, and lock-screen preferences. The keyboard button remains tappable when control is unavailable: it offers explicit device consent or explains the Mac control and Accessibility requirements. Keyboard focus resumes after settings and purchase sheets, and the button reflects the visible software keyboard.
 
 ## 12. Quality bar
 

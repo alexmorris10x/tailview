@@ -164,10 +164,7 @@ final class RemoteTextField: UITextField {
                         self?.finishPendingRefocus(generation)
                     }
                 } else if !self.isFirstResponder {
-                    _ = self.becomeFirstResponder()
-                    #if DEBUG
-                    self.logKeyboard("focused")
-                    #endif
+                    self.activateKeyboard(generation: generation)
                 }
             } else {
                 if self.isFirstResponder { self.resignFirstResponder() }
@@ -208,10 +205,24 @@ final class RemoteTextField: UITextField {
         DispatchQueue.main.async { [weak self] in
             guard let self, self.focusGeneration == generation,
                   self.desiredActive, self.window?.isKeyWindow == true else { return }
-            _ = self.becomeFirstResponder()
+            self.activateKeyboard(generation: generation)
+        }
+    }
+
+    /// A sheet dismissal can briefly reject focus even while the window is key.
+    /// Retry only this request, and stop if the user hides input or a sheet opens.
+    private func activateKeyboard(generation: Int, attemptsRemaining: Int = 3) {
+        guard focusGeneration == generation, desiredActive,
+              window?.isKeyWindow == true else { return }
+        if isFirstResponder || becomeFirstResponder() {
             #if DEBUG
-            self.logKeyboard("refocused")
+            logKeyboard("focused")
             #endif
+            return
+        }
+        guard attemptsRemaining > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            self?.activateKeyboard(generation: generation, attemptsRemaining: attemptsRemaining - 1)
         }
     }
 

@@ -1,6 +1,5 @@
 import Combine
 import AVKit
-import GameController
 import SwiftUI
 
 struct ViewerView: View {
@@ -18,6 +17,7 @@ struct ViewerView: View {
     @State private var showPairing = false
     @State private var showSettings = false
     @State private var showPurchase = false
+    @State private var showControlHelp = false
     @State private var automaticConnection = true
     @State private var didRunDebugLaunch = false
     @State private var diagnosticLaunch = false
@@ -55,7 +55,7 @@ struct ViewerView: View {
                     connectionView
                 }
                 RemoteKeyboardInput(
-                    isActive: keyboardActive && viewer.isControlAllowed && !showSettings,
+                    isActive: keyboardActive && viewer.isControlAllowed && !showSettings && !showPurchase,
                     focusRequest: keyboardFocusRequest,
                     onText: sendText,
                     onDelete: { sendKey(.delete) },
@@ -86,8 +86,27 @@ struct ViewerView: View {
             }) {
                 settingsView
             }
-            .sheet(isPresented: $showPurchase) {
+            .sheet(isPresented: $showPurchase, onDismiss: {
+                if viewer.isControlAllowed && !keyboardUserHidden { showKeyboard() }
+            }) {
                 PurchaseView(access: access)
+            }
+            .alert(remoteControlConsent ? "Enable control on your Mac" : "Enable keyboard and pointer control?",
+                   isPresented: $showControlHelp) {
+                if !remoteControlConsent {
+                    Button("Enable Control") {
+                        keyboardUserHidden = false
+                        remoteControlConsent = true
+                        if viewer.isControlAllowed { showKeyboard() }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } else {
+                    Button("OK", role: .cancel) {}
+                }
+            } message: {
+                Text(remoteControlConsent
+                     ? "On your Mac, open TailView, enable remote control, and allow Accessibility in System Settings. The keyboard will open when control is available."
+                     : "Allow this device to send typing and pointer actions to your paired Mac. Your Mac must also enable remote control and allow Accessibility. You can turn this off in Settings.")
             }
         }
         .onChange(of: access.state) { _, _ in
@@ -145,7 +164,7 @@ struct ViewerView: View {
         }
         .onChange(of: viewer.isControlAllowed) { _, allowed in
             if allowed {
-                if !showSettings && !keyboardUserHidden { showKeyboard() }
+                if !showSettings && !showPurchase && !keyboardUserHidden { showKeyboard() }
             } else {
                 closeKeyboard()
                 releaseFunctionKey()
@@ -187,7 +206,7 @@ struct ViewerView: View {
                 viewer.reloadSavedMacs()
                 connectPreferredIfNeeded()
                 viewer.resumeAudioAfterForeground()
-                if viewer.isControlAllowed && !showSettings && !keyboardUserHidden {
+                if viewer.isControlAllowed && !showSettings && !showPurchase && !keyboardUserHidden {
                     showKeyboard()
                 }
             }
@@ -393,8 +412,8 @@ struct ViewerView: View {
                     BarIcon("keyboard")
                 }
                 .accessibilityLabel(keyboardShown ? "Hide keyboard" : "Show keyboard")
+                .accessibilityHint(viewer.isControlAllowed ? "" : "Explains how to enable keyboard and pointer control")
                 .accessibilityIdentifier("tailview.keyboardButton")
-                .disabled(!viewer.isControlAllowed)
                 Button { pasteClipboard() } label: {
                     BarIcon("doc.on.clipboard")
                 }
@@ -823,13 +842,17 @@ struct ViewerView: View {
         keyboardActive = false
     }
 
-    /// With a hardware keyboard attached, iPadOS may show only a thin
-    /// accessory strip, so a focused input counts as the keyboard being on.
+    /// Focus alone does not mean an onscreen keyboard is visible.
     private var keyboardShown: Bool {
-        nativeKeyboardVisible || (keyboardActive && GCKeyboard.coalesced != nil)
+        nativeKeyboardVisible
     }
 
     private func toggleKeyboard() {
+        guard viewer.isControlAllowed else {
+            keyboardUserHidden = false
+            showControlHelp = true
+            return
+        }
         if keyboardShown {
             hideKeyboard()
         } else {
