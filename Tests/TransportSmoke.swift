@@ -6,11 +6,11 @@ struct TransportSmoke {
     static func main() throws {
         guard CommandLine.arguments.count == 2 else { throw TestError.message("Pass the Mac Tailscale IPv4 address") }
         let address = CommandLine.arguments[1]
-        let code = UUID().uuidString.lowercased()
-        let server = try VideoServer(address: address, code: code, audioSink: nil)
+        var code = UUID().uuidString.lowercased()
+        let server = try VideoServer(address: address, audioSink: nil)
         let deviceID = UUID()
         let token = String(repeating: "ab", count: 32)
-        let pair = PairingRequest.pair(code: code, id: deviceID, token: token, deviceName: "Test iPad")
+        var pair = PairingRequest.pair(code: code, id: deviceID, token: token, deviceName: "Test iPad")
         let saved = PairingRequest.authenticate(id: deviceID, token: token)
         let credentials = CredentialStore()
         let delivered = ControlRecorder()
@@ -19,7 +19,9 @@ struct TransportSmoke {
         server.authenticateSaved = { credentials.authenticate($0, token: $1) }
         server.isPreferredMicrophone = { $0 == deviceID }
         server.onPairingRequest = { credentials.add($0, token: $2); return true }
-        server.authorizeTrustedControl = { true }
+        let consent = HostTestConsent()
+        server.authorizeTrustedControl = { consent.controlAllowed }
+        let microphoneSink = HostTestMicrophoneSink()
         server.onControlCommand = { delivered.append($0) }
         let pastes = PasteRecorder()
         server.onPaste = { pastes.append($0) }
@@ -34,15 +36,6 @@ struct TransportSmoke {
         try expectRejected(address, line: pair.line, reason: "pairing without Mac consent")
         try expectRejected(address, line: saved.line, reason: "unknown saved device")
 
-        let client = try connect(to: address)
-        guard writeExactly(client, Data((code + "\n").utf8)),
-              readExactly(client, 3) == Data("OK\n".utf8) else {
-            throw TestError.message("Correct session code was not acknowledged")
-        }
-        guard connected.wait(timeout: .now() + 5) == .success else {
-            throw TestError.message("Viewer did not become active")
-        }
-        try expectState(client, allowed: false, phase: "session connect")
         let click = ControlCommand(kind: .leftClick, x: 0.25, y: 0.75)
         guard let clickData = click.encoded(), ControlCommand.decode(clickData) == click else {
             throw TestError.message("Valid control command did not round trip")
@@ -83,24 +76,6 @@ struct TransportSmoke {
               ControlCommand.decode(scrollData) == diagonalScroll else {
             throw TestError.message("Two-axis scroll command did not round trip")
         }
-        server.setControlEnabled(true)
-        try expectState(client, allowed: false, phase: "session enable attempt")
-        let macAudio = Data(repeating: 0x5a, count: 3_840)
-        server.publishAudio(macAudio)
-        var ready = pollfd(fd: client, events: Int16(POLLIN), revents: 0)
-        guard Darwin.poll(&ready, 1, 100) == 0 else {
-            throw TestError.message("Session-code viewer received trusted Mac audio")
-        }
-        guard writeExactly(client, Packet.encode(.control, clickData)) else {
-            throw TestError.message("Session-only control packet could not be sent")
-        }
-        guard let sessionPaste = ClipboardPaste.encode("session paste"),
-              writeExactly(client, Packet.encode(.paste, sessionPaste)) else {
-            throw TestError.message("Session-only paste packet could not be sent")
-        }
-        Thread.sleep(forTimeInterval: 0.1)
-        guard delivered.count == 0 else { throw TestError.message("Session-code viewer controlled the Mac") }
-        guard pastes.texts.isEmpty else { throw TestError.message("Session-code viewer pasted on the Mac") }
         let maximumPaste = String(repeating: "a", count: ClipboardPaste.maximumBytes)
         guard ClipboardPaste.encode("") == nil, ClipboardPaste.encode(maximumPaste + "a") == nil,
               ClipboardPaste.encode(maximumPaste) != nil, ClipboardPaste.decode(Data([0xff, 0xfe])) == nil,
@@ -109,26 +84,45 @@ struct TransportSmoke {
         }
 
         let jpeg = Data([0xff, 0xd8, 0xff, 0xd9])
-        server.publish(jpeg)
-        guard let frame = readPacket(client), frame.kind == .jpeg, frame.payload == jpeg else {
-            throw TestError.message("Screen frame was not delivered")
-        }
         let microphone = Data([0x01, 0x00, 0x02, 0x00])
-        guard writeExactly(client, Packet.encode(.microphoneRequest, Data([1]))),
-              writeExactly(client, Packet.encode(.microphone, microphone)) else {
-            throw TestError.message("Session microphone packets could not be sent")
-        }
-        Darwin.shutdown(client, SHUT_RDWR)
-        Darwin.close(client)
-
-        server.enablePairing()
+        let macAudio = Data(repeating: 0x5a, count: 3_840)
+        let closedCode = server.enablePairing()
+        server.disablePairing()
+        try expectRejected(address, line: closedCode + "\n", reason: "closed legacy UUID")
+        try expectRejected(address,
+                           line: PairingRequest.pair(code: closedCode, id: deviceID, token: token, deviceName: "Test iPad").line,
+                           reason: "closed pairing code")
+        let expiredCode = server.enablePairing(for: -1)
+        try expectRejected(address,
+                           line: PairingRequest.pair(code: expiredCode, id: deviceID, token: token, deviceName: "Test iPad").line,
+                           reason: "expired pairing window")
+        code = server.enablePairing()
+        guard code != closedCode, code != expiredCode else { throw TestError.message("Pairing codes were reused") }
+        try expectRejected(address, line: code + "\n", reason: "legacy UUID during open pairing")
+        try expectRejected(address,
+                           line: PairingRequest.pair(code: closedCode, id: deviceID, token: token, deviceName: "Test iPad").line,
+                           reason: "old code during a new pairing window")
+        pair = PairingRequest.pair(code: code, id: deviceID, token: token, deviceName: "Test iPad")
         let pairedClient = try connect(to: address)
         guard writeExactly(pairedClient, Data(pair.line.utf8)),
               readExactly(pairedClient, 7) == Data("PAIRED\n".utf8) else {
             throw TestError.message("Pairing was not acknowledged")
         }
-        try expectState(pairedClient, allowed: true, phase: "paired connect")
+        try expectState(pairedClient, allowed: false, phase: "paired without control consent")
         try expectMicrophoneState(pairedClient, allowed: true, phase: "paired connect")
+        guard writeExactly(pairedClient, Packet.encode(.control, clickData)),
+              let noConsentPaste = ClipboardPaste.encode("without consent"),
+              writeExactly(pairedClient, Packet.encode(.paste, noConsentPaste)),
+              writeExactly(pairedClient, Packet.encode(.microphone, microphone)) else {
+            throw TestError.message("Could not exercise the host consent gates")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard delivered.count == 0, pastes.texts.isEmpty, microphones.count == 0 else {
+            throw TestError.message("Pairing implicitly enabled control or microphone routing")
+        }
+        // Screen and Mac sound remain available without control or microphone consent.
+        server.publish(jpeg)
+        try expectPayload(pairedClient, kind: .jpeg, payload: jpeg, phase: "view-only paired screen")
         server.publishAudio(macAudio)
         var receivedMacAudio = false
         for _ in 0..<4 {
@@ -148,6 +142,10 @@ struct TransportSmoke {
             if kind == .macAudio { parsedAudio = payload }
         }
         guard parsedAudio == macAudio else { throw TestError.message("Mac audio parser failed") }
+        consent.controlAllowed = true
+        server.setControlEnabled(true)
+        server.setAudioSink(microphoneSink)
+        try expectState(pairedClient, allowed: true, phase: "explicit control consent")
         guard writeExactly(pairedClient, Packet.encode(.control, clickData)) else {
             throw TestError.message("Paired control packet could not be sent")
         }
@@ -197,9 +195,9 @@ struct TransportSmoke {
         // receive frames, while one device owns Mac sound and microphone.
         let phoneID = UUID()
         let phoneToken = String(repeating: "ef", count: 32)
-        let phonePair = PairingRequest.pair(code: code, id: phoneID, token: phoneToken,
+        let phoneCode = server.enablePairing()
+        let phonePair = PairingRequest.pair(code: phoneCode, id: phoneID, token: phoneToken,
                                             deviceName: "Test iPhone")
-        server.enablePairing()
         var phoneClient = try connect(to: address)
         guard writeExactly(phoneClient, Data(phonePair.line.utf8)),
               readExactly(phoneClient, 7) == Data("PAIRED\n".utf8),
@@ -291,7 +289,12 @@ struct TransportSmoke {
             if readPacket(savedClient) == nil { oldConnectionClosed = true; break }
         }
         guard oldConnectionClosed else { throw TestError.message("Replaced iPad connection remained open") }
-        try expectRejected(address, line: code + "\n", reason: "third simultaneous viewer")
+        let thirdID = UUID()
+        let thirdCode = server.enablePairing()
+        try expectRejected(address,
+                           line: PairingRequest.pair(code: thirdCode, id: thirdID, token: token, deviceName: "Third device").line,
+                           reason: "third simultaneous viewer")
+        server.disablePairing()
         server.disconnectPairedDevice(deviceID)
         try expectMicrophoneState(phoneClient, allowed: true, phase: "microphone handoff")
         Thread.sleep(forTimeInterval: 0.3)
@@ -522,6 +525,27 @@ struct TransportSmoke {
         guard waitForViewerCount(server, 0) else {
             throw TestError.message("Flow-control viewer did not disconnect")
         }
+        // Turning off host consent persists through a saved-device reconnect.
+        consent.controlAllowed = false
+        server.setAudioSink(nil)
+        let viewOnly = try connect(to: address)
+        guard writeExactly(viewOnly, Data(saved.line.utf8)),
+              readExactly(viewOnly, 3) == Data("OK\n".utf8) else {
+            throw TestError.message("Saved view-only device could not reconnect")
+        }
+        try expectState(viewOnly, allowed: false, phase: "reconnect after control consent removed")
+        try expectMicrophoneState(viewOnly, allowed: true, phase: "view-only Mac sound owner")
+        let receivedBefore = microphoneSink.count
+        guard writeExactly(viewOnly, Packet.encode(.microphone, microphone)) else {
+            throw TestError.message("Could not send microphone after consent removed")
+        }
+        Thread.sleep(forTimeInterval: 0.1)
+        guard microphoneSink.count == receivedBefore else {
+            throw TestError.message("Remote microphone reached Mac after routing consent was removed")
+        }
+        Darwin.shutdown(viewOnly, SHUT_RDWR)
+        Darwin.close(viewOnly)
+        guard waitForViewerCount(server, 0) else { throw TestError.message("View-only test viewer did not disconnect") }
         credentials.setUnavailable(true)
         try expectClosedWithoutRejection(address, line: saved.line, reason: "unreadable saved devices")
         credentials.setUnavailable(false)
@@ -789,4 +813,21 @@ private final class CredentialStore {
         lock.lock(); defer { lock.unlock() }
         tokens.removeValue(forKey: id)
     }
+}
+
+private final class HostTestConsent {
+    private let lock = NSLock()
+    private var allowed = false
+    var controlAllowed: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return allowed }
+        set { lock.lock(); allowed = newValue; lock.unlock() }
+    }
+}
+
+private final class HostTestMicrophoneSink: AudioSinkOutput {
+    private let lock = NSLock()
+    private var received = 0
+    var count: Int { lock.lock(); defer { lock.unlock() }; return received }
+    func append(_ data: Data) { lock.lock(); received += 1; lock.unlock() }
+    func clear() {}
 }

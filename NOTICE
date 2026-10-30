@@ -1,0 +1,13 @@
+TailView
+Copyright 2026 Alex Morris
+
+TailView's original source code and artwork are licensed under the
+Apache License, Version 2.0. See LICENSE.
+
+Apple frameworks are supplied by the operating system and are not licensed
+under this project's Apache license. Apple, Mac, iPhone, iPad, and App Store
+are trademarks of Apple Inc.
+
+Tailscale and BlackHole are separate products, installed independently.
+Their code, binaries, names, and marks are not relicensed by this project.
+TailView does not bundle either product and is not affiliated with them.

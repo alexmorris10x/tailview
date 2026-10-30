@@ -7,14 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		01D690B0B957E3C1C4058841 /* TailView.storekit in Resources */ = {isa = PBXBuildFile; fileRef = CDBB249A7E3567DE54FF89EE /* TailView.storekit */; };
 		083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
 		14CEFCD5FC87C9109BB0D015 /* WidgetRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */; };
 		17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */; };
 		184CB899EB12E6B327C6EC5B /* TailViewLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		1B3F1DE2EC2E08D8733EF0F8 /* StoreKitTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 91FBC088BBD9EA312F142476 /* StoreKitTest.framework */; };
 		1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
 		1FB87D9CD8678B4D95A68164 /* TailViewConnectWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E788ACC17DF6F0A7E39E049E /* TailViewConnectWidget.swift */; };
 		2178E26CCCB3A482B962C4E8 /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
 		23CC289FC1E2FCAAF5E1D344 /* DisplayControlModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49ACCAC73BE7A1A3BD8190B4 /* DisplayControlModel.swift */; };
+		29337F9658347EF5C6483CDD /* TailscaleSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B72C83612435374A3903936 /* TailscaleSetup.swift */; };
 		2C3138630F878A33B50EA70F /* AudioRoutingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */; };
 		3490C489727F9C7FBE54BECF /* TailViewMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */; };
 		3A5EA7D320A37B0FA8568E20 /* DiagnosticLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D423DC3388C7632ABFA92C /* DiagnosticLog.swift */; };
@@ -23,24 +26,30 @@
 		45D75DC6E5ED31A1D5AA4A9D /* FunctionKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0783290D5A919CD6310B9B9 /* FunctionKeys.swift */; };
 		48E9D18EFF50F2B35287C264 /* ViewerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D10F8991B1089241B3E66D5 /* ViewerModel.swift */; };
 		4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E90C7F0AF464E7238A871F0 /* ContentView.swift */; };
+		4B9B3C7E8AC36309AAAECCCE /* PurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42475CE75B415174074EDFC6 /* PurchaseView.swift */; };
 		4BEEE2D8132A535FEEB1A2A6 /* AACAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */; };
 		4CB79A26FA3BA693C2D48847 /* WindowArranger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1677B424CBD84C8CA05935 /* WindowArranger.swift */; };
 		55FA5B9A380E2C6BD8A38909 /* LiveControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C84D54F79A82CF02DA3433FB /* LiveControls.swift */; };
 		5B1BC0F9D158C872A6F8C1C9 /* HostModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FB29C814C93650C267420E /* HostModel.swift */; };
 		5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */; };
 		66CCCA847C8D20A218CDA044 /* ModifierSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */; };
+		702682D273D62160FB3FD6BD /* PurchaseAccessStoreKitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20132DA448292DB544DC36DA /* PurchaseAccessStoreKitTests.swift */; };
 		750DF88B49955570BD944C02 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2ED200EAE69D0972F6653D93 /* Assets.xcassets */; };
+		7A0B65931F379E22573D686E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C99A7AA4200C44580AD9C115 /* PrivacyInfo.xcprivacy */; };
 		7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF5F28AE665343293EA19C0A /* SavedMacStore.swift */; };
 		7E134BA54E230E19089BC23D /* PhysicalDisplayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F7A4A2A9085AF68C5BB785 /* PhysicalDisplayController.swift */; };
+		81E59B4F096626551E5CA0EA /* StreamAccessGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E189E240D71D13F4719E36F /* StreamAccessGate.swift */; };
 		829F0A82AC53DB09A2BA7403 /* AudioJitterBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */; };
 		860CEB4A5170A59574801741 /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
 		8BB8A9D5564AA07A9A3EC708 /* ViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */; };
 		8BBE9A9B25D7BE58A16B7F6F /* AudioConnectionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */; };
 		8E1085C0AFE0F75FE3C9AF14 /* VideoServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47838951CB82DF0FD1EA557B /* VideoServer.swift */; };
+		91BF159A827AE976D10CFDFF /* TrialAccessRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468BF6DAD44F724F6E03ADA8 /* TrialAccessRules.swift */; };
 		950ADC23CFFBDA653A6BD1EF /* LiveControlsActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631DE9DE7174936614641B63 /* LiveControlsActivity.swift */; };
 		9955681A18E76FEF8CA49A69 /* PairedDeviceStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491848EAC2F810F07C3FA7B9 /* PairedDeviceStore.swift */; };
 		9C1EA10C101CA225C3C3895E /* SessionLockController.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC989BE803A21C343E9BFBCD /* SessionLockController.swift */; };
 		9FA1FA127D670CC057400BB8 /* AuthenticationReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */; };
+		A0457BF88A66B4C7E33E869A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B1C7D5A6EFDE39C6C02A093A /* PrivacyInfo.xcprivacy */; };
 		A72E9B7166FDCD924F02F920 /* TailViewIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */; };
 		A783C36DF12F342C9E17E7BC /* AudioJitterBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */; };
 		AF62EE973A7949C2F309F1EB /* Packet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20D2B8181E5E82E5B6433F69 /* Packet.swift */; };
@@ -49,23 +58,35 @@
 		BF2F93D2904B5C1F4D415953 /* ControlInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */; };
 		C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */; };
 		C0DEFAEBDD2EBE85678E9CD1 /* AudioConnectionGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */; };
+		C461986DE08621BD81B5EC3D /* StreamAccessGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E189E240D71D13F4719E36F /* StreamAccessGate.swift */; };
 		C4FFE508A3EDFA633B05317F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 228BA387B565D9B98B1F35FA /* Assets.xcassets */; };
 		CB800F966C1E83DCC2D4EF30 /* PendingTaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0C94E51C0739995CBF94FF /* PendingTaps.swift */; };
 		CDF5A91AA43F982E1D2DF364 /* AudioSink.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */; };
 		D0FFBA182CEF11EA7E2B83FF /* TailViewLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */; };
+		D20370E87626F559368764CA /* HostConsent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B309862429D525BDD5E80883 /* HostConsent.swift */; };
 		D532889CD858A358B807E9A4 /* WidgetRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */; };
+		D9390B02DD5827C455F4AF49 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E5A80FDF0A7FD3053DAFD449 /* PrivacyInfo.xcprivacy */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
+		E2DFF6483803B3259FC63E0D /* PurchaseAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004D45BFCF918F6B9E149628 /* PurchaseAccess.swift */; };
 		E373B23CD90E4A0C6264A55F /* BacklightController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A18A3313347868348999728 /* BacklightController.swift */; };
 		E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */; };
 		E787339A2352E81E1A2BF5C5 /* ControlCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54C4272B69B3D917AFDF90B /* ControlCommand.swift */; };
 		EF259E62E76940465BEFB7A2 /* DevAssets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 590D18DC9D63B20A1C6CD689 /* DevAssets.xcassets */; };
 		F0AC032D5A673D0FD6936CC5 /* LocalInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7120797B5BA592ECF917EBD6 /* LocalInputController.swift */; };
+		F4881FB42B40D9DAE4F51A09 /* TrialAccessRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 468BF6DAD44F724F6E03ADA8 /* TrialAccessRules.swift */; };
 		F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
 		F97B9CB834975C3E4D3C9C5A /* LiveControlsRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */; };
 		FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		51BBCB614DAE0B8CBDAABE7F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 03C2B9C994EFE2102BCB5882 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 750556B4F082C572763AD138;
+			remoteInfo = TailViewIOS;
+		};
 		F9CC90D19F1B831325974607 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 03C2B9C994EFE2102BCB5882 /* Project object */;
@@ -90,11 +111,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		004D45BFCF918F6B9E149628 /* PurchaseAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseAccess.swift; sourceTree = "<group>"; };
 		0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierSelection.swift; sourceTree = "<group>"; };
 		0B0C94E51C0739995CBF94FF /* PendingTaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTaps.swift; sourceTree = "<group>"; };
 		10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewMacApp.swift; sourceTree = "<group>"; };
 		1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewLiveActivity.swift; sourceTree = "<group>"; };
 		1E90C7F0AF464E7238A871F0 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		20132DA448292DB544DC36DA /* PurchaseAccessStoreKitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseAccessStoreKitTests.swift; sourceTree = "<group>"; };
 		20D2B8181E5E82E5B6433F69 /* Packet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packet.swift; sourceTree = "<group>"; };
 		228BA387B565D9B98B1F35FA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		29E91D2E3D60149D11B48E21 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -102,6 +125,8 @@
 		2ED200EAE69D0972F6653D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconnectBackoff.swift; sourceTree = "<group>"; };
 		3D10F8991B1089241B3E66D5 /* ViewerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerModel.swift; sourceTree = "<group>"; };
+		42475CE75B415174074EDFC6 /* PurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseView.swift; sourceTree = "<group>"; };
+		468BF6DAD44F724F6E03ADA8 /* TrialAccessRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialAccessRules.swift; sourceTree = "<group>"; };
 		46D423DC3388C7632ABFA92C /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		47838951CB82DF0FD1EA557B /* VideoServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoServer.swift; sourceTree = "<group>"; };
 		491848EAC2F810F07C3FA7B9 /* PairedDeviceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedDeviceStore.swift; sourceTree = "<group>"; };
@@ -114,23 +139,32 @@
 		5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewIOSApp.swift; sourceTree = "<group>"; };
 		631DE9DE7174936614641B63 /* LiveControlsActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControlsActivity.swift; sourceTree = "<group>"; };
 		635F9F9D9112777D13D4657A /* AudioConnectionGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioConnectionGate.swift; sourceTree = "<group>"; };
+		6E189E240D71D13F4719E36F /* StreamAccessGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamAccessGate.swift; sourceTree = "<group>"; };
 		7120797B5BA592ECF917EBD6 /* LocalInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalInputController.swift; sourceTree = "<group>"; };
 		747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteKeyboardInput.swift; sourceTree = "<group>"; };
+		7B72C83612435374A3903936 /* TailscaleSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailscaleSetup.swift; sourceTree = "<group>"; };
 		7C1677B424CBD84C8CA05935 /* WindowArranger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowArranger.swift; sourceTree = "<group>"; };
+		81AA9E3D518242D443BDABB7 /* TailViewPurchaseTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TailViewPurchaseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AACAudio.swift; sourceTree = "<group>"; };
 		89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlInjector.swift; sourceTree = "<group>"; };
 		8A18A3313347868348999728 /* BacklightController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklightController.swift; sourceTree = "<group>"; };
 		8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCapture.swift; sourceTree = "<group>"; };
+		91FBC088BBD9EA312F142476 /* StoreKitTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKitTest.framework; path = Developer/Library/Frameworks/StoreKitTest.framework; sourceTree = SDKROOT; };
 		93AD9527C78E5A28DFBD8800 /* AudioRoutingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioRoutingController.swift; sourceTree = "<group>"; };
 		97F7FE165928B2CA81F8A176 /* AuthenticationReply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationReply.swift; sourceTree = "<group>"; };
 		B0783290D5A919CD6310B9B9 /* FunctionKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FunctionKeys.swift; sourceTree = "<group>"; };
+		B1C7D5A6EFDE39C6C02A093A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControlsRules.swift; sourceTree = "<group>"; };
 		B2FB29C814C93650C267420E /* HostModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostModel.swift; sourceTree = "<group>"; };
+		B309862429D525BDD5E80883 /* HostConsent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostConsent.swift; sourceTree = "<group>"; };
 		BCBE93C3A3142F680AFCAA4D /* AudioSink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSink.swift; sourceTree = "<group>"; };
 		C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRoute.swift; sourceTree = "<group>"; };
 		C58510EFA91AE1A996487215 /* AudioJitterBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioJitterBuffer.swift; sourceTree = "<group>"; };
 		C84D54F79A82CF02DA3433FB /* LiveControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControls.swift; sourceTree = "<group>"; };
+		C99A7AA4200C44580AD9C115 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		CDBB249A7E3567DE54FF89EE /* TailView.storekit */ = {isa = PBXFileReference; path = TailView.storekit; sourceTree = "<group>"; };
 		E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRequest.swift; sourceTree = "<group>"; };
+		E5A80FDF0A7FD3053DAFD449 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TailViewLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E788ACC17DF6F0A7E39E049E /* TailViewConnectWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewConnectWidget.swift; sourceTree = "<group>"; };
 		EC989BE803A21C343E9BFBCD /* SessionLockController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLockController.swift; sourceTree = "<group>"; };
@@ -140,6 +174,17 @@
 		FF5F28AE665343293EA19C0A /* SavedMacStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedMacStore.swift; sourceTree = "<group>"; };
 		FFAD381F1F4B2EF73F5FED87 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		23C8851EE7455EBC15AEA725 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B3F1DE2EC2E08D8733EF0F8 /* StoreKitTest.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		060BA4452FF12CA95F178CDD /* LiveControls */ = {
@@ -151,14 +196,31 @@
 			path = LiveControls;
 			sourceTree = "<group>";
 		};
+		1987EBF894B1FA99CAEE5B70 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				91FBC088BBD9EA312F142476 /* StoreKitTest.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		2C2F21E1F70FF1AFE1D33D4C /* LiveActivity */ = {
 			isa = PBXGroup;
 			children = (
 				29E91D2E3D60149D11B48E21 /* Info.plist */,
+				E5A80FDF0A7FD3053DAFD449 /* PrivacyInfo.xcprivacy */,
 				E788ACC17DF6F0A7E39E049E /* TailViewConnectWidget.swift */,
 				1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */,
 			);
 			path = LiveActivity;
+			sourceTree = "<group>";
+		};
+		34EE8096B4ADEAAFAC2F8673 /* PurchaseTests */ = {
+			isa = PBXGroup;
+			children = (
+				20132DA448292DB544DC36DA /* PurchaseAccessStoreKitTests.swift */,
+			);
+			path = PurchaseTests;
 			sourceTree = "<group>";
 		};
 		504DF70E66AD2D385DB41508 /* DisplayControl */ = {
@@ -190,10 +252,13 @@
 				1E90C7F0AF464E7238A871F0 /* ContentView.swift */,
 				89F1D43DAF94856CFF7F6113 /* ControlInjector.swift */,
 				B0783290D5A919CD6310B9B9 /* FunctionKeys.swift */,
+				B309862429D525BDD5E80883 /* HostConsent.swift */,
 				B2FB29C814C93650C267420E /* HostModel.swift */,
 				4BD5CCB624B37839736A66A9 /* Info.plist */,
 				491848EAC2F810F07C3FA7B9 /* PairedDeviceStore.swift */,
+				C99A7AA4200C44580AD9C115 /* PrivacyInfo.xcprivacy */,
 				8B09F57B89F8F7C020D8EC0D /* ScreenCapture.swift */,
+				7B72C83612435374A3903936 /* TailscaleSetup.swift */,
 				10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */,
 				47838951CB82DF0FD1EA557B /* VideoServer.swift */,
 				7C1677B424CBD84C8CA05935 /* WindowArranger.swift */,
@@ -214,6 +279,8 @@
 				E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */,
 				3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */,
 				5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */,
+				6E189E240D71D13F4719E36F /* StreamAccessGate.swift */,
+				468BF6DAD44F724F6E03ADA8 /* TrialAccessRules.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -224,6 +291,7 @@
 				FB734A9B934E848BE257E976 /* TailViewIOS.app */,
 				E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */,
 				4999CF6A69B090B64F97C774 /* TailViewMac.app */,
+				81AA9E3D518242D443BDABB7 /* TailViewPurchaseTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -238,6 +306,9 @@
 				631DE9DE7174936614641B63 /* LiveControlsActivity.swift */,
 				B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */,
 				0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */,
+				B1C7D5A6EFDE39C6C02A093A /* PrivacyInfo.xcprivacy */,
+				004D45BFCF918F6B9E149628 /* PurchaseAccess.swift */,
+				42475CE75B415174074EDFC6 /* PurchaseView.swift */,
 				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
 				FF5F28AE665343293EA19C0A /* SavedMacStore.swift */,
@@ -251,12 +322,15 @@
 		F53259DFD54C0492E87AFB9E = {
 			isa = PBXGroup;
 			children = (
+				CDBB249A7E3567DE54FF89EE /* TailView.storekit */,
 				E9D69E6F5506366887948727 /* IOSViewer */,
 				2C2F21E1F70FF1AFE1D33D4C /* LiveActivity */,
 				060BA4452FF12CA95F178CDD /* LiveControls */,
 				77A8FEB6220A7E844073C981 /* MacHost */,
+				34EE8096B4ADEAAFAC2F8673 /* PurchaseTests */,
 				8C10591072A0B1C8A842CE2C /* Shared */,
 				591647ACF9A907BCAB6C2965 /* WidgetSupport */,
+				1987EBF894B1FA99CAEE5B70 /* Frameworks */,
 				8ED3EE00A99C0096796D770A /* Products */,
 			);
 			sourceTree = "<group>";
@@ -270,6 +344,7 @@
 			buildPhases = (
 				46045EC14230389FAB6CADA1 /* Validate build identity */,
 				3433D8A80A6E4AAD3584BD58 /* Sources */,
+				F44194140C84B29B31FF4BBF /* Resources */,
 			);
 			buildRules = (
 			);
@@ -299,6 +374,26 @@
 			productName = TailViewMac;
 			productReference = 4999CF6A69B090B64F97C774 /* TailViewMac.app */;
 			productType = "com.apple.product-type.application";
+		};
+		6C1CCC90EB33DE0113597AE1 /* TailViewPurchaseTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 514D032ABB19A0FBBE1A519E /* Build configuration list for PBXNativeTarget "TailViewPurchaseTests" */;
+			buildPhases = (
+				179300E980CA6C4D5FD4B335 /* Sources */,
+				061AFD958F3E440D55877F6A /* Resources */,
+				23C8851EE7455EBC15AEA725 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				318BD4D79598660BF9A71A68 /* PBXTargetDependency */,
+			);
+			name = TailViewPurchaseTests;
+			packageProductDependencies = (
+			);
+			productName = TailViewPurchaseTests;
+			productReference = 81AA9E3D518242D443BDABB7 /* TailViewPurchaseTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 		750556B4F082C572763AD138 /* TailViewIOS */ = {
 			isa = PBXNativeTarget;
@@ -338,6 +433,10 @@
 						DevelopmentTeam = 98CDQPW36W;
 						ProvisioningStyle = Automatic;
 					};
+					6C1CCC90EB33DE0113597AE1 = {
+						DevelopmentTeam = 98CDQPW36W;
+						ProvisioningStyle = Automatic;
+					};
 					750556B4F082C572763AD138 = {
 						DevelopmentTeam = 98CDQPW36W;
 						ProvisioningStyle = Automatic;
@@ -361,17 +460,27 @@
 				3651267505B69BEE22499B6B /* TailViewMac */,
 				750556B4F082C572763AD138 /* TailViewIOS */,
 				3368BAAAE4FFA486E1010BFF /* TailViewLiveActivity */,
+				6C1CCC90EB33DE0113597AE1 /* TailViewPurchaseTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		061AFD958F3E440D55877F6A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				01D690B0B957E3C1C4058841 /* TailView.storekit in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		8302493F4403F7C49E4EEB7D /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				750DF88B49955570BD944C02 /* Assets.xcassets in Resources */,
 				EF259E62E76940465BEFB7A2 /* DevAssets.xcassets in Resources */,
+				A0457BF88A66B4C7E33E869A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -380,6 +489,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				C4FFE508A3EDFA633B05317F /* Assets.xcassets in Resources */,
+				7A0B65931F379E22573D686E /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F44194140C84B29B31FF4BBF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D9390B02DD5827C455F4AF49 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -429,6 +547,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		179300E980CA6C4D5FD4B335 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				702682D273D62160FB3FD6BD /* PurchaseAccessStoreKitTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3433D8A80A6E4AAD3584BD58 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -458,12 +584,16 @@
 				860CEB4A5170A59574801741 /* Packet.swift in Sources */,
 				1B4626C89AC6474005CC9595 /* PairingRequest.swift in Sources */,
 				BB4EAA6F73E4B18B7F8CC67F /* PendingTaps.swift in Sources */,
+				E2DFF6483803B3259FC63E0D /* PurchaseAccess.swift in Sources */,
+				4B9B3C7E8AC36309AAAECCCE /* PurchaseView.swift in Sources */,
 				FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */,
 				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,
 				7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */,
 				DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */,
+				C461986DE08621BD81B5EC3D /* StreamAccessGate.swift in Sources */,
 				A72E9B7166FDCD924F02F920 /* TailViewIOSApp.swift in Sources */,
+				F4881FB42B40D9DAE4F51A09 /* TrialAccessRules.swift in Sources */,
 				48E9D18EFF50F2B35287C264 /* ViewerModel.swift in Sources */,
 				8BB8A9D5564AA07A9A3EC708 /* ViewerView.swift in Sources */,
 				14CEFCD5FC87C9109BB0D015 /* WidgetRoute.swift in Sources */,
@@ -486,6 +616,7 @@
 				BF2F93D2904B5C1F4D415953 /* ControlInjector.swift in Sources */,
 				23CC289FC1E2FCAAF5E1D344 /* DisplayControlModel.swift in Sources */,
 				45D75DC6E5ED31A1D5AA4A9D /* FunctionKeys.swift in Sources */,
+				D20370E87626F559368764CA /* HostConsent.swift in Sources */,
 				5B1BC0F9D158C872A6F8C1C9 /* HostModel.swift in Sources */,
 				F0AC032D5A673D0FD6936CC5 /* LocalInputController.swift in Sources */,
 				AF62EE973A7949C2F309F1EB /* Packet.swift in Sources */,
@@ -496,7 +627,10 @@
 				5E67E5B3869F7DCE86F24734 /* ScreenCapture.swift in Sources */,
 				083745AA04DC1BB5AC52C713 /* ScreenViewport.swift in Sources */,
 				9C1EA10C101CA225C3C3895E /* SessionLockController.swift in Sources */,
+				81E59B4F096626551E5CA0EA /* StreamAccessGate.swift in Sources */,
 				3490C489727F9C7FBE54BECF /* TailViewMacApp.swift in Sources */,
+				29337F9658347EF5C6483CDD /* TailscaleSetup.swift in Sources */,
+				91BF159A827AE976D10CFDFF /* TrialAccessRules.swift in Sources */,
 				8E1085C0AFE0F75FE3C9AF14 /* VideoServer.swift in Sources */,
 				4CB79A26FA3BA693C2D48847 /* WindowArranger.swift in Sources */,
 			);
@@ -505,6 +639,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		318BD4D79598660BF9A71A68 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 750556B4F082C572763AD138 /* TailViewIOS */;
+			targetProxy = 51BBCB614DAE0B8CBDAABE7F /* PBXContainerItemProxy */;
+		};
 		EFD35E9C3E1530EB80A3CBB1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 3368BAAAE4FFA486E1010BFF /* TailViewLiveActivity */;
@@ -513,6 +652,25 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		057AE80D6FC2D9D659992B82 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.purchases.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TailViewIOS.app/TailViewIOS";
+			};
+			name = Release;
+		};
 		26A150DB94D889CF8326687E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -527,6 +685,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev;
 				SDKROOT = iphoneos;
 				TAILVIEW_URL_SCHEME = "tailview-dev";
@@ -547,6 +706,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.LiveActivity;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -584,9 +744,29 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev.LiveActivity;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		8AB1E8BEF0424A12B7C9014E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.purchases.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TailViewIOS.app/TailViewIOS";
 			};
 			name = Debug;
 		};
@@ -740,6 +920,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios;
 				SDKROOT = iphoneos;
 				TAILVIEW_URL_SCHEME = tailview;
@@ -755,6 +936,15 @@
 			buildConfigurations = (
 				B39EAF730B7F786BC48FA72C /* Debug */,
 				B404D688147E298249A5757F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		514D032ABB19A0FBBE1A519E /* Build configuration list for PBXNativeTarget "TailViewPurchaseTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8AB1E8BEF0424A12B7C9014E /* Debug */,
+				057AE80D6FC2D9D659992B82 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

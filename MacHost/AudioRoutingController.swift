@@ -35,7 +35,7 @@ protocol AudioRoutingBackend: AnyObject {
     func setDefault(_ kind: AudioDefault, device: AudioDeviceID) throws
 }
 
-/// Owns Mac defaults only while at least one trusted viewer is connected.
+/// Owns Mac defaults only after explicit opt-in and while a trusted viewer is connected.
 /// Store UIDs rather than transient Core Audio IDs so restoration survives a relaunch.
 @MainActor
 final class AudioRoutingController {
@@ -49,10 +49,11 @@ final class AudioRoutingController {
     private let defaults: UserDefaults
     private var snapshot: Snapshot?
     private var connected = false
+    private var enabled = false
     private var timer: Timer?
     private var terminationObserver: NSObjectProtocol?
     var onStatus: ((String) -> Void)?
-    private(set) var status = "Automatic audio routing starts with a paired viewer"
+    private(set) var status = "Off · Mac audio selections stay unchanged"
 
     init(backend: AudioRoutingBackend = CoreAudioRoutingBackend(), defaults: UserDefaults = .standard) {
         self.backend = backend
@@ -86,21 +87,34 @@ final class AudioRoutingController {
             return
         }
         connected = enabled
-        if enabled {
+        updateRouting()
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        guard self.enabled != enabled else { return }
+        self.enabled = enabled
+        updateRouting()
+    }
+
+    private func updateRouting() {
+        timer?.invalidate()
+        timer = nil
+        if connected && enabled {
             // A watchdog also retries transient failures and missing-device recovery.
             timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { self?.enforce() }
             }
             enforce()
         } else {
-            timer?.invalidate()
-            timer = nil
             if let snapshot, restore(snapshot, onlyIfManaged: false) { self.snapshot = nil }
+            if snapshot == nil {
+                updateStatus(enabled ? "Ready · starts when a paired viewer connects" : "Off · Mac audio selections stay unchanged")
+            }
         }
     }
 
     func enforce() {
-        guard connected else { return }
+        guard connected && enabled else { return }
         do {
             let devices = try backend.devices()
             if snapshot == nil {

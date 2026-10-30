@@ -78,8 +78,9 @@ final class VideoServer {
     var onControlSessionEnded: (() -> Void)?
 
     private let lock = NSLock()
-    private let code: String
-    private let audioSink: AudioSink?
+    private var pairingCode: String?
+    private var pairingGeneration: UInt64 = 0
+    private var audioSinkStorage: AudioSinkOutput?
     private var listenerFD: Int32
     private var viewers = [UUID: ViewerConnection]()
     private var microphoneOwner: UUID?
@@ -94,7 +95,7 @@ final class VideoServer {
     private var macAudioEncoder: AACEncoder?
     private var macAudioEncoderOwner: UUID?
 
-    init(address: String, code: String, audioSink: AudioSink?) throws {
+    init(address: String, audioSink: AudioSinkOutput?) throws {
         let fd = Darwin.socket(AF_INET, SOCK_STREAM, 0)
         guard fd >= 0 else { throw ServerError.socket }
         var reuse: Int32 = 1
@@ -118,8 +119,7 @@ final class VideoServer {
             throw ServerError.bind(error)
         }
         listenerFD = fd
-        self.code = code
-        self.audioSink = audioSink
+        self.audioSinkStorage = audioSink
     }
 
     deinit { stop() }
@@ -129,12 +129,49 @@ final class VideoServer {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.acceptLoop() }
     }
 
-    func enablePairing(for seconds: TimeInterval = 300) {
-        lock.lock(); pairingDeadline = ProcessInfo.processInfo.systemUptime + seconds; lock.unlock()
+    @discardableResult
+    func enablePairing(for seconds: TimeInterval = 300) -> String {
+        let code = UUID().uuidString.lowercased()
+        lock.lock()
+        guard running else { lock.unlock(); return "" }
+        pairingGeneration &+= 1
+        let generation = pairingGeneration
+        pairingCode = code
+        pairingDeadline = ProcessInfo.processInfo.systemUptime + seconds
+        lock.unlock()
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            if self.pairingGeneration == generation {
+                self.pairingCode = nil
+                self.pairingDeadline = 0
+            }
+            self.lock.unlock()
+        }
+        return code
     }
 
     func disablePairing() {
-        lock.lock(); pairingDeadline = 0; lock.unlock()
+        lock.lock()
+        pairingCode = nil
+        pairingDeadline = 0
+        pairingGeneration &+= 1
+        lock.unlock()
+    }
+
+    /// The host supplies a sink only after the owner opts into remote microphone
+    /// routing. Removing it stops accepting voice without affecting Mac sound.
+    func setAudioSink(_ sink: AudioSinkOutput?) {
+        lock.lock()
+        let previous = audioSinkStorage
+        audioSinkStorage = sink
+        lock.unlock()
+        previous?.clear()
+    }
+
+    private var audioSink: AudioSinkOutput? {
+        lock.lock(); defer { lock.unlock() }
+        return audioSinkStorage
     }
 
     func disconnectPairedDevice(_ id: UUID) {
@@ -182,6 +219,9 @@ final class VideoServer {
         viewers.removeAll()
         microphoneOwner = nil
         manuallySelectedMicrophone = nil
+        pairingCode = nil
+        pairingDeadline = 0
+        pairingGeneration &+= 1
         latestFrame = nil
         lock.unlock()
         if hadControl { onControlSessionEnded?() }
@@ -411,8 +451,10 @@ final class VideoServer {
         var pairingName: String?
         var acknowledgment = Data("OK\n".utf8)
         switch request {
-        case .session(let suppliedCode):
-            guard suppliedCode == code else { return }
+        case .session:
+            // Old view-only UUIDs bypassed the pairing window. Every viewer now
+            // needs either a saved credential or an explicitly opened pairing.
+            return
         case .authenticate(let id, let token):
             switch authenticateSaved?(id, token) ?? .rejected {
             case .accepted: break
@@ -427,12 +469,21 @@ final class VideoServer {
             }
             pairedID = id
         case .pair(let suppliedCode, let id, let token, let deviceName):
-            guard suppliedCode == code, isPairingAvailable(), hasViewerCapacity(),
-                  onPairingRequest?(id, deviceName, token) == true else { return }
+            // Check and consume the window under one lock: simultaneous clients
+            // cannot use one code to pair multiple devices or race Close pairing.
+            lock.lock()
+            guard running, pairingDeadline > ProcessInfo.processInfo.systemUptime,
+                  suppliedCode == pairingCode, viewers.count < Self.maximumViewers,
+                  onPairingRequest?(id, deviceName, token) == true else {
+                lock.unlock(); return
+            }
+            pairingCode = nil
+            pairingDeadline = 0
+            pairingGeneration &+= 1
+            lock.unlock()
             pairedID = id
             pairingName = deviceName
             acknowledgment = Data("PAIRED\n".utf8)
-            disablePairing()
         }
         let preferredMicrophone = pairedID.map { isPreferredMicrophone?($0) == true } ?? false
         lock.lock()
@@ -459,6 +510,7 @@ final class VideoServer {
         lock.unlock()
         admitted = viewer
         if let replacedViewer { close(replacedViewer) }
+        if let pairedID, let pairingName { onPairingSuccess?(pairedID, pairingName) }
         guard Self.writeExactly(fd, acknowledgment) else { finish(viewer); return }
         if let demotedMicrophone {
             audioSink?.clear()
@@ -469,7 +521,6 @@ final class VideoServer {
         // Cellular RTT spikes and retransmissions can briefly fill the TCP
         // window. Frame/audio queues are already bounded, so allow a stalled
         // send to recover instead of resetting a healthy session at 250 ms.
-        if let pairedID, let pairingName { onPairingSuccess?(pairedID, pairingName) }
         onViewerStatus?("Connected")
         sendControlState(viewer)
         sendMicrophoneState(viewer)
@@ -546,7 +597,8 @@ final class VideoServer {
 
     private func receiveMicrophone(_ pcm: Data, from viewer: ViewerConnection) {
         lock.lock()
-        let allowed = running && viewers[viewer.id] === viewer && microphoneOwner == viewer.id
+        let sink = audioSinkStorage
+        let allowed = running && viewers[viewer.id] === viewer && microphoneOwner == viewer.id && sink != nil
         lock.unlock()
         guard allowed else { return }
         if !viewer.didReportMicrophone {
@@ -558,7 +610,7 @@ final class VideoServer {
             viewer.lastLevelReport = now
             onMicrophoneLevel?(Self.microphoneLevel(pcm))
         }
-        audioSink?.append(pcm)
+        sink?.append(pcm)
     }
 
     private func sendControlState(_ viewer: ViewerConnection) {
@@ -658,16 +710,6 @@ final class VideoServer {
             return true
         }
         return success ? data : nil
-    }
-
-    private func isPairingAvailable() -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return pairingDeadline > ProcessInfo.processInfo.systemUptime
-    }
-
-    private func hasViewerCapacity() -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return running && viewers.count < Self.maximumViewers
     }
 
     private static func readLine(_ fd: Int32, maximum: Int) -> String? {

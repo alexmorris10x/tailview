@@ -9,13 +9,15 @@ struct ViewerView: View {
     @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
     @AppStorage("reverseScrollDirection") private var reverseScrollDirection = false
-    @AppStorage("microphoneOnConnect") private var microphoneOnConnect = true
+    @AppStorage("microphoneOnConnect") private var microphoneOnConnect = false
+    @AppStorage("remoteControlConsent") private var remoteControlConsent = false
     @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
     @AppStorage("lockScreenControls") private var lockScreenControls = true
     @State private var code = ""
     @State private var profileName = "My Mac"
     @State private var showPairing = false
     @State private var showSettings = false
+    @State private var showPurchase = false
     @State private var automaticConnection = true
     @State private var didRunDebugLaunch = false
     @State private var diagnosticLaunch = false
@@ -27,7 +29,7 @@ struct ViewerView: View {
     @State private var keyboardUserHidden = false
     @State private var keyboardFocusRequest = 0
     @State private var nativeKeyboardVisible = false
-    @State private var microphoneSessionEnabled = true
+    @State private var microphoneSessionEnabled = false
     @State private var macAudioSessionEnabled = true
     @State private var screenZoom: CGFloat = 1
     @State private var screenOffset = CGSize.zero
@@ -35,6 +37,7 @@ struct ViewerView: View {
     @State private var notice: String?
     @State private var noticeGeneration = 0
     @StateObject private var viewer = ViewerModel()
+    @StateObject private var access = PurchaseAccess.shared
 
     var body: some View {
         NavigationStack {
@@ -83,6 +86,26 @@ struct ViewerView: View {
             }) {
                 settingsView
             }
+            .sheet(isPresented: $showPurchase) {
+                PurchaseView(access: access)
+            }
+        }
+        .onChange(of: access.state) { _, _ in
+            updateAccess()
+            if access.streamAllowed {
+                showPurchase = false
+                connectPreferredIfNeeded()
+            }
+        }
+        .onChange(of: remoteControlConsent) { _, enabled in
+            viewer.setRemoteControlConsent(enabled)
+        }
+        .onChange(of: viewer.lastPairedMacID) { _, id in
+            guard let id else { return }
+            preferredMacID = id.uuidString
+            showPairing = false
+            automaticConnection = true
+            code = ""
         }
         .onOpenURL { url in
             guard let route = WidgetRoute(url: url) else { return }
@@ -157,6 +180,8 @@ struct ViewerView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             DiagnosticLog.note("Scene phase: \(phase)")
+            access.setForeground(phase == .active)
+            updateAccess()
             viewer.setVideoActive(phase == .active)
             if phase == .active {
                 viewer.reloadSavedMacs()
@@ -174,10 +199,16 @@ struct ViewerView: View {
             }
         }
         .onReceive(Timer.publish(every: 4, on: .main, in: .common).autoconnect()) { _ in
+            updateAccess()
             if !viewer.savedMacsLoaded { viewer.reloadSavedMacs() }
             connectPreferredIfNeeded()
         }
         .task {
+            viewer.setRemoteControlConsent(remoteControlConsent)
+            access.setForeground(scenePhase == .active)
+            updateAccess()
+            await access.refresh()
+            updateAccess()
             #if DEBUG
             if !didRunDebugLaunch {
                 didRunDebugLaunch = true
@@ -210,6 +241,10 @@ struct ViewerView: View {
         }
     }
 
+    private func updateAccess() {
+        viewer.setStreamingAccess(allowed: access.streamAllowed, expiresAt: access.expirationDate)
+    }
+
     private func openSettings() {
         releaseHeldMouse()
         releaseFunctionKey()
@@ -221,9 +256,27 @@ struct ViewerView: View {
     private var connectionView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                ContentUnavailableView("Waiting for Mac", systemImage: "display",
+                ContentUnavailableView(viewer.savedMacs.isEmpty ? "Connect to your Mac" : "Your Mac is ready",
+                                       systemImage: "display",
                                        description: Text(viewer.status))
                     .frame(maxWidth: .infinity)
+                if viewer.savedMacs.isEmpty {
+                    setupSteps
+                }
+                if !viewer.savedMacs.isEmpty && !access.streamAllowed {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(access.statusTitle).font(.headline)
+                        Text(access.statusDetail).font(.subheadline).foregroundStyle(.secondary)
+                        Button("Trial and lifetime access") { showPurchase = true }
+                            .buttonStyle(.borderedProminent)
+                            .accessibilityIdentifier("tailview.access")
+                        Text("Your Mac stays paired. Starting a trial never charges you automatically.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 16))
+                }
                 if viewer.isConnecting || viewer.isReconnecting {
                     ProgressView()
                         .frame(maxWidth: .infinity)
@@ -238,7 +291,8 @@ struct ViewerView: View {
                     Button("Pair a new Mac") { showPairing = true }
                         .frame(maxWidth: .infinity)
                 } else if !viewer.savedMacs.isEmpty && !showPairing {
-                    Button("Reconnect to \(preferredProfile?.name ?? "Mac")") {
+                    Button("Connect to \(preferredProfile?.name ?? "Mac")") {
+                        guard access.streamAllowed else { showPurchase = true; return }
                         automaticConnection = true
                         if let profile = preferredProfile {
                             viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
@@ -262,24 +316,54 @@ struct ViewerView: View {
         .background(Color(uiColor: .systemBackground))
     }
 
+    private var setupSteps: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("1. Connect both devices to Tailscale", systemImage: "network")
+                .font(.headline)
+            Text("Sign in to the same Tailscale network on this device and your Mac. TailView only connects through that private network.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Link("Get Tailscale", destination: URL(string: "https://tailscale.com/download")!)
+            Label("2. Set up the free Mac companion", systemImage: "desktopcomputer")
+                .font(.headline)
+            Text("On your Mac, open TailView, enable sharing, and allow Screen Recording. Enable remote control and microphone routing only if you want them.")
+                .font(.subheadline).foregroundStyle(.secondary)
+            Link("Mac download and setup", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
+            Label("3. Pair before you start your trial", systemImage: "link")
+                .font(.headline)
+            Text("Choose Pair a New Device on the Mac, then enter its Tailscale address and temporary code below. Your seven days start only when you choose Start Trial.")
+                .font(.subheadline).foregroundStyle(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+    }
+
     private var pairingForm: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Pair a new Mac").font(.headline)
-            Text("Choose Pair a New Device in the Mac menu bar once, then enter its address and code here.")
+            Text("The Mac’s pairing code expires after five minutes and can be used once.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField("Profile name", text: $profileName)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("tailview.profile-name")
             TextField("Mac Tailscale address (100.x.x.x)", text: $macAddress)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .keyboardType(.numbersAndPunctuation)
                 .textFieldStyle(.roundedBorder)
+                .accessibilityIdentifier("tailview.mac-address")
             SecureField("Pairing code shown on Mac", text: $code)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .textFieldStyle(.roundedBorder)
-            Button("Pair and connect") {
+                .accessibilityIdentifier("tailview.pairing-code")
+            Toggle("Enable keyboard and pointer control", isOn: $remoteControlConsent)
+            Toggle("Send this device’s microphone on connect", isOn: $microphoneOnConnect)
+            Text("Microphone audio is sent to your Mac only when enabled and permitted. The Mac must separately allow remote control and microphone routing. You can change these choices in Settings.")
+                .font(.caption).foregroundStyle(.secondary)
+            Button(access.streamAllowed ? "Pair and connect" : "Pair Mac") {
                 viewer.pair(host: macAddress.trimmingCharacters(in: .whitespacesAndNewlines),
                             code: code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
                             name: profileName,
@@ -287,6 +371,7 @@ struct ViewerView: View {
                             startMacAudioOnConnect: macAudioOnConnect)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("tailview.pair")
             .disabled(viewer.isConnecting || macAddress.isEmpty || code.isEmpty)
             if showPairing && !viewer.savedMacs.isEmpty && !viewer.isConnecting {
                 Button("Back to saved Macs") {
@@ -550,6 +635,13 @@ struct ViewerView: View {
     private var settingsView: some View {
         NavigationStack {
             Form {
+                Section("TailView access") {
+                    Text(access.statusTitle)
+                    Text(access.statusDetail).font(.caption).foregroundStyle(.secondary)
+                    NavigationLink("Trial, purchase and restore") {
+                        PurchaseView(access: access, embedded: true)
+                    }
+                }
                 Section("Connection") {
                     Text(viewer.status)
                     if viewer.isConnected || viewer.isReconnecting {
@@ -563,6 +655,7 @@ struct ViewerView: View {
                         HStack {
                             Button(profile.name) {
                                 preferredMacID = profile.id.uuidString
+                                guard access.streamAllowed else { return }
                                 automaticConnection = true
                                 viewer.disconnect()
                                 viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,
@@ -591,10 +684,16 @@ struct ViewerView: View {
                 }
                 Section("Lock screen") {
                     Toggle("Show lock screen controls", isOn: $lockScreenControls)
-                    Text("While connected, the lock screen and Dynamic Island show Mic, Sound, and fn. Tap Hold fn to hold the Mac's Fn key, for example for dictation, and tap Release fn to let go. Locking the phone does not release it. Mutes from the lock screen keep audio running silently and become ordinary mutes when you open TailView.")
+                    Text("Controls remain available while intentional audio is running. Muting stops that audio direction. If both are off, iOS may suspend the connection; open TailView to reconnect or turn audio back on.")
+                }
+                Section("Remote control") {
+                    Toggle("Enable keyboard and pointer control", isOn: $remoteControlConsent)
+                    Text("The Mac must also allow remote control. Turning this off keeps screen viewing available and stops input from this device.")
                 }
                 Section("Microphone") {
                     Toggle("Connect microphone automatically", isOn: $microphoneOnConnect)
+                    Text("Sends this device’s microphone to the Mac. This requires microphone permission here and optional BlackHole setup and consent on the Mac.")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text(viewer.microphoneStatus)
                     Text(viewer.inputLevelStatus)
                 }
@@ -616,6 +715,13 @@ struct ViewerView: View {
                 }
                 Section("Keyboard") {
                     Text("Tap Control, Option, or Command once for the next key or click. Tap twice quickly to hold it for multiple actions; tap a held modifier again to release it. Blue means next action and orange means held.")
+                }
+                Section("Help") {
+                    Link("Setup and troubleshooting", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
+                    Link("Privacy", destination: URL(string: "https://alexmorris10x.github.io/tailview/privacy.html")!)
+                    Link("Support", destination: URL(string: "https://alexmorris10x.github.io/tailview/support.html")!)
+                    Text("TailView \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 #if DEBUG
                 Section("Microphone input test") {
@@ -659,7 +765,7 @@ struct ViewerView: View {
         // reactivate playback and interrupt the four-second microphone test.
         guard !ProcessInfo.processInfo.arguments.contains("--tailview-test-isolated-recorder") else { return }
         #endif
-        guard scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
+        guard access.streamAllowed, scenePhase == .active, automaticConnection, !showPairing, !diagnosticLaunch,
               !viewer.isConnected, !viewer.isConnecting, !viewer.isReconnecting,
               let profile = preferredProfile, !viewer.rejectedMacIDs.contains(profile.id) else { return }
         viewer.connect(profile: profile, startMicrophoneOnConnect: microphoneOnConnect,

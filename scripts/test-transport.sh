@@ -2,6 +2,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p DerivedData/Tests
+swiftc MacHost/HostConsent.swift MacHost/TailscaleSetup.swift Tests/HostConsentSmoke.swift -o DerivedData/Tests/HostConsentSmoke
+DerivedData/Tests/HostConsentSmoke
 swiftc Shared/AudioJitterBuffer.swift Shared/AudioConnectionGate.swift Shared/ReconnectBackoff.swift Shared/AuthenticationReply.swift Tests/AudioReliabilitySmoke.swift -o DerivedData/Tests/AudioReliabilitySmoke
 DerivedData/Tests/AudioReliabilitySmoke
 swiftc Shared/Packet.swift Shared/AACAudio.swift Shared/PairingRequest.swift Shared/ControlCommand.swift Shared/AudioJitterBuffer.swift MacHost/AudioSink.swift MacHost/VideoServer.swift Tests/TransportSmoke.swift -o DerivedData/Tests/TransportSmoke

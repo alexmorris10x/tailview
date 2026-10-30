@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var host: HostModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -11,6 +12,9 @@ struct ContentView: View {
             footer
         }
         .padding(24)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await host.refreshSetup() } }
+        }
     }
 
     private var details: some View {
@@ -23,12 +27,13 @@ struct ContentView: View {
                         .font(.largeTitle.bold())
                     Text(host.isPaused
                          ? "Access is paused. Resume Access to connect from a paired device."
-                         : "Ready for trusted devices while this app is running")
+                         : (host.isSharing ? "Sharing with your paired devices over Tailscale" : "Set up this Mac, then choose Start sharing"))
                         .foregroundStyle(.secondary)
                 }
             }
 
             Divider()
+            setupSection
 
             LabeledContent("Access", value: host.status)
             LabeledContent("Viewer", value: host.viewerStatus)
@@ -61,27 +66,13 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                GroupBox("Trusted device control") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Paired devices can view and control this Mac. One device at a time handles sound and microphone. Use Audio device in iOS Settings to switch it. Pause Access to disconnect both immediately.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(host.controlStatus)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if !ControlInjector.hasPermission() {
-                            Button("Grant Mac control permission") { host.requestControlPermission() }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(4)
-                }
             }
+
+            accessSection
 
             GroupBox("Paired devices") {
                 if host.pairedDevices.isEmpty {
-                    Text("No saved devices yet")
+                    Text("Start sharing, choose Pair a new device, then enter the Mac address and pairing code in TailView on your iPhone or iPad.")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
@@ -106,18 +97,99 @@ struct ContentView: View {
         }
     }
 
+    private var setupSection: some View {
+        GroupBox("Set up your Mac") {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("1. Connect Tailscale", systemImage: host.tailscaleAddress.isEmpty ? "network" : "checkmark.circle.fill")
+                    .font(.headline)
+                Text(host.tailscaleStatus)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button(host.isTailscaleInstalled ? "Open Tailscale" : "Get Tailscale") { host.openTailscale() }
+                    Link("Tailscale setup guide", destination: URL(string: "https://tailscale.com/kb/1016/install-mac")!)
+                }
+                Divider()
+                Label("2. Allow Screen Recording", systemImage: host.hasScreenRecordingPermission ? "checkmark.circle.fill" : "display")
+                    .font(.headline)
+                Text(host.hasScreenRecordingPermission
+                     ? "Allowed. TailView captures your main display and Mac sound only while you are sharing."
+                     : "Screen Recording lets your paired devices see your main display and hear Mac sound. Allow TailView Mac in System Settings; macOS may ask you to reopen the app.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !host.hasScreenRecordingPermission {
+                    Button("Allow Screen Recording…") { host.requestScreenRecordingPermission() }
+                }
+                Divider()
+                Label("3. Start sharing and pair your device", systemImage: host.isSharing ? "checkmark.circle.fill" : "iphone.and.arrow.forward")
+                    .font(.headline)
+                Text("Start sharing enables access while TailView runs. Your choice is remembered when the app reopens. Pause Access disconnects all viewers and keeps sharing off until you resume it.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button("Check setup again") { Task { await host.refreshSetup() } }
+                        .disabled(host.isCheckingSetup)
+                    if host.isCheckingSetup { ProgressView().controlSize(.small) }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+        }
+    }
+
+    private var accessSection: some View {
+        GroupBox("Optional access") {
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Allow paired devices to control this Mac", isOn: Binding(
+                    get: { host.allowsRemoteControl },
+                    set: { host.setRemoteControlAllowed($0) }
+                ))
+                Text("Enables taps, typing, shortcuts, and clipboard paste from paired devices. Turning this off keeps viewing available. macOS Accessibility permission is also required.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                LabeledContent("Accessibility", value: host.hasAccessibilityPermission ? "Allowed by macOS" : "Not yet allowed · optional")
+                if host.allowsRemoteControl && !host.hasAccessibilityPermission {
+                    Button("Allow Accessibility…") { host.requestControlPermission() }
+                }
+                Divider()
+                Toggle("Automatically route audio for the remote microphone", isOn: Binding(
+                    get: { host.automaticAudioRouting },
+                    set: { host.setAutomaticAudioRouting($0) }
+                ))
+                Text("While a paired viewer is connected, sends its microphone through BlackHole 2ch, selects BlackHole as the Mac’s default input, and keeps output on speakers or headphones to avoid feedback. TailView restores your previous input and output when you disconnect, pause, quit, or turn this off.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("BlackHole is an optional, separate installation. Screen viewing and Mac sound work without it, with your Mac’s audio selections unchanged.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Link("Get BlackHole 2ch", destination: URL(string: "https://existential.audio/blackhole/")!)
+                Text("One viewer at a time handles Mac sound and microphone. Choose Audio device in the iPhone or iPad app to switch.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+        }
+    }
+
     private var footer: some View {
         HStack {
             if host.isPaused {
                 Button("Resume Access") { host.resumeAccess() }
-            } else {
+            } else if host.isSharing || host.isStarting {
                 Button("Pause Access") { host.pauseAccess() }
-                if !host.isSharing && !host.isStarting {
-                    Button("Retry sharing") { host.start() }
-                }
+            } else {
+                Button(host.sharingWasEnabled ? "Start sharing again" : "Start sharing") { host.start() }
+                    .buttonStyle(.borderedProminent)
             }
             Spacer()
-            Text("Main display • up to 8 fps")
+            Text("Your main display · Tailscale only")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

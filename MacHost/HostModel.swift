@@ -1,3 +1,5 @@
+import AppKit
+import CoreGraphics
 import Foundation
 
 @MainActor
@@ -18,14 +20,25 @@ final class HostModel: ObservableObject {
     @Published private(set) var isControlEnabled = false
     @Published private(set) var controlStatus = "Control is off"
     @Published private(set) var isPaused = false
+    @Published private(set) var sharingWasEnabled = false
+    @Published private(set) var allowsRemoteControl = false
+    @Published private(set) var automaticAudioRouting = false
+    @Published private(set) var hasScreenRecordingPermission = false
+    @Published private(set) var hasAccessibilityPermission = false
+    @Published private(set) var tailscaleStatus = "Checking Tailscale…"
+    @Published private(set) var tailscaleAddress = ""
+    @Published private(set) var isTailscaleInstalled = false
+    @Published private(set) var isCheckingSetup = false
 
     let display = DisplayControlModel()
 
-    private let pairedStore = PairedDeviceStore()
+    private let pairedStore: PairedDeviceStore
+    private let consent: HostConsent
     private let controlInjector = ControlInjector()
     private let audioRouting = AudioRoutingController()
     private var capture: ScreenCapture?
     private var server: VideoServer?
+    private var microphoneSink: AudioSink?
     private var peakMicrophoneLevel = 0.0
     private var pairingWindowID = UUID()
     private var launchGeneration: UInt64 = 0
@@ -34,20 +47,44 @@ final class HostModel: ObservableObject {
     private var lastCaptureRecovery = Date.distantPast
 
     init() {
+        let store = PairedDeviceStore()
+        pairedStore = store
+        consent = HostConsent(hasPairedDevices: (try? store.list().isEmpty) == false)
+        allowsRemoteControl = consent.remoteControlAllowed
+        automaticAudioRouting = consent.automaticAudioRoutingEnabled
+        sharingWasEnabled = consent.sharingEnabled
         audioRoutingStatus = audioRouting.status
         audioRouting.onStatus = { [weak self] in self?.audioRoutingStatus = $0 }
+        audioRouting.setEnabled(automaticAudioRouting)
         display.onDisplayConfigurationChange = { [weak self] in self?.replaceCapture(reason: nil) }
         isPaused = UserDefaults.standard.bool(forKey: "tailview.accessPaused")
         reloadPairedDevices()
-        if isPaused {
-            status = "Access paused"
-        } else {
-            Task { @MainActor [weak self] in self?.start() }
+        status = isPaused ? "Access paused" : "Sharing is off"
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.refreshSetup()
+            if self.consent.sharingEnabled && !self.isPaused { self.beginSharing() }
         }
     }
 
+    /// This is a deliberate user action. Startup uses beginSharing only when a
+    /// previous sharing choice exists; a fresh install never starts capture.
     func start() {
+        consent.sharingEnabled = true
+        sharingWasEnabled = true
+        isPaused = false
+        UserDefaults.standard.set(false, forKey: "tailview.accessPaused")
+        if !CGPreflightScreenCaptureAccess() { requestScreenRecordingPermission() }
+        beginSharing()
+    }
+
+    private func beginSharing() {
         guard !isPaused, !isSharing, !isStarting else { return }
+        hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
+        guard hasScreenRecordingPermission else {
+            status = "Allow Screen Recording in System Settings, then start sharing. macOS may ask you to reopen TailView."
+            return
+        }
         launchGeneration &+= 1
         let generation = launchGeneration
         isStarting = true
@@ -55,12 +92,14 @@ final class HostModel: ObservableObject {
         status = "Starting screen capture…"
         Task { [self] in
             do {
-                let ip = try Self.tailscaleIPv4()
-                let code = UUID().uuidString.lowercased()
-                let sink = try? AudioSink.blackHole()
-                let server = try VideoServer(address: ip, code: code, audioSink: sink)
+                let setup = await TailscaleSetup.check()
+                applyTailscaleSetup(setup)
+                guard generation == launchGeneration, !isPaused else { return }
+                guard let ip = setup.address else { throw HostError.message(setup.message) }
+                let server = try VideoServer(address: ip, audioSink: nil)
                 let store = pairedStore
                 let injector = controlInjector
+                let consent = self.consent
                 server.authenticateSaved = { [weak self] id, token in
                     let result = store.authenticate(id: id, token: token)
                     if result == .unavailable {
@@ -75,7 +114,7 @@ final class HostModel: ObservableObject {
                         .localizedCaseInsensitiveContains("iPad") == true
                 }
                 server.authorizeTrustedControl = { [weak injector] in
-                    guard ControlInjector.hasPermission(), let injector else { return false }
+                    guard consent.remoteControlAllowed, ControlInjector.hasPermission(), let injector else { return false }
                     injector.setEnabled(true)
                     return true
                 }
@@ -93,6 +132,7 @@ final class HostModel: ObservableObject {
                     Task { @MainActor in
                         self?.reloadPairedDevices()
                         self?.isPairingOpen = false
+                        self?.sessionCode = ""
                         self?.pairingStatus = "Paired \(name)"
                     }
                 }
@@ -107,13 +147,10 @@ final class HostModel: ObservableObject {
                         if let capture = self.capture {
                             self.updateSystemAudioCapture(server.hasPairedViewer, on: capture)
                         }
-                        self.isControlEnabled = server.isControlEnabled
-                        self.controlStatus = count > 0
-                            ? (server.isControlEnabled ? "Trusted device can control this Mac" : "Grant macOS control permission in TailView settings")
-                            : "Control is off"
+                        self.updateControlStatus()
                         if count == 0 {
                             self.peakMicrophoneLevel = 0
-                            self.microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
+                            self.updateMicrophoneStatus()
                         }
                     }
                 }
@@ -121,17 +158,17 @@ final class HostModel: ObservableObject {
                 server.onPaste = { text in injector.paste(text) }
                 server.onMicrophonePacket = { [weak self] in
                     Task { @MainActor in
-                        self?.microphoneStatus = sink == nil ? "Receiving voice; install BlackHole 2ch to route it" : "Receiving voice through BlackHole 2ch"
+                        guard let self, self.automaticAudioRouting else { return }
+                        self.microphoneStatus = "Receiving voice through BlackHole 2ch"
                     }
                 }
                 server.onMicrophoneLevel = { [weak self] level in
                     Task { @MainActor in
-                        guard let self else { return }
+                        guard let self, self.automaticAudioRouting else { return }
                         self.peakMicrophoneLevel = max(self.peakMicrophoneLevel, level)
                         let decibels = level > 0 ? max(-90, Int((20 * log10(level)).rounded())) : -90
                         let peak = self.peakMicrophoneLevel > 0 ? max(-90, Int((20 * log10(self.peakMicrophoneLevel)).rounded())) : -90
-                        let routing = sink == nil ? " · BlackHole 2ch needed for Mac input" : " · BlackHole 2ch"
-                        self.microphoneStatus = "Voice \(decibels) dBFS · peak \(peak) dBFS\(routing)"
+                        self.microphoneStatus = "Voice \(decibels) dBFS · peak \(peak) dBFS · BlackHole 2ch"
                     }
                 }
                 server.onLinkStats = { [weak self] summary in
@@ -147,11 +184,12 @@ final class HostModel: ObservableObject {
                     self.capture = capture
                     self.server = server
                     address = ip
-                    sessionCode = code
-                    microphoneStatus = sink == nil ? "Unavailable until BlackHole 2ch is installed" : "Ready through BlackHole 2ch"
+                    sessionCode = ""
                     viewerStatus = "Waiting for a viewer"
                     status = "Sharing main display"
                     isSharing = true
+                    updateMicrophoneRouting()
+                    updateControlStatus()
                     server.start()
                 }
             } catch {
@@ -164,10 +202,15 @@ final class HostModel: ObservableObject {
     func stop() {
         guard isSharing || isStarting else { return }
         launchGeneration &+= 1
-        disableControl()
+        controlInjector.setEnabled(false)
+        server?.setControlEnabled(false)
+        isControlEnabled = false
+        controlStatus = "Control is off"
         server?.disablePairing()
         server?.stop()
+        server?.setAudioSink(nil)
         server = nil
+        microphoneSink = nil
         audioRouting.setConnected(false)
         let capture = self.capture
         self.capture = nil
@@ -238,54 +281,118 @@ final class HostModel: ObservableObject {
     func pauseAccess() {
         guard !isPaused else { return }
         isPaused = true
+        consent.sharingEnabled = false
         UserDefaults.standard.set(true, forKey: "tailview.accessPaused")
         stop()
         status = "Access paused"
     }
 
-    func resumeAccess() {
-        guard isPaused else { return }
-        isPaused = false
-        UserDefaults.standard.set(false, forKey: "tailview.accessPaused")
-        start()
-    }
+    func resumeAccess() { start() }
 
-    func enableControl() {
-        guard isSharing, let server, server.hasPairedViewer else {
-            controlStatus = "Connect with a saved, paired device before allowing control"
-            return
-        }
-        guard ControlInjector.hasPermission() else {
-            _ = ControlInjector.requestPermission()
-            controlStatus = "Allow TailView Mac in the Privacy & Security pane macOS opened, then relaunch TailView Mac and try again"
-            return
-        }
-        controlInjector.setEnabled(true)
-        server.setControlEnabled(true)
-        isControlEnabled = true
-        controlStatus = "Control allowed for connected trusted devices until you turn it off or sharing ends"
+    func setRemoteControlAllowed(_ allowed: Bool) {
+        consent.remoteControlAllowed = allowed
+        allowsRemoteControl = allowed
+        if allowed && !ControlInjector.hasPermission() { requestControlPermission() }
+        synchronizeControlPermission()
     }
 
     func requestControlPermission() {
-        guard ControlInjector.hasPermission() else {
+        if !ControlInjector.hasPermission() {
             _ = ControlInjector.requestPermission()
-            controlStatus = "Allow TailView Mac in macOS Privacy & Security, then relaunch TailView Mac"
-            return
+            openSettings("Privacy_Accessibility")
         }
-        if server?.hasPairedViewer == true { enableControl() }
-        else { controlStatus = "Control permission is ready for trusted devices" }
+        hasAccessibilityPermission = ControlInjector.hasPermission()
+        synchronizeControlPermission()
     }
 
-    func disableControl() {
-        controlInjector.setEnabled(false)
-        server?.setControlEnabled(false)
-        isControlEnabled = false
-        controlStatus = "Control is off"
+    private func synchronizeControlPermission() {
+        hasAccessibilityPermission = ControlInjector.hasPermission()
+        let enabled = allowsRemoteControl && hasAccessibilityPermission && server?.hasPairedViewer == true
+        controlInjector.setEnabled(enabled)
+        server?.setControlEnabled(enabled)
+        updateControlStatus()
+    }
+
+    private func updateControlStatus() {
+        isControlEnabled = server?.isControlEnabled == true
+        if !allowsRemoteControl { controlStatus = "View only · remote control is off" }
+        else if !hasAccessibilityPermission { controlStatus = "Allow Accessibility in System Settings to use remote control" }
+        else if isControlEnabled { controlStatus = "Paired devices can control this Mac" }
+        else { controlStatus = "Ready · control starts when a paired viewer connects" }
+    }
+
+    func setAutomaticAudioRouting(_ enabled: Bool) {
+        consent.automaticAudioRoutingEnabled = enabled
+        automaticAudioRouting = enabled
+        audioRouting.setEnabled(enabled)
+        updateMicrophoneRouting()
+    }
+
+    private func updateMicrophoneRouting() {
+        guard let server else { updateMicrophoneStatus(); return }
+        guard automaticAudioRouting else {
+            server.setAudioSink(nil)
+            microphoneSink = nil
+            updateMicrophoneStatus()
+            return
+        }
+        guard microphoneSink == nil else { return }
+        do {
+            let sink = try AudioSink.blackHole()
+            microphoneSink = sink
+            server.setAudioSink(sink)
+            microphoneStatus = "Ready through BlackHole 2ch"
+        } catch {
+            server.setAudioSink(nil)
+            microphoneStatus = "Install BlackHole 2ch separately, then check setup again"
+        }
+    }
+
+    private func updateMicrophoneStatus() {
+        microphoneStatus = automaticAudioRouting
+            ? "Remote microphone enabled · BlackHole 2ch is required"
+            : "Off · enable automatic audio routing to use a viewer’s microphone in Mac apps"
+    }
+
+    func refreshSetup() async {
+        guard !isCheckingSetup else { return }
+        isCheckingSetup = true
+        defer { isCheckingSetup = false }
+        hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
+        synchronizeControlPermission()
+        applyTailscaleSetup(await TailscaleSetup.check())
+        if isSharing { updateMicrophoneRouting() }
+    }
+
+    private func applyTailscaleSetup(_ setup: TailscaleSetup) {
+        tailscaleStatus = setup.message
+        tailscaleAddress = setup.address ?? ""
+        isTailscaleInstalled = setup.isInstalled
+    }
+
+    func requestScreenRecordingPermission() {
+        if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
+        hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
+        if !hasScreenRecordingPermission { openSettings("Privacy_ScreenCapture") }
+    }
+
+    func openTailscale() {
+        if let path = TailscaleSetup.applicationPaths.first(where: { FileManager.default.fileExists(atPath: $0) }) {
+            NSWorkspace.shared.open(URL(fileURLWithPath: path))
+        } else if let url = URL(string: "https://tailscale.com/download/mac") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func openSettings(_ pane: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + pane) {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func enablePairing() {
         guard isSharing, let server else { return }
-        server.enablePairing()
+        sessionCode = server.enablePairing()
         pairingWindowID = UUID()
         let windowID = pairingWindowID
         isPairingOpen = true
@@ -301,6 +408,8 @@ final class HostModel: ObservableObject {
     func disablePairing() {
         server?.disablePairing()
         isPairingOpen = false
+        sessionCode = ""
+        pairingWindowID = UUID()
         pairingStatus = "Pairing closed"
     }
 
@@ -337,26 +446,6 @@ final class HostModel: ObservableObject {
                 }
             }
         }
-    }
-
-    private static func tailscaleIPv4() throws -> String {
-        let paths = ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale"]
-        guard let path = paths.first(where: FileManager.default.isExecutableFile(atPath:)) else {
-            throw HostError.message("Tailscale CLI is unavailable")
-        }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["ip", "-4"]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
-        try process.run()
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0,
-              let ip = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              ip.hasPrefix("100.") else { throw HostError.message("Connect this Mac to Tailscale") }
-        return ip
     }
 
     private enum HostError: LocalizedError {

@@ -1,0 +1,48 @@
+{
+  "identifier" : "5E5D293A-C702-4D38-9C6B-510D27F79903",
+  "nonRenewingSubscriptions" : [],
+  "products" : [
+    {
+      "displayPrice" : "0.00",
+      "familyShareable" : false,
+      "internalID" : "7AD07F82-C416-40BA-8C67-8F9B1B5F7A2F",
+      "localizations" : [
+        {
+          "description" : "Full access for seven days. No automatic charge. Screen viewing, control, and audio stop when the trial ends unless you choose the permanent unlock.",
+          "displayName" : "7-day Trial",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.10x.tailview.ios.trial7",
+      "referenceName" : "7-day Trial",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "62BE5E09-10E3-4C35-963E-434EE3A93907",
+      "localizations" : [
+        {
+          "description" : "Permanently unlock screen viewing, control, and audio. One payment. No subscription.",
+          "displayName" : "TailView Permanent Unlock",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.10x.tailview.ios.lifetime",
+      "referenceName" : "TailView Permanent Unlock",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [],
+  "version" : { "major" : 3, "minor" : 0 }
+}

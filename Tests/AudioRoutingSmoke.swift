@@ -14,10 +14,20 @@ struct AudioRoutingSmoke {
         routing.enforce()
         try check(hardware.selected[.input] == 1, "Idle host changed the input")
         routing.setConnected(true)
+        routing.enforce()
+        try check(hardware.selected == [.input: 1, .output: 3, .systemOutput: 4],
+                  "A connection changed Mac audio defaults without explicit consent")
+        routing.setEnabled(true)
         try check(hardware.selected[.input] == 2, "Connection did not select BlackHole")
         try check(hardware.selected[.output] == 3, "Connection replaced the selected headphones")
         try check(hardware.selected[.systemOutput] == 3, "System sound was routed elsewhere")
 
+        routing.setEnabled(false)
+        try check(hardware.selected == [.input: 1, .output: 3, .systemOutput: 4],
+                  "Removing consent did not immediately restore defaults")
+        routing.enforce()
+        try check(hardware.selected[.input] == 1, "Watchdog routed audio after consent was removed")
+        routing.setEnabled(true)
         hardware.selected = [.input: 1, .output: 2, .systemOutput: 2]
         routing.enforce()
         try check(hardware.selected == [.input: 2, .output: 3, .systemOutput: 3],

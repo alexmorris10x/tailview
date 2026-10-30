@@ -5,7 +5,8 @@ import SwiftUI
 
 final class ViewerModel: ObservableObject {
     @Published private(set) var image: UIImage?
-    @Published private(set) var status = "Looking for your Mac…"
+    @Published private(set) var status = "Set up your Mac, then pair this device"
+    @Published private(set) var lastPairedMacID: UUID?
     @Published private(set) var microphoneStatus = "Microphone is off"
     @Published private(set) var inputLevelStatus = ""
     @Published private(set) var macAudioStatus = "Mac sound is off"
@@ -30,9 +31,8 @@ final class ViewerModel: ObservableObject {
     @Published private(set) var functionHeld = false
     /// Held by a lock-screen tap; stays down when TailView leaves the foreground.
     @Published private(set) var functionLatched = false
-    // Lock-screen mutes keep audio running: iOS may refuse to restart the
-    // microphone in the background, and stopping all audio would let iOS
-    // suspend the app. They become ordinary mutes when TailView returns.
+    // Kept as observable state for existing control presentation. A mute now
+    // stops the corresponding audio direction, including on the lock screen.
     @Published private(set) var microphoneSoftMuted = false
     @Published private(set) var macAudioSoftMuted = false
     @Published private(set) var savedMacs = [SavedMac]()
@@ -77,6 +77,9 @@ final class ViewerModel: ObservableObject {
     }
 
     private let networkQueue = DispatchQueue(label: "TailView.viewerNetwork")
+    private let streamAccess = StreamAccessGate()
+    private var remoteControlConsent = false
+    private var hostAllowsControl = false
     private let packetLock = NSLock()
     private let deliveryLock = NSLock()
     private var imageDeliveryPending = false
@@ -314,7 +317,24 @@ final class ViewerModel: ObservableObject {
         }
     }
 
-    func pair(host: String, code: String, name: String, startMicrophoneOnConnect: Bool = true,
+    func setStreamingAccess(allowed: Bool, expiresAt: Date?) {
+        streamAccess.update(allowed: allowed, expiresAt: expiresAt)
+        if !streamAccess.permits(), isConnected || isReconnecting {
+            disconnect()
+            status = "Start your trial or unlock TailView to view your Mac"
+        }
+    }
+
+    func setRemoteControlConsent(_ allowed: Bool) {
+        if !allowed, isControlAllowed {
+            setFunctionLatched(false)
+            endFunctionPress()
+        }
+        remoteControlConsent = allowed
+        isControlAllowed = allowed && hostAllowsControl && streamAccess.permits()
+    }
+
+    func pair(host: String, code: String, name: String, startMicrophoneOnConnect: Bool = false,
               startMacAudioOnConnect: Bool = true) {
         guard PairingRequest.validCode(code) else {
             status = "Enter the current session code shown on the Mac"
@@ -332,9 +352,9 @@ final class ViewerModel: ObservableObject {
         }
     }
 
-    func connect(profile: SavedMac, startMicrophoneOnConnect: Bool = true,
+    func connect(profile: SavedMac, startMicrophoneOnConnect: Bool = false,
                  startMacAudioOnConnect: Bool = true) {
-        guard connection == nil, !isReconnecting else { return }
+        guard connection == nil, !isReconnecting, streamAccess.permits() else { return }
         reconnectProfile = profile
         reconnectBackoff.reset()
         savedCredentialRejected = false
@@ -377,6 +397,12 @@ final class ViewerModel: ObservableObject {
                                  runRecorderTestOnConnect: Bool = false,
                                  runSyntheticTestOnConnect: Bool = false) {
         guard connection == nil else { return }
+        if case .pair = credential {
+            // Save and verify a Mac before the customer starts a trial.
+        } else if !streamAccess.permits() {
+            status = "Start your trial or unlock TailView to view your Mac"
+            return
+        }
         guard host.hasPrefix("100."),
               let port = NWEndpoint.Port(rawValue: 47_820) else {
             status = "Enter the Mac Tailscale address (100.x.x.x)"
@@ -387,8 +413,8 @@ final class ViewerModel: ObservableObject {
         isControlAllowed = false
         isPairedSession = false
         audioRouteAllowed = false
-        startMicrophoneAfterConnect = startMicrophoneOnConnect
-        startMacAudioAfterConnect = startMacAudioOnConnect
+        startMicrophoneAfterConnect = startMicrophoneOnConnect && streamAccess.permits()
+        startMacAudioAfterConnect = startMacAudioOnConnect && streamAccess.permits()
         if !isReconnecting {
             microphoneWanted = startMicrophoneOnConnect
             macAudioWanted = startMacAudioOnConnect
@@ -468,17 +494,15 @@ final class ViewerModel: ObservableObject {
         isConnected = false
         isConnecting = false
         isControlAllowed = false
+        hostAllowsControl = false
         isPairedSession = false
         macAcceptsPaste = false
         audioRouteAllowed = false
         image = nil
         startMicrophoneAfterConnect = false
         startMacAudioAfterConnect = false
-        // Discard pending playback and microphone sends. Keep already running,
-        // user-requested audio going: iOS suspends a background app with no
-        // active audio, which would stop the reconnect. Microphone samples
-        // during the outage have no destination and are discarded immediately.
-        // pauseReconnecting bounds this in the background.
+        // Discard pending playback and microphone sends. A lost connection
+        // has no audio destination and must not keep recording to stay awake.
         macAudioGeneration &+= 1
         macAudioPlayer?.stop()
         queuedMacAudioFrames = 0
@@ -499,7 +523,7 @@ final class ViewerModel: ObservableObject {
     }
 
     private func scheduleReconnect() {
-        guard let profile = reconnectProfile, !savedCredentialRejected else { return }
+        guard streamAccess.permits(), let profile = reconnectProfile, !savedCredentialRejected else { return }
         isReconnecting = true
         reconnectWork?.cancel()
         reconnectGeneration &+= 1
@@ -521,7 +545,7 @@ final class ViewerModel: ObservableObject {
     }
 
     /// The Mac stayed unreachable for the whole background grace period.
-    /// Stop retrying and release audio, including the silent playback, so the
+    /// Stop retrying and release audio so the
     /// microphone indicator goes off and iOS can suspend TailView. What the
     /// user wants stays set, and resumeAudioAfterForeground restarts it all.
     private func pauseReconnecting() {
@@ -548,6 +572,7 @@ final class ViewerModel: ObservableObject {
     }
 
     func resumeAudioAfterForeground() {
+        guard streamAccess.permits() else { return }
         // Back in the app, lock-screen mutes become ordinary mutes, so the
         // microphone indicator turns off.
         if microphoneSoftMuted {
@@ -596,19 +621,18 @@ final class ViewerModel: ObservableObject {
                     self.pauseReconnecting()
                     return
                 }
-                let keepAudio = self.engine?.isRunning == true &&
-                    ((self.microphoneWanted && self.isMicrophoneOn) || (self.macAudioWanted && self.isMacAudioOn))
-                if !keepAudio && !self.reconnectBackgroundTimeRequested {
+                if !self.reconnectBackgroundTimeRequested {
                     self.reconnectBackgroundTimeRequested = true
                     self.reconnectBackgroundTask = UIApplication.shared.beginBackgroundTask(withName: "Reconnect TailView") { [weak self] in
-                        // iOS grants limited extra time for playback-only sessions.
-                        // Ongoing microphone recording has its own audio allowance.
+                        // A bounded OS allowance, never silent audio, gives a
+                        // transient connection time to recover in background.
+                        if self?.isReconnecting == true { self?.pauseReconnecting() }
                         self?.endReconnectBackgroundTask()
                     }
                 }
-                self.tearDownConnection(keepingAudio: keepAudio)
+                self.tearDownConnection(keepingAudio: false)
                 self.scheduleReconnect()
-                if !self.audioInterrupted { self.keepAudioRunning() }
+                self.endLiveControlsIfSuspending()
             }
             self.status = message
         }
@@ -644,11 +668,17 @@ final class ViewerModel: ObservableObject {
                             self.savedMacs = profiles
                             self.savedMacsLoaded = true
                             self.reconnectProfile = profile
+                            self.lastPairedMacID = profile.id
                         } catch {
                             self.disconnect()
                             self.status = "Mac paired, but this iPad could not save its profile: \(error.localizedDescription)"
                             return
                         }
+                    }
+                    guard self.streamAccess.permits() else {
+                        self.disconnect()
+                        self.status = "Mac paired. Start your free trial when you’re ready to view it."
+                        return
                     }
                     self.isConnected = true
                     self.isConnecting = false
@@ -715,6 +745,14 @@ final class ViewerModel: ObservableObject {
                                macAudioDecoder: AACDecoder?) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) { [weak self, weak connection] data, _, complete, error in
             guard let self, let connection, self.connection === connection else { return }
+            guard self.streamAccess.permits() else {
+                DispatchQueue.main.async {
+                    guard self.connection === connection else { return }
+                    self.disconnect()
+                    self.status = "Your trial has ended. Unlock TailView to reconnect."
+                }
+                return
+            }
             guard error == nil, !complete, let data, !data.isEmpty else {
                 self.failConnection(connection, message: "Mac connection lost; reconnecting…")
                 return
@@ -756,12 +794,15 @@ final class ViewerModel: ObservableObject {
                             self.deliveryLock.lock()
                             self.imageDeliveryPending = false
                             self.deliveryLock.unlock()
-                            if self.connection === connection { self.image = image }
+                            if self.connection === connection, self.streamAccess.permits() { self.image = image }
                         }
                     case .controlState:
                         guard payload.count == 1, payload[0] <= 1 else { return }
                         DispatchQueue.main.async {
-                            if self.connection === connection { self.isControlAllowed = payload[0] == 1 }
+                            if self.connection === connection {
+                                self.hostAllowsControl = payload[0] == 1
+                                self.isControlAllowed = self.hostAllowsControl && self.remoteControlConsent && self.streamAccess.permits()
+                            }
                         }
                     case .macAudio:
                         deliverMacAudio(payload)
@@ -796,7 +837,7 @@ final class ViewerModel: ObservableObject {
     }
 
     func sendControl(_ command: ControlCommand) {
-        guard isConnected, isPairedSession, isControlAllowed,
+        guard streamAccess.permits(), isConnected, isPairedSession, isControlAllowed,
               let connection, let payload = command.encoded() else { return }
         connection.send(content: Packet.encode(.control, payload), completion: .contentProcessed { [weak self, weak connection] error in
             guard error != nil else { return }
@@ -811,7 +852,7 @@ final class ViewerModel: ObservableObject {
     /// can't take it: control is off, the text is empty or over the cap, or
     /// the Mac predates paste and would drop the connection.
     func sendPaste(_ text: String) -> Bool {
-        guard isConnected, isPairedSession, isControlAllowed, macAcceptsPaste,
+        guard streamAccess.permits(), isConnected, isPairedSession, isControlAllowed, macAcceptsPaste,
               let connection, let payload = ClipboardPaste.encode(text) else { return false }
         send(.paste, payload, on: connection)
         return true
@@ -832,6 +873,7 @@ final class ViewerModel: ObservableObject {
     }
 
     private func send(_ kind: PacketKind, _ payload: Data, on connection: NWConnection) {
+        guard streamAccess.permits() else { return }
         connection.send(content: Packet.encode(kind, payload),
                         completion: .contentProcessed { [weak self, weak connection] error in
             guard error != nil else { return }
@@ -875,6 +917,7 @@ final class ViewerModel: ObservableObject {
     }
 
     func startMacAudio(userInitiated: Bool = true) {
+        guard streamAccess.permits() else { return }
         if userInitiated { audioInterrupted = false; audioRecoveryAttempts = 0 }
         macAudioWanted = true
         guard isConnected, !isMacAudioOn, !audioInterrupted else { return }
@@ -922,7 +965,7 @@ final class ViewerModel: ObservableObject {
     }
 
     private func playMacAudio(_ payload: Data) {
-        guard isConnected, isMacAudioOn, payload.count.isMultiple(of: 4),
+        guard streamAccess.permits(), isConnected, isMacAudioOn, payload.count.isMultiple(of: 4),
               !payload.isEmpty, payload.count <= 65_536,
               let player = macAudioPlayer else { return }
         let frameCount = payload.count / 4
@@ -1085,6 +1128,10 @@ final class ViewerModel: ObservableObject {
     // MARK: Lock-screen controls
 
     private func performLiveControl(_ action: LiveControlAction) {
+        guard streamAccess.permits() else {
+            disconnect()
+            return
+        }
         guard liveControlRepeats.accept(action) else {
             DiagnosticLog.note("Lock-screen control: \(action) repeated within 0.5 s; ignored")
             return
@@ -1103,21 +1150,13 @@ final class ViewerModel: ObservableObject {
         }
         switch action {
         case .microphone:
-            if microphoneSoftMuted { setMicrophoneSoftMuted(false) }
-            else if !microphoneWanted { startMicrophone() }
-            // While paused nothing runs, but the tap still mutes rather than
-            // forgetting that the microphone is wanted.
-            else if background && (isMicrophoneOn || reconnectPaused) { setMicrophoneSoftMuted(true) }
-            else { stopMicrophone() }
+            if microphoneWanted { stopMicrophone() }
+            else if !background { startMicrophone() }
+            else { microphoneStatus = "Open TailView to turn on the microphone" }
         case .macSound:
-            if macAudioSoftMuted {
-                macAudioSoftMuted = false
-                macAudioPlayer?.volume = 1
-            } else if !macAudioWanted { startMacAudio() }
-            else if background && (isMacAudioOn || reconnectPaused) {
-                macAudioSoftMuted = true
-                macAudioPlayer?.volume = 0
-            } else { stopMacAudio() }
+            if macAudioWanted { stopMacAudio() }
+            else if !background { startMacAudio() }
+            else { macAudioStatus = "Open TailView to turn on Mac sound" }
         case .function:
             setFunctionLatched(!functionHeld)
         case .returnKey:
@@ -1125,6 +1164,7 @@ final class ViewerModel: ObservableObject {
             // still needs Fn's release to paste before Return submits.
             if !functionHeld { sendControl(ControlCommand(kind: .key, key: .returnKey)) }
         }
+        endLiveControlsIfSuspending()
         refreshLiveControls()
     }
 
@@ -1165,7 +1205,7 @@ final class ViewerModel: ObservableObject {
     /// Called on entering the background and when audio moves to another
     /// device. Without audio iOS suspends TailView within seconds, and the
     /// controls would go stale, so end them; they return once TailView opens
-    /// and connects. Audio keepAudioRunning would keep going counts.
+    /// and connects. Only intentionally active audio keeps these controls up.
     private func endLiveControlsIfSuspending() {
         guard UIApplication.shared.applicationState == .background,
               !LiveControlsRules.stayUpInBackground(audioRunning: engine?.isRunning == true,
@@ -1221,21 +1261,12 @@ final class ViewerModel: ObservableObject {
         microphoneWanted && AVAudioApplication.shared.recordPermission == .granted
     }
 
-    /// iOS suspends a background app within seconds once its audio stops,
-    /// which drops the Mac. That happens when iOS wakes TailView after another
-    /// app's interruption (its connection has usually died meanwhile), or when
-    /// it refuses to restart the microphone in the background. Keep silent
-    /// playback running while audio is wanted and this device may own it,
-    /// until a long background outage pauses reconnecting.
+    /// Recover only intentional, connected audio. Do not create an empty
+    /// playback engine to keep networking alive during an outage or mute.
     private func keepAudioRunning() {
-        guard engine == nil, !reconnectPaused, isReconnecting || audioRouteAllowed,
-              microphoneCanRecover || macAudioWanted else { return }
-        do {
-            _ = try ensureAudioEngine(inputRequired: false)
-            DiagnosticLog.note("Started silent playback to keep TailView running")
-        } catch {
-            DiagnosticLog.note("Could not keep audio running: \(DiagnosticLog.describe(error))")
-        }
+        guard streamAccess.permits(), isConnected, !reconnectPaused, audioRouteAllowed,
+              UIApplication.shared.applicationState == .active else { return }
+        scheduleAudioRouteRecovery()
     }
 
     /// In the background iOS lets TailView restart recording only just after
@@ -1351,6 +1382,7 @@ final class ViewerModel: ObservableObject {
     }
 
     func startMicrophone(userInitiated: Bool = true) {
+        guard streamAccess.permits() else { return }
         if userInitiated { audioInterrupted = false; audioRecoveryAttempts = 0 }
         microphoneWanted = true
         guard isConnected, !isMicrophoneOn, !audioInterrupted else { return }
@@ -1379,7 +1411,7 @@ final class ViewerModel: ObservableObject {
     }
 
     func takeAudio() {
-        guard canTakeAudio, let connection else { return }
+        guard streamAccess.permits(), canTakeAudio, let connection else { return }
         microphoneStatus = "Switching audio to this device…"
         connection.send(content: Packet.encode(.microphoneRequest, Data([1])),
                         completion: .contentProcessed { [weak self, weak connection] error in
@@ -1459,7 +1491,7 @@ final class ViewerModel: ObservableObject {
     }
 
     private func beginCapture() {
-        guard let connection, isConnected, microphoneWanted, audioRouteAllowed,
+        guard streamAccess.permits(), let connection, isConnected, microphoneWanted, audioRouteAllowed,
               !isMicrophoneOn, !audioInterrupted else { return }
         do {
             let session = AVAudioSession.sharedInstance()
@@ -1518,6 +1550,7 @@ final class ViewerModel: ObservableObject {
 
     private func sendMicrophone(_ input: AVAudioPCMBuffer, converter: AVAudioConverter,
                                 format: AVAudioFormat, encoder: AACEncoder?, generation: UInt64) {
+        guard streamAccess.permits() else { return }
         reportInputLevel(input)
         packetLock.lock()
         let firstCapture = !didReportCapture
@@ -1571,6 +1604,7 @@ final class ViewerModel: ObservableObject {
     /// has not accepted AAC yet.
     private func sendMicrophonePacket(_ kind: PacketKind, _ payload: Data, frames: Int,
                                       generation: UInt64, requiring: NWConnection?) {
+        guard streamAccess.permits() else { return }
         guard let ticket = microphoneGate.reserve(frames: frames, capture: generation) else {
             packetLock.lock(); droppedMicrophoneFrames += frames; packetLock.unlock()
             return

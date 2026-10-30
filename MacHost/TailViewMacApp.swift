@@ -67,9 +67,10 @@ private struct TailViewMenu: View {
         if host.isPaused {
             Button("Resume Access") { host.resumeAccess() }
         } else {
-            Button("Pause Access") { host.pauseAccess() }
-            if !host.isSharing && !host.isStarting {
-                Button("Retry sharing") { host.start() }
+            if host.isSharing || host.isStarting {
+                Button("Pause Access") { host.pauseAccess() }
+            } else {
+                Button("Start Sharing") { host.start() }
             }
             Button("Pair a New Device…") {
                 host.enablePairing()

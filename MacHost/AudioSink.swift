@@ -2,7 +2,12 @@ import AudioToolbox
 import CoreAudio
 import Foundation
 
-final class AudioSink {
+protocol AudioSinkOutput: AnyObject {
+    func append(_ data: Data)
+    func clear()
+}
+
+final class AudioSink: AudioSinkOutput {
     private let lock = NSLock()
     private var jitterBuffer = AudioJitterBuffer()
     private var queue: AudioQueueRef?

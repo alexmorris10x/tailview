@@ -6,9 +6,9 @@
 <key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 <key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.5.11</string>
-<key>CFBundleVersion</key><string>29</string>
+<key>CFBundleShortVersionString</key><string>1.0</string>
+<key>CFBundleVersion</key><string>30</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>NSScreenCaptureUsageDescription</key><string>Share this Mac's display with your paired iPhone or iPad.</string>
-<key>NSHumanReadableCopyright</key><string>Private experimental tool</string>
+<key>NSHumanReadableCopyright</key><string>Copyright © 2026 Alex Morris. Apache-2.0.</string>
 </dict></plist>
