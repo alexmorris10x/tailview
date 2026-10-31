@@ -716,7 +716,8 @@
 		658BE5754D55425CF3D7A22F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				APP_DISPLAY_NAME = "TailView Mac Dev";
+				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_APP_SANDBOX = NO;
@@ -726,7 +727,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.mac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.mac.dev;
+				PRODUCT_MODULE_NAME = TailViewMac;
+				PRODUCT_NAME = "TailView Mac Dev";
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -773,6 +776,7 @@
 		A9ADA630A9074E3749160792 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APP_DISPLAY_NAME = "TailView Mac";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -784,6 +788,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.mac;
+				PRODUCT_MODULE_NAME = TailViewMac;
 				SDKROOT = macosx;
 			};
 			name = Release;

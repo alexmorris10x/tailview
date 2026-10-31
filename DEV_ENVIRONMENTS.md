@@ -22,3 +22,7 @@ On a Mac with Swift, also run `python3 scripts/test-ios-runtime-identity.py`. It
 6. If Simulator installation/launch is authorized, show side-by-side app names/icons and independent disposable local preferences/files. Do not copy credentials or Release user data. Device coexistence, actual audio, pairing, provider records and background scheduling are not established by these source/build tests.
 
 TailView-specific: build TailViewIOS with its embedded Live Activity; inspect both built bundle IDs and extension display name. Snapshot TailViewMac Debug/Release build settings before/after generation and verify semantic equality. MacHost, Shared and LiveControls must remain unchanged. Never launch the Mac host, connect a viewer, request pairing or exercise remote control/audio for this identity-only verification. Release iOS PNG must retain Git blob 5d52601741b783a9e411454c6f569de0e31f0071.
+
+## Mac host development identity
+
+Debug builds `TailView Mac Dev.app` (`com.10x.tailview.mac.dev`, `AppIcon-Dev`) beside the Release `TailViewMac.app` (`com.10x.tailview.mac`, unchanged). Both read the same paired-devices Keychain item (`com.10x.tailview.mac.paired-devices`), so pairings carry over; macOS may ask once to let the Dev app use it. Screen Recording, Accessibility and login-item approvals are per bundle ID, so the Dev app needs its own grants. Run only one host at a time. The Dev icon set was generated with `~/bin/ios-dev-icon --size N MacHost/Assets.xcassets/AppIcon.appiconset/TailViewIcon-1024.png …` for each slot.

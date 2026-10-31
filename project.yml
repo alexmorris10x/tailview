@@ -14,10 +14,20 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.mac
+        PRODUCT_MODULE_NAME: TailViewMac
+        APP_DISPLAY_NAME: TailView Mac
         INFOPLIST_FILE: MacHost/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         ENABLE_APP_SANDBOX: NO
+      configs:
+        # Debug builds the separate "TailView Mac Dev" app (own bundle ID, DEV icon).
+        # It keeps the same paired-devices Keychain item, so existing pairings carry over.
+        Debug:
+          PRODUCT_NAME: TailView Mac Dev
+          PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.mac.dev
+          APP_DISPLAY_NAME: TailView Mac Dev
+          ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon-Dev
   TailViewIOS:
     type: application
     platform: iOS
