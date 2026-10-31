@@ -12,7 +12,7 @@ final class ControlInjector {
     private var functionIsDown = false
     private var lastPoint = CGPoint.zero
 
-    static func hasPermission() -> Bool { CGPreflightPostEventAccess() }
+    static func hasPermission() -> Bool { CGPreflightPostEventAccess() || AXIsProcessTrusted() }
 
     static func requestPermission() -> Bool { CGRequestPostEventAccess() }
 

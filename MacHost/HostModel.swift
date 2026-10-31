@@ -45,6 +45,7 @@ final class HostModel: ObservableObject {
     private var audioCaptureUpdate: Task<Void, Never>?
     private var isReplacingCapture = false
     private var lastCaptureRecovery = Date.distantPast
+    private var permissionWatch: Task<Void, Never>?
 
     init() {
         let store = PairedDeviceStore()
@@ -64,6 +65,23 @@ final class HostModel: ObservableObject {
             guard let self else { return }
             await self.refreshSetup()
             if self.consent.sharingEnabled && !self.isPaused { self.beginSharing() }
+        }
+        watchControlPermission()
+    }
+
+    /// macOS gives no callback when Accessibility is granted or revoked, and the
+    /// host usually lives in the menu bar, so its window rarely becomes active.
+    /// Re-check every two seconds so a grant made while a viewer is connected
+    /// reaches that viewer without reconnecting or relaunching.
+    private func watchControlPermission() {
+        permissionWatch = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self else { return }
+                if ControlInjector.hasPermission() != self.hasAccessibilityPermission {
+                    self.synchronizeControlPermission()
+                }
+            }
         }
     }
 
