@@ -106,3 +106,5 @@ The following reviewer-owned Mac setup was saved in App Store Connect on 2026-10
 6. Exercise the documented reviewer-owned Mac setup and attach the corrected build and first in-app purchases. Alex handles TestFlight/App Store submission and the release decision.
 
 References: [App Review Guidelines 3.1.1 and 4.2.7](https://developer.apple.com/app-store/review/guidelines/), [Apple app privacy details](https://developer.apple.com/app-store/app-privacy-details/).
+
+Screenshots and purchase-review images as uploaded: [screenshots/](screenshots/README.md) (moved from Google Drive on 1 Nov 2026).
