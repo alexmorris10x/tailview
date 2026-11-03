@@ -72,3 +72,7 @@ For the public Mac package, use `scripts/package-mac-release.sh` with Developer 
 TailView shares the main display as JPEG frames; it does not provide separate remote sessions, file transfer, or multi-monitor selection. It supports text clipboard paste. Image quality, latency, background operation, and audio continuity depend on the network and OS. The host binds to its Tailscale IPv4 address and relies on Tailscale transport encryption, which can use direct or encrypted relay paths. Open source is not a security-audit claim.
 
 The launch change's pure trial, consent, transport, and audio tests passed. Five local StoreKit scenarios passed on a physical iPhone, including trial restoration with its original deadline, lifetime purchase/restoration/refund, pending approval, cancellation, and catalog failure. Declined-approval retry remains unresolved in the local test service; Apple sandbox/TestFlight, actual reinstall, and active-session expiry remain unverified. The current release gates are in [TODO](docs/TODO.md).
+
+## Product research and operating notes
+
+[Material imported from Google Drive](docs/Drive%20imports.md). Product knowledge is kept in this repo; dated deliverables live in the weekly Agent Work desk.

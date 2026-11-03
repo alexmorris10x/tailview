@@ -1,0 +1,51 @@
+<style>
+  .companion-prices { color: var(--foreground, #17202a); font-family: var(--font-sans, system-ui, sans-serif); max-width: 728px; line-height: 1.45; }
+  .companion-prices * { box-sizing: border-box; }
+  .companion-prices h2 { font-size: 21px; line-height: 1.2; margin: 0 0 8px; font-weight: 650; }
+  .companion-prices p { margin: 0 0 16px; font-size: 14px; }
+  .companion-prices .muted { color: var(--muted-foreground, #637080); }
+  .companion-prices figure { margin: 24px 0 16px; }
+  .companion-prices .plot { height: 260px; }
+  .companion-prices .row { height: 78px; }
+  .companion-prices .label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 15px; margin-bottom: 3px; }
+  .companion-prices .value { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .companion-prices .scope { font-size: 12px; line-height: 1.25; margin-bottom: 7px; color: var(--muted-foreground, #637080); }
+  .companion-prices .track { height: 22px; position: relative; border-left: 1px solid var(--border, #aab4bf); border-right: 1px solid var(--border, #aab4bf); background-image: linear-gradient(to right, transparent calc(100% - 1px), var(--border, #d5dbe1) 0); background-size: 25% 100%; }
+  .companion-prices .bar { height: 22px; background: var(--chart-1, #3568c0); }
+  .companion-prices .proposed { background: transparent; border: 2px dashed var(--chart-2, #168679); }
+  .companion-prices .axis { height: 26px; position: relative; font-size: 12px; color: var(--muted-foreground, #637080); }
+  .companion-prices .tick { position: absolute; transform: translateX(-50%); padding-top: 5px; white-space: nowrap; }
+  .companion-prices .tick:first-child { transform: none; }
+  .companion-prices .tick:last-child { transform: translateX(-100%); }
+  .companion-prices a { color: var(--chart-1, #3568c0); text-underline-offset: 3px; }
+  .companion-prices .sources { font-size: 12px; }
+  @media (max-width: 380px) { .companion-prices .label { font-size: 14px; } .companion-prices h2 { font-size: 19px; } }
+</style>
+<article class="companion-prices">
+  <h2>One-time remote viewer prices</h2>
+  <p class="muted">US dollars · observed 30 October 2026. TailView is a proposed launch price. Product capabilities and platform coverage differ.</p>
+  <figure aria-label="Horizontal bar chart on a linear zero to 200 US dollar axis. TailView proposed 9.99 dollars for iPhone and iPad. Jump Desktop observed 14.99 dollars for iPhone and iPad. Screens 5 observed 199.99 dollars for a lifetime purchase across Apple platforms.">
+    <div class="plot">
+      <div class="row">
+        <div class="label"><span>TailView · proposed</span><span class="value">$9.99</span></div>
+        <div class="scope">iPhone/iPad · upfront · free Mac host</div>
+        <div class="track"><div class="bar proposed" style="width:4.995%"></div></div>
+      </div>
+      <div class="row">
+        <div class="label"><span>Jump Desktop · observed</span><span class="value">$14.99</span></div>
+        <div class="scope">iPhone/iPad · upfront · Mac viewer sold separately</div>
+        <div class="track"><div class="bar" style="width:7.495%"></div></div>
+      </div>
+      <div class="row">
+        <div class="label"><span>Screens 5 · observed</span><span class="value">$199.99</span></div>
+        <div class="scope">iPhone/iPad/Mac/Vision Pro · lifetime unlock</div>
+        <div class="track"><div class="bar" style="width:99.995%"></div></div>
+      </div>
+      <div class="axis" aria-hidden="true">
+        <span class="tick" style="left:0">$0</span><span class="tick" style="left:25%">$50</span><span class="tick" style="left:50%">$100</span><span class="tick" style="left:75%">$150</span><span class="tick" style="left:100%">$200</span>
+      </div>
+    </div>
+    <figcaption class="muted" style="font-size:12px">Dashed outline = proposed. Solid bars = observed. Full linear scale; no axis break. Prices do not imply feature parity or validated demand.</figcaption>
+  </figure>
+  <p class="sources">Sources: <a href="https://apps.apple.com/us/app/jump-desktop-rdp-vnc-fluid/id364876095">Jump Desktop US App Store</a> · <a href="https://help.edovia.com/en/screens-5/faq/s5-pricing">Screens 5 official pricing</a>. TailView is the report’s recommendation, not an existing offer.</p>
+</article>
