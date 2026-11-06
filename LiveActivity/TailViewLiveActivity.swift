@@ -21,7 +21,7 @@ struct TailViewControlsLiveActivity: Widget {
                     Spacer()
                     Text(StatusText.text(context))
                         .font(.caption)
-                        .foregroundStyle(context.isStale ? Color.orange : Color.secondary)
+                        .foregroundStyle(Color.secondary)
                 }
                 ControlButtons(state: context.state)
             }
@@ -38,21 +38,21 @@ struct TailViewControlsLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(StatusText.text(context))
                         .font(.caption)
-                        .foregroundStyle(context.isStale ? Color.orange : Color.secondary)
+                        .foregroundStyle(Color.secondary)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     ControlButtons(state: context.state)
                 }
             } compactLeading: {
                 if context.isStale {
-                    Image(systemName: StatusText.staleSymbol).foregroundStyle(.orange)
+                    Image(systemName: StatusText.staleSymbol).foregroundStyle(.secondary)
                 } else {
                     Image(systemName: MicrophoneSymbol.name(context.state))
                         .foregroundStyle(MicrophoneSymbol.color(context.state))
                 }
             } compactTrailing: {
                 if context.isStale {
-                    Text("Open").font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                    Text("Open").font(.caption).foregroundStyle(.secondary)
                 } else if context.state.functionHeld {
                     Text("fn").font(.caption.weight(.bold)).foregroundStyle(.green)
                 } else {
@@ -61,7 +61,7 @@ struct TailViewControlsLiveActivity: Widget {
                 }
             } minimal: {
                 if context.isStale {
-                    Image(systemName: StatusText.staleSymbol).foregroundStyle(.orange)
+                    Image(systemName: StatusText.staleSymbol).foregroundStyle(.secondary)
                 } else if context.state.functionHeld {
                     Text("fn").font(.caption2.weight(.bold)).foregroundStyle(.green)
                 } else {
@@ -75,8 +75,10 @@ struct TailViewControlsLiveActivity: Widget {
 
 /// TailView confirms the activity while it runs. A stale activity means iOS
 /// suspended or ended the app, so its buttons and status are out of date.
+/// That is routine, not a fault, so it stays grey: an orange warning
+/// triangle in the Dynamic Island read as a problem to fix (Alex, 6 Nov 2026).
 private enum StatusText {
-    static let staleSymbol = "exclamationmark.triangle.fill"
+    static let staleSymbol = "display"
 
     static func text(_ context: ActivityViewContext<TailViewControlsAttributes>) -> String {
         context.isStale ? "Not running – open TailView" : context.state.status
