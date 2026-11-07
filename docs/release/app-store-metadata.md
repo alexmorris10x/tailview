@@ -1,11 +1,11 @@
-# TailView App Store metadata draft
+# TailView App Store metadata
 
-**Status (2026-10-30):** Build `20261030110510`, required iPhone/iPad screenshots, and both purchase-review images are processed and attached. Version 1.0, the free trial, and lifetime unlock passed Add for Review validation and share one unsubmitted draft. Agreements are Active and release remains manual. Visible local StoreKit purchase, restore, and active-session expiry checks passed on the physical iPhone. Actual reinstall/restore, declined Ask to Buy retry, and full setup with the distributed Mac app remain unresolved; see [the remaining work](../TODO.md). No submission or approval is claimed.
+**Status (2026-11-07):** Version 1.0 (build `20261030110510`) and both in-app purchases were first submitted to App Review on 7 November 2026 and are **Waiting for Review**, with **automatic release after approval**. This page is the listing as it stands in App Store Connect (read through the API on 7 November 2026); a later submission driven from the repo must start from these values. Actual reinstall/restore, declined Ask to Buy retry, and full setup with the distributed Mac app were still open at submission; see [the remaining work](../TODO.md).
 
 ## Listing
 
-- **Name:** TailView – Remote Mac
-- **Subtitle:** Your Mac over Tailscale
+- **Name (en-US):** TailView: Remote Desktop Mac
+- **Subtitle (en-US):** Control your Mac from iPhone
 - **Primary category:** Utilities
 - **Secondary category:** Productivity
 - **Download price:** Free
@@ -15,7 +15,17 @@
 - **Support URL:** `https://alexmorris10x.github.io/tailview/support.html`
 - **Privacy policy URL:** `https://alexmorris10x.github.io/tailview/privacy.html`
 - **Copyright:** 2026 Alex Morris
-- **Keywords:** `remote,desktop,mac,tailscale,screen,keyboard,mouse,audio,control,ipad`
+- **Keywords (en-US):** `vnc,screen,sharing,mouse,keyboard,trackpad,access,ipad,audio,tailnet,viewer,away,host,wireguard`
+
+### Spanish (Mexico) localization: second US keyword field
+
+Added 7 November 2026. The US App Store also indexes es-MX, so it carries its own name, subtitle and keywords; its promotional text, description and URLs are the same English text as en-US. Keep it when submitting.
+
+- **Name (es-MX):** TailView: Mac Remote Control
+- **Subtitle (es-MX):** Screen share your Mac anywhere
+- **Keywords (es-MX):** `rdp,macbook,imac,computer,pc,mirror,stream,connect,vpn,private,secure,phone,iphone,touch,desktop`
+
+Before 7 November the draft listing was "TailView – Remote Mac" / "Your Mac over Tailscale" with keywords `remote,desktop,mac,tailscale,screen,keyboard,mouse,audio,control,ipad`.
 
 ### Promotional text
 
@@ -65,7 +75,7 @@ https://alexmorris10x.github.io/tailview/
 
 Use Apple's permitted non-subscription trial model. Do not create an auto-renewable subscription, subscription introductory offer, server license key, or external checkout. The app must show trial duration, the functions that stop, and the local lifetime price before starting the trial. A restored trial keeps its original start date and does not restart. Configure availability and localizations for both products, attach their review screenshots, and include them with the first app submission.
 
-Family Sharing is not advertised in this launch draft. If enabled in App Store Connect, update the copy and test the resulting StoreKit ownership behavior before claiming it.
+Family Sharing is not advertised in this listing. If enabled in App Store Connect, update the copy and test the resulting StoreKit ownership behavior before claiming it.
 
 ## App privacy and permissions
 
@@ -73,30 +83,41 @@ The source currently sends session data between user-selected devices; it has no
 
 Screen, microphone, clipboard, paired-device records, and local diagnostics are explained in the public privacy policy. The privacy manifest and required-reason API declarations must match the shipped source. No sensitive screen or customer material belongs in screenshots or review attachments.
 
-## App Review notes and saved setup
+## App Review notes (as submitted 7 November 2026)
 
-TailView is a general remote-desktop client for a Mac owned or administered by the user. It mirrors the whole Mac desktop; the host application and processing remain on that Mac. The iOS client does not download or execute Mac applications. The separate free Mac host is distributed directly with Developer ID signing and notarization.
+Sign-in required: No. Contact: Alex Morris, the address in App Store Connect. The setup uses a reviewer-owned Mac; it gives no access to the developer's desktop or network.
 
-Tailscale must be installed and connected on both devices. TailView has no separate account login. Pairing authorizes a device through a temporary code and then uses a saved credential. Screen Recording and Accessibility consent are granted locally on the Mac; microphone permission on iOS is optional.
+```text
+TailView is a remote desktop client for a Mac owned or administered by the user. It mirrors the Mac's whole desktop; it does not download or execute Mac applications. It requires macOS 14+ and Tailscale on both devices. There is no TailView account or developer-hosted desktop.
 
-The iOS app is free to download. `com.10x.tailview.ios.trial7` is a free non-consumable named "7-day Trial"; it starts an explicit seven-day trial. `com.10x.tailview.ios.lifetime` is a paid non-consumable lifetime unlock. These are not subscriptions. The trial does not charge automatically. When it expires, remote viewing, control, and audio stop, while saved settings, setup help, purchase, and restore remain available. Please use the App Review purchase environment to test both products.
+REVIEW SETUP — USE A MAC YOU CONTROL
 
-Background audio is used for an ongoing user-started remote audio session, including microphone return if enabled. Lock-screen controls are optional session controls. The Mac companion includes advanced display-management controls; those Mac-only private system interfaces are not part of the iOS client.
+1. Download the free, Developer ID-signed and notarized Mac companion: https://github.com/alexmorris10x/tailview/releases/tag/v1.0.0-mac . Open the DMG, drag TailView Mac into Applications, and launch it.
+2. Install Tailscale on the Mac and review iPhone/iPad; connect both to your own Tailscale network. Permit the device to reach the Mac on TCP 47820 if your network has restrictive rules.
+3. Grant TailView Mac Screen Recording permission, reopen it if macOS requests, and choose Start sharing. Keep the Mac awake and signed in. Open a harmless TextEdit document for the interaction test.
+4. Choose Pair a new device on the Mac. In the iOS app, enter the Mac address and current code shown on the Mac, then choose Pair Mac. Codes are single-use and last five minutes; choose Pair a new device again for a fresh code. Pairing does not start the trial.
+5. Choose Start 7-day free trial and confirm the zero-price "7-day Trial" item in Apple's review purchase environment. It is a non-consumable and never renews or charges. "Lifetime Unlock" is a separate $9.99 US one-time non-consumable. Restore Purchases restores the original entitlement without restarting an expired trial. Trial expiry stops remote viewing/control/audio while preserving saved Macs, setup, purchases and restore.
+6. For keyboard/pointer control, enable remote-control consent in both apps and grant TailView Mac Accessibility permission. Type into the harmless document; viewing also works with control disabled.
+7. Test Mac audio with a harmless audio file. Optional microphone return requires the separately installed BlackHole 2ch driver, iOS microphone permission, and Mac audio routing or manual input selection. BlackHole is not bundled or required for viewing, remote input or Mac-to-device audio.
+8. Disconnect and reconnect using the saved Mac. Pause Access on the Mac disconnects viewers; Resume Access allows reconnection. Revoke removes a device's authorization and requires new pairing.
 
-The following reviewer-owned Mac setup was saved in App Store Connect on 2026-10-30. It does not provide access to the developer's desktop or network. The flow has not been independently exercised or accepted by App Review.
+Both products are intended to accompany this first app submission. Background audio supports ongoing user-started remote audio sessions. Optional lock-screen controls manage those sessions. Mac-only display-management interfaces are not included in the iOS client.
 
-1. Use a Mac running macOS 14 or later. Download the free, Developer ID-signed and notarized companion from [the Mac release](https://github.com/alexmorris10x/tailview/releases/tag/v1.0.0-mac), open its DMG, drag TailView Mac into Applications, and launch it.
-2. Install Tailscale on the Mac and review iPhone/iPad, and connect both to a network you control. Permit the review device to reach the Mac on TCP port 47820. There is no TailView login.
-3. Allow Screen Recording, reopen TailView Mac if macOS requests it, and choose **Start sharing**. Keep the Mac awake and signed in. Open a harmless TextEdit document for the interaction test.
-4. Choose **Pair a new device** on the Mac. Enter its displayed address and current code in the iOS app, then choose **Pair Mac**. Codes are single-use and expire after five minutes; generate another on the Mac when needed. Pairing does not start the trial.
-5. Choose **Start 7-day free trial** and confirm the free **7-day Trial** item in Apple's review purchase environment. It never renews or charges automatically. **Lifetime Unlock** is a separate one-time non-consumable, with a US base price of $9.99. **Restore Purchases** preserves the original entitlement and does not restart an expired trial.
-6. For keyboard and pointer control, enable remote-control consent in both apps and grant TailView Mac Accessibility permission. Type into the harmless document. Viewing works with control disabled.
-7. Test Mac audio with a harmless audio file. Optional microphone return additionally requires BlackHole 2ch, iOS microphone consent, and the Mac app's audio-routing option or manual input selection; it is not needed for viewing, remote input, or Mac-to-device audio.
-8. Disconnect and reconnect to the saved Mac. **Pause Access** disconnects all viewers, **Resume Access** permits saved-device connections, and **Revoke** requires fresh pairing.
+Full setup: https://alexmorris10x.github.io/tailview/setup.html . Both client and host are Apache 2.0 open source. Please use the submission contact if the Mac or network prerequisites prevent review.
+```
 
-[Full setup instructions](https://alexmorris10x.github.io/tailview/setup.html). If a prerequisite prevents review, use the contact listed in the submission. Never put real credentials, tailnet auth keys, or pairing secrets in this repository. A supporting recording does not replace functional review access.
+[Full setup instructions](https://alexmorris10x.github.io/tailview/setup.html). Never put real credentials, tailnet auth keys, or pairing secrets in this repository. A supporting recording does not replace functional review access.
 
-## Before Alex submits
+## Submission — 7 November 2026
+
+- First submission of iOS 1.0 (build `20261030110510`) with `com.10x.tailview.ios.trial7` (7-day Trial, $0 non-consumable) and `com.10x.tailview.ios.lifetime` (Lifetime Unlock, $9.99 US non-consumable).
+- Submitted 7 November 2026 at 18:54 Taipei (10:54 UTC): [App Review submission](https://appstoreconnect.apple.com/apps/6828728093/distribution/reviewsubmissions/details/2f7fc97c-89c6-45f7-9b00-ed81a07b582b) `2f7fc97c-89c6-45f7-9b00-ed81a07b582b`, three items, all Waiting for Review.
+- Same day: ASO listing change (en-US name, subtitle and keywords above, plus the new es-MX localization).
+- Release type: automatic after approval.
+
+Submission is not approval or public release.
+
+## Pre-submission checklist (kept for history; submitted 7 November 2026)
 
 1. Publish and open the marketing, privacy, and support URLs; replace the site's pending-download text only when each download is actually available.
 2. Make the notarized Mac host downloadable with a source tag and SHA-256 checksum.

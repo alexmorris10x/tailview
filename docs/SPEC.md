@@ -38,7 +38,7 @@ Use the explicit seven-day trial on a person's own Mac. Ask where setup first be
 
 ## 7. Platforms and infrastructure
 
-macOS 14+ host, iOS/iPadOS 17+ viewer, Tailscale on both, TCP 47820 bound to Tailscale IPv4. Optional BlackHole 2ch is installed separately. Source: `MacHost/`, `IOSViewer/`, `Shared/`, widgets/live controls. Direct Mac distribution uses Developer ID, hardened runtime, notarization, and a stapled DMG. iOS uses App Store Connect record `6828728093`; a record is not a submitted build. Website: `https://alexmorris10x.github.io/tailview/`.
+macOS 14+ host, iOS/iPadOS 17+ viewer, Tailscale on both, TCP 47820 bound to Tailscale IPv4. Optional BlackHole 2ch is installed separately. Source: `MacHost/`, `IOSViewer/`, `Shared/`, widgets/live controls. Direct Mac distribution uses Developer ID, hardened runtime, notarization, and a stapled DMG. iOS uses App Store Connect record `6828728093`; 1.0 (`20261030110510`) and both purchases were first submitted on 2026-11-07 and are waiting for review, with automatic release on approval. Listing (en-US and the es-MX second keyword field) and review notes: [app-store-metadata.md](release/app-store-metadata.md). Website: `https://alexmorris10x.github.io/tailview/`.
 
 ## 8. Brand and look
 
