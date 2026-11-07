@@ -100,7 +100,7 @@ final class HostModel: ObservableObject {
         guard !isPaused, !isSharing, !isStarting else { return }
         hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
         guard hasScreenRecordingPermission else {
-            status = "Allow Screen Recording in System Settings, then start sharing. macOS may ask you to reopen TailView."
+            status = "Allow Screen Recording in System Settings, then start sharing. macOS may ask you to reopen Mac Remote."
             return
         }
         launchGeneration &+= 1

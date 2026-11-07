@@ -7,7 +7,7 @@ struct TailViewMacApp: App {
     @StateObject private var host = HostModel()
 
     var body: some Scene {
-        WindowGroup("TailView", id: "main") {
+        WindowGroup("Mac Remote", id: "main") {
             ContentView()
                 .environmentObject(host)
                 .environmentObject(host.display)
@@ -15,7 +15,7 @@ struct TailViewMacApp: App {
         }
         .defaultSize(width: 680, height: 880)
 
-        MenuBarExtra("TailView", systemImage: "display") {
+        MenuBarExtra("Mac Remote", systemImage: "display") {
             TailViewMenu()
                 .environmentObject(host)
                 .environmentObject(host.display)
@@ -51,7 +51,7 @@ private struct TailViewMenu: View {
     @AppStorage(DockVisibility.key) private var showInDock = true
 
     private func showMainWindow() {
-        if let window = NSApplication.shared.windows.first(where: { $0.title == "TailView" }) {
+        if let window = NSApplication.shared.windows.first(where: { $0.title == "Mac Remote" }) {
             window.makeKeyAndOrderFront(nil)
         } else {
             openWindow(id: "main")
@@ -63,7 +63,7 @@ private struct TailViewMenu: View {
         Text(host.isPaused ? "Access paused" : host.status)
         Text(host.viewerStatus)
         Divider()
-        Button("Open TailView") { showMainWindow() }
+        Button("Open Mac Remote") { showMainWindow() }
         if host.isPaused {
             Button("Resume Access") { host.resumeAccess() }
         } else {
@@ -106,6 +106,6 @@ private struct TailViewMenu: View {
         Toggle("Show in Dock", isOn: $showInDock)
             .onChange(of: showInDock) { _, shown in DockVisibility.apply(shown) }
         Divider()
-        Button("Quit TailView") { NSApplication.shared.terminate(nil) }
+        Button("Quit Mac Remote") { NSApplication.shared.terminate(nil) }
     }
 }

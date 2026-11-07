@@ -1,4 +1,6 @@
-# TailView
+# Mac Remote (formerly TailView)
+
+The app is named **Mac Remote** from iOS 1.0.1 (App Store: "Mac Remote Desktop & Control"). The repo, bundle IDs, product IDs and code identifiers keep `tailview`.
 
 See and control your Mac from an iPhone or iPad over your own Tailscale network. The iOS app is a free download with an explicit seven-day trial, then a **$9.99 one-time permanent unlock** at the US launch price. Apple displays your local price before purchase. No subscription or automatic charge. The Mac companion is free, and both apps' original source is licensed under [Apache 2.0](LICENSE).
 
@@ -15,7 +17,7 @@ Requires macOS 14 or later, iOS / iPadOS 17 or later, and Tailscale connected on
 1. Install the free Mac companion in Applications. Open it, allow Screen Recording, and choose **Start sharing**. Sharing is off on a fresh installation and remembers your choice afterward.
 2. Choose **Pair a new device**. Enter the displayed address and temporary code on iOS and choose **Pair Mac**. A code lasts five minutes, closes after successful pairing, and can be closed manually. Pairing does not start the trial.
 3. Once setup is ready, choose **Start 7-day free trial** and confirm the free **7-day Trial** item in Apple's purchase sheet, or buy the permanent unlock. Restore Purchases recovers an existing entitlement; it never restarts an expired trial.
-4. For remote input, enable the control consent in both apps and grant TailView Mac Accessibility permission. Viewing remains available when control is disabled.
+4. For remote input, enable the control consent in both apps and grant Mac Remote Accessibility permission. Viewing remains available when control is disabled.
 5. Microphone return is off initially. Enable it and grant iOS Microphone permission only if you want to send your voice to the Mac.
 
 After the trial expires, screen viewing, control, and audio stop until you buy the permanent unlock. Saved Macs, setup, help, and purchase/restore remain available. The app loads both the free trial and local unlock price before allowing a new trial.
@@ -42,7 +44,7 @@ Up to two paired devices can view and control the same desktop. Their mouse and 
 
 **Mic** and **Speaker** mute the two directions independently. Only one viewer owns audio at a time; use **Audio device** in iOS Settings to move ownership. An orange Mic status means the microphone is not currently sending despite being enabled. Bring the app to the foreground and toggle Mic to retry after an interruption.
 
-Mac sound works without an extra driver. Sending the iOS microphone into a Mac app requires the separately installed [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole). TailView does not bundle it. The Mac's **Automatically route audio for the remote microphone** option is off initially. When enabled, it selects BlackHole as the default input and a physical playback output during the session, restoring the previous routes on disconnect, pause, quit, or disabling the option. A Mac app with its own input setting still needs BlackHole selected there.
+Mac sound works without an extra driver. Sending the iOS microphone into a Mac app requires the separately installed [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole). Mac Remote does not bundle it. The Mac's **Automatically route audio for the remote microphone** option is off initially. When enabled, it selects BlackHole as the default input and a physical playback output during the session, restoring the previous routes on disconnect, pause, quit, or disabling the option. A Mac app with its own input setting still needs BlackHole selected there.
 
 Home Screen and Lock Screen widgets open your saved Mac, keyboard, or settings; they are launchers, not live status displays. An active session can show a Live Activity with Mic, Sound, Fn, and Return controls. These controls can affect the Mac without unlocking the phone; turn them off in Settings if unwanted. Lock-screen Fn latches until tapped again, and Return is disabled while Fn is held.
 
@@ -52,7 +54,7 @@ An audio-owning viewer can continue its session in the background. A viewer with
 
 **Disconnect** ends one viewer's session. **Pause Access** on the Mac disconnects every viewer, stops capture and input, and persists until **Resume Access**. **Revoke** removes a device's permission. iOS **Forget** removes its local saved profile; revoke it on the Mac too when retiring the device. Pairing credentials are kept in the iOS Keychain; the Mac stores credential digests.
 
-The Mac's advanced display controls can darken its built-in display while continuing the remote session. Display disconnection requires another active display and initially restores itself after a countdown unless explicitly retained. Optional local-input blocking prevents physical keyboard/mouse input while blacked out; **there is no physical-keyboard escape**. Restore the display remotely or quit TailView normally; restarting the Mac is the recovery fallback.
+The Mac's advanced display controls can darken its built-in display while continuing the remote session. Display disconnection requires another active display and initially restores itself after a countdown unless explicitly retained. Optional local-input blocking prevents physical keyboard/mouse input while blacked out; **there is no physical-keyboard escape**. Restore the display remotely or quit Mac Remote normally; restarting the Mac is the recovery fallback.
 
 These controls use undocumented macOS interfaces and may need changes after OS updates. A darkened display is still an active desktop, not a locked Mac. They do not replace macOS security controls. Launch at Login is optional and off by default.
 
@@ -69,7 +71,7 @@ For the public Mac package, use `scripts/package-mac-release.sh` with Developer 
 
 ## Limits and verification
 
-TailView shares the main display as JPEG frames; it does not provide separate remote sessions, file transfer, or multi-monitor selection. It supports text clipboard paste. Image quality, latency, background operation, and audio continuity depend on the network and OS. The host binds to its Tailscale IPv4 address and relies on Tailscale transport encryption, which can use direct or encrypted relay paths. Open source is not a security-audit claim.
+Mac Remote shares the main display as JPEG frames; it does not provide separate remote sessions, file transfer, or multi-monitor selection. It supports text clipboard paste. Image quality, latency, background operation, and audio continuity depend on the network and OS. The host binds to its Tailscale IPv4 address and relies on Tailscale transport encryption, which can use direct or encrypted relay paths. Open source is not a security-audit claim.
 
 The launch change's pure trial, consent, transport, and audio tests passed. Five local StoreKit scenarios passed on a physical iPhone, including trial restoration with its original deadline, lifetime purchase/restoration/refund, pending approval, cancellation, and catalog failure. Declined-approval retry remains unresolved in the local test service; Apple sandbox/TestFlight, actual reinstall, and active-session expiry remain unverified. The current release gates are in [TODO](docs/TODO.md).
 

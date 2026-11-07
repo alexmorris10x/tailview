@@ -10,7 +10,7 @@ esac
 case "${TARGET_NAME:-}" in
   TailViewIOS)
     expected_bundle='com.10x.tailview.ios'
-    expected_name='TailView'
+    expected_name='Mac Remote'
     if [ "$dev" = true ]; then
       expected_bundle='com.10x.tailview.ios.dev'
       expected_name='TailView Dev'
@@ -18,7 +18,7 @@ case "${TARGET_NAME:-}" in
     ;;
   TailViewLiveActivity)
     expected_bundle='com.10x.tailview.ios.LiveActivity'
-    expected_name='TailView Controls'
+    expected_name='Mac Remote Controls'
     if [ "$dev" = true ]; then
       expected_bundle='com.10x.tailview.ios.dev.LiveActivity'
       expected_name='TailView Controls Dev'

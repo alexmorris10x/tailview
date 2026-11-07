@@ -26,6 +26,7 @@
 		45D75DC6E5ED31A1D5AA4A9D /* FunctionKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0783290D5A919CD6310B9B9 /* FunctionKeys.swift */; };
 		48E9D18EFF50F2B35287C264 /* ViewerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D10F8991B1089241B3E66D5 /* ViewerModel.swift */; };
 		4A708A74133A3026F89ED8B4 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E90C7F0AF464E7238A871F0 /* ContentView.swift */; };
+		4AFEEBB5C6CF4EFA5C156872 /* AppStoreScreenshotUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF7449080E42AE452CBCFC98 /* AppStoreScreenshotUITests.swift */; };
 		4B9B3C7E8AC36309AAAECCCE /* PurchaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42475CE75B415174074EDFC6 /* PurchaseView.swift */; };
 		4BEEE2D8132A535FEEB1A2A6 /* AACAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83258A2DBDE9FA8B8DB64B7E /* AACAudio.swift */; };
 		4CB79A26FA3BA693C2D48847 /* WindowArranger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C1677B424CBD84C8CA05935 /* WindowArranger.swift */; };
@@ -77,9 +78,17 @@
 		F8384FF611B9B4258C0D30B3 /* PairingRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */; };
 		F97B9CB834975C3E4D3C9C5A /* LiveControlsRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1D1701DA2C31DD38A865177 /* LiveControlsRules.swift */; };
 		FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */; };
+		FB1DB0D217786EBFFD2578D8 /* ReviewPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BAF927D435C95C7420676EF /* ReviewPrompt.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		515F20AA43DCEEDE56F08388 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 03C2B9C994EFE2102BCB5882 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 750556B4F082C572763AD138;
+			remoteInfo = TailViewIOS;
+		};
 		51BBCB614DAE0B8CBDAABE7F /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 03C2B9C994EFE2102BCB5882 /* Project object */;
@@ -111,6 +120,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0032B5D9347A208B3846F4D4 /* TailViewScreenshotUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TailViewScreenshotUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		004D45BFCF918F6B9E149628 /* PurchaseAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseAccess.swift; sourceTree = "<group>"; };
 		0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierSelection.swift; sourceTree = "<group>"; };
 		0B0C94E51C0739995CBF94FF /* PendingTaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTaps.swift; sourceTree = "<group>"; };
@@ -124,6 +134,7 @@
 		2BFE4F929EF4F5F0BB50F449 /* ViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerView.swift; sourceTree = "<group>"; };
 		2ED200EAE69D0972F6653D93 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3B940A798C5AEA4CF82B52E7 /* ReconnectBackoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconnectBackoff.swift; sourceTree = "<group>"; };
+		3BAF927D435C95C7420676EF /* ReviewPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewPrompt.swift; sourceTree = "<group>"; };
 		3D10F8991B1089241B3E66D5 /* ViewerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerModel.swift; sourceTree = "<group>"; };
 		42475CE75B415174074EDFC6 /* PurchaseView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseView.swift; sourceTree = "<group>"; };
 		468BF6DAD44F724F6E03ADA8 /* TrialAccessRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrialAccessRules.swift; sourceTree = "<group>"; };
@@ -163,6 +174,7 @@
 		C84D54F79A82CF02DA3433FB /* LiveControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveControls.swift; sourceTree = "<group>"; };
 		C99A7AA4200C44580AD9C115 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		CDBB249A7E3567DE54FF89EE /* TailView.storekit */ = {isa = PBXFileReference; path = TailView.storekit; sourceTree = "<group>"; };
+		CF7449080E42AE452CBCFC98 /* AppStoreScreenshotUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStoreScreenshotUITests.swift; sourceTree = "<group>"; };
 		E2D97DBBE8AB9A645D9602B8 /* PairingRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRequest.swift; sourceTree = "<group>"; };
 		E5A80FDF0A7FD3053DAFD449 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TailViewLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -243,6 +255,14 @@
 			path = WidgetSupport;
 			sourceTree = "<group>";
 		};
+		5E9C028C503372CDD265887C /* ScreenshotUITests */ = {
+			isa = PBXGroup;
+			children = (
+				CF7449080E42AE452CBCFC98 /* AppStoreScreenshotUITests.swift */,
+			);
+			path = ScreenshotUITests;
+			sourceTree = "<group>";
+		};
 		77A8FEB6220A7E844073C981 /* MacHost */ = {
 			isa = PBXGroup;
 			children = (
@@ -292,6 +312,7 @@
 				E68DC39F2390ED158C92EF7C /* TailViewLiveActivity.appex */,
 				4999CF6A69B090B64F97C774 /* TailViewMac.app */,
 				81AA9E3D518242D443BDABB7 /* TailViewPurchaseTests.xctest */,
+				0032B5D9347A208B3846F4D4 /* TailViewScreenshotUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -311,6 +332,7 @@
 				42475CE75B415174074EDFC6 /* PurchaseView.swift */,
 				747BD171E0E1673A07044075 /* RemoteKeyboardInput.swift */,
 				FD96AC2584E1E2B1D6A2B1D1 /* RemoteScreenView.swift */,
+				3BAF927D435C95C7420676EF /* ReviewPrompt.swift */,
 				FF5F28AE665343293EA19C0A /* SavedMacStore.swift */,
 				5FC72E3CEAFE00428712B1B4 /* TailViewIOSApp.swift */,
 				3D10F8991B1089241B3E66D5 /* ViewerModel.swift */,
@@ -328,6 +350,7 @@
 				060BA4452FF12CA95F178CDD /* LiveControls */,
 				77A8FEB6220A7E844073C981 /* MacHost */,
 				34EE8096B4ADEAAFAC2F8673 /* PurchaseTests */,
+				5E9C028C503372CDD265887C /* ScreenshotUITests */,
 				8C10591072A0B1C8A842CE2C /* Shared */,
 				591647ACF9A907BCAB6C2965 /* WidgetSupport */,
 				1987EBF894B1FA99CAEE5B70 /* Frameworks */,
@@ -338,6 +361,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		32869DB4CFF2DF0861CD007A /* TailViewScreenshotUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70F53385DD6E081B7FCC3735 /* Build configuration list for PBXNativeTarget "TailViewScreenshotUITests" */;
+			buildPhases = (
+				DE083CF674D452AE398A0778 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0CBD3ABA65ADC73B0E3D3E72 /* PBXTargetDependency */,
+			);
+			name = TailViewScreenshotUITests;
+			packageProductDependencies = (
+			);
+			productName = TailViewScreenshotUITests;
+			productReference = 0032B5D9347A208B3846F4D4 /* TailViewScreenshotUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		3368BAAAE4FFA486E1010BFF /* TailViewLiveActivity */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = AAD37363B33DB79EAED17927 /* Build configuration list for PBXNativeTarget "TailViewLiveActivity" */;
@@ -425,6 +466,11 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					32869DB4CFF2DF0861CD007A = {
+						DevelopmentTeam = 98CDQPW36W;
+						ProvisioningStyle = Automatic;
+						TestTargetID = 750556B4F082C572763AD138;
+					};
 					3368BAAAE4FFA486E1010BFF = {
 						DevelopmentTeam = 98CDQPW36W;
 						ProvisioningStyle = Automatic;
@@ -461,6 +507,7 @@
 				750556B4F082C572763AD138 /* TailViewIOS */,
 				3368BAAAE4FFA486E1010BFF /* TailViewLiveActivity */,
 				6C1CCC90EB33DE0113597AE1 /* TailViewPurchaseTests */,
+				32869DB4CFF2DF0861CD007A /* TailViewScreenshotUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -589,6 +636,7 @@
 				FB1112CCBD806273A25CF8FB /* ReconnectBackoff.swift in Sources */,
 				E40951D896AA582A8BB1F112 /* RemoteKeyboardInput.swift in Sources */,
 				C0D503039AE5E3DA72B910A3 /* RemoteScreenView.swift in Sources */,
+				FB1DB0D217786EBFFD2578D8 /* ReviewPrompt.swift in Sources */,
 				7AD159DA59D7E375CCD64949 /* SavedMacStore.swift in Sources */,
 				DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */,
 				C461986DE08621BD81B5EC3D /* StreamAccessGate.swift in Sources */,
@@ -636,9 +684,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DE083CF674D452AE398A0778 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4AFEEBB5C6CF4EFA5C156872 /* AppStoreScreenshotUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		0CBD3ABA65ADC73B0E3D3E72 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 750556B4F082C572763AD138 /* TailViewIOS */;
+			targetProxy = 515F20AA43DCEEDE56F08388 /* PBXContainerItemProxy */;
+		};
 		318BD4D79598660BF9A71A68 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 750556B4F082C572763AD138 /* TailViewIOS */;
@@ -678,14 +739,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 64;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev;
 				SDKROOT = iphoneos;
 				TAILVIEW_URL_SCHEME = "tailview-dev";
@@ -696,9 +757,9 @@
 		38596A7F17A355D3697A5510 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APP_DISPLAY_NAME = "TailView Controls";
+				APP_DISPLAY_NAME = "Mac Remote Controls";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 64;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -706,7 +767,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.LiveActivity;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -739,7 +800,7 @@
 			buildSettings = {
 				APP_DISPLAY_NAME = "TailView Controls Dev";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 64;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -747,7 +808,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios.dev.LiveActivity;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -776,7 +837,7 @@
 		A9ADA630A9074E3749160792 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APP_DISPLAY_NAME = "TailView Mac";
+				APP_DISPLAY_NAME = "Mac Remote";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -910,14 +971,52 @@
 			};
 			name = Release;
 		};
+		C03A82B31D69584CC2078351 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.screenshots.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TailViewIOS;
+			};
+			name = Debug;
+		};
+		DE42992969B923184E42889B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.screenshots.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = TailViewIOS;
+			};
+			name = Release;
+		};
 		EDBF310758BF2DF5484324BB /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				APP_DISPLAY_NAME = TailView;
+				APP_DISPLAY_NAME = "Mac Remote";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 63;
+				CURRENT_PROJECT_VERSION = 64;
 				EXCLUDED_SOURCE_FILE_NAMES = DevAssets.xcassets;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -925,7 +1024,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.10x.tailview.ios;
 				SDKROOT = iphoneos;
 				TAILVIEW_URL_SCHEME = tailview;
@@ -950,6 +1049,15 @@
 			buildConfigurations = (
 				8AB1E8BEF0424A12B7C9014E /* Debug */,
 				057AE80D6FC2D9D659992B82 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		70F53385DD6E081B7FCC3735 /* Build configuration list for PBXNativeTarget "TailViewScreenshotUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C03A82B31D69584CC2078351 /* Debug */,
+				DE42992969B923184E42889B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -15,7 +15,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.mac
         PRODUCT_MODULE_NAME: TailViewMac
-        APP_DISPLAY_NAME: TailView Mac
+        APP_DISPLAY_NAME: Mac Remote
         INFOPLIST_FILE: MacHost/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
@@ -38,9 +38,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: 63
-        APP_DISPLAY_NAME: TailView
+        MARKETING_VERSION: "1.0.1"
+        CURRENT_PROJECT_VERSION: 64
+        APP_DISPLAY_NAME: Mac Remote
         TAILVIEW_URL_SCHEME: tailview
         INFOPLIST_FILE: IOSViewer/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
@@ -68,9 +68,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios.LiveActivity
-        MARKETING_VERSION: "1.0"
-        CURRENT_PROJECT_VERSION: 63
-        APP_DISPLAY_NAME: TailView Controls
+        MARKETING_VERSION: "1.0.1"
+        CURRENT_PROJECT_VERSION: 64
+        APP_DISPLAY_NAME: Mac Remote Controls
         INFOPLIST_FILE: LiveActivity/Info.plist
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -100,7 +100,33 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.purchases.tests
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_STYLE: Automatic
+  TailViewScreenshotUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources: [ScreenshotUITests]
+    dependencies:
+      - target: TailViewIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.screenshots.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
 schemes:
+  # App Store screenshots: see docs/app-store/screenshots/2026-11-07/README.md.
+  # Its tests inherit the Run action's local StoreKit file for the access screen.
+  TailViewScreenshots:
+    build:
+      targets:
+        TailViewIOS: all
+        TailViewScreenshotUITests: [test]
+    run:
+      config: Debug
+      storeKitConfiguration: TailView.storekit
+    test:
+      config: Debug
+      targets:
+        - name: TailViewScreenshotUITests
   TailViewIOS:
     build:
       targets:

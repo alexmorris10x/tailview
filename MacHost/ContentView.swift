@@ -23,7 +23,7 @@ struct ContentView: View {
                 Image(systemName: "display")
                     .font(.largeTitle)
                 VStack(alignment: .leading) {
-                    Text("TailView")
+                    Text("Mac Remote")
                         .font(.largeTitle.bold())
                     Text(host.isPaused
                          ? "Access is paused. Resume Access to connect from a paired device."
@@ -44,7 +44,7 @@ struct ContentView: View {
             LabeledContent("Remote control", value: host.isControlEnabled ? "Allowed" : host.controlStatus)
 
             if host.isSharing {
-                GroupBox("Connect from TailView on iPhone or iPad") {
+                GroupBox("Connect from Mac Remote on iPhone or iPad") {
                     VStack(alignment: .leading, spacing: 8) {
                         LabeledContent("Mac address", value: host.address)
                         LabeledContent("Port", value: "47820")
@@ -62,7 +62,7 @@ struct ContentView: View {
                     } else {
                         Button("Pair a new device") { host.enablePairing() }
                     }
-                    Text(host.isPairingOpen ? "Enter this code once on your new device." : "Trusted devices connect automatically when TailView opens.")
+                    Text(host.isPairingOpen ? "Enter this code once on your new device." : "Trusted devices connect automatically when Mac Remote opens.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -72,7 +72,7 @@ struct ContentView: View {
 
             GroupBox("Paired devices") {
                 if host.pairedDevices.isEmpty {
-                    Text("Start sharing, choose Pair a new device, then enter the Mac address and pairing code in TailView on your iPhone or iPad.")
+                    Text("Start sharing, choose Pair a new device, then enter the Mac address and pairing code in Mac Remote on your iPhone or iPad.")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
@@ -114,8 +114,8 @@ struct ContentView: View {
                 Label("2. Allow Screen Recording", systemImage: host.hasScreenRecordingPermission ? "checkmark.circle.fill" : "display")
                     .font(.headline)
                 Text(host.hasScreenRecordingPermission
-                     ? "Allowed. TailView captures your main display and Mac sound only while you are sharing."
-                     : "Screen Recording lets your paired devices see your main display and hear Mac sound. Allow TailView Mac in System Settings; macOS may ask you to reopen the app.")
+                     ? "Allowed. Mac Remote captures your main display and Mac sound only while you are sharing."
+                     : "Screen Recording lets your paired devices see your main display and hear Mac sound. Allow Mac Remote in System Settings; macOS may ask you to reopen the app.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -125,7 +125,7 @@ struct ContentView: View {
                 Divider()
                 Label("3. Start sharing and pair your device", systemImage: host.isSharing ? "checkmark.circle.fill" : "iphone.and.arrow.forward")
                     .font(.headline)
-                Text("Start sharing enables access while TailView runs. Your choice is remembered when the app reopens. Pause Access disconnects all viewers and keeps sharing off until you resume it.")
+                Text("Start sharing enables access while Mac Remote runs. Your choice is remembered when the app reopens. Pause Access disconnects all viewers and keeps sharing off until you resume it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -160,7 +160,7 @@ struct ContentView: View {
                     get: { host.automaticAudioRouting },
                     set: { host.setAutomaticAudioRouting($0) }
                 ))
-                Text("While a paired viewer is connected, sends its microphone through BlackHole 2ch, selects BlackHole as the Mac’s default input, and keeps output on speakers or headphones to avoid feedback. TailView restores your previous input and output when you disconnect, pause, quit, or turn this off.")
+                Text("While a paired viewer is connected, sends its microphone through BlackHole 2ch, selects BlackHole as the Mac’s default input, and keeps output on speakers or headphones to avoid feedback. Mac Remote restores your previous input and output when you disconnect, pause, quit, or turn this off.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -204,7 +204,7 @@ private struct DisplayPrivacySection: View {
     var body: some View {
         GroupBox("Display privacy") {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Keep this Mac’s built-in screen dark during a remote session without sleeping or locking it. TailView keeps sharing the screen while the backlight is off.")
+                Text("Keep this Mac’s built-in screen dark during a remote session without sleeping or locking it. Mac Remote keeps sharing the screen while the backlight is off.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -228,7 +228,7 @@ private struct DisplayPrivacySection: View {
                     get: { display.blocksLocalInputWhenBlackedOut },
                     set: { display.setBlocksLocalInputWhenBlackedOut($0) }
                 ))
-                Text("Physical keyboard, brightness keys, mouse, and trackpad stop working; TailView remote control keeps working. Restoring the backlight releases local input. There is no physical keyboard escape.")
+                Text("Physical keyboard, brightness keys, mouse, and trackpad stop working; remote control from your iPhone or iPad keeps working. Restoring the backlight releases local input. There is no physical keyboard escape.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -243,7 +243,7 @@ private struct DisplayPrivacySection: View {
                                      set: { _ in display.toggleLaunchAtLogin() }))
                 Toggle("Show in Dock", isOn: $showInDock)
                     .onChange(of: showInDock) { _, shown in DockVisibility.apply(shown) }
-                Text("When hidden, open TailView from its menu bar item.")
+                Text("When hidden, open Mac Remote from its menu bar item.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

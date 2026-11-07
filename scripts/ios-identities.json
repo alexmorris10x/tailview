@@ -3,12 +3,12 @@
     "TailViewIOS",
     "IOSViewer/Info.plist",
     "com.10x.tailview.ios",
-    "TailView"
+    "Mac Remote"
   ],
   [
     "TailViewLiveActivity",
     "LiveActivity/Info.plist",
     "com.10x.tailview.ios.LiveActivity",
-    "TailView Controls"
+    "Mac Remote Controls"
   ]
 ]

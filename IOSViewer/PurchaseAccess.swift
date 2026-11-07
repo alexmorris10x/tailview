@@ -36,10 +36,10 @@ final class PurchaseAccess: ObservableObject {
     var statusTitle: String {
         switch state {
         case .loading: return "Checking purchases"
-        case .trialAvailable: return "Try TailView free for 7 days"
+        case .trialAvailable: return "Try Mac Remote free for 7 days"
         case .trialActive: return "Your 7-day trial is active"
         case .trialExpired: return "Your free trial has ended"
-        case .lifetime: return "TailView is unlocked"
+        case .lifetime: return "Mac Remote is unlocked"
         case .revoked: return "Purchase access is unavailable"
         case .verificationFailed: return "Purchase could not be verified"
         case .developer: return "Developer access"
@@ -59,9 +59,9 @@ final class PurchaseAccess: ObservableObject {
         case .lifetime:
             return "Screen viewing, control, and audio are permanently unlocked for this Apple Account."
         case .revoked:
-            return "The App Store no longer reports an active purchase. Restore purchases or unlock TailView to continue."
+            return "The App Store no longer reports an active purchase. Restore purchases or unlock Mac Remote to continue."
         case .verificationFailed:
-            return "TailView could not verify your App Store transaction. Connect to the internet and restore purchases."
+            return "Mac Remote could not verify your App Store transaction. Connect to the internet and restore purchases."
         case .developer:
             return "This development build has full access. App Store builds require a trial or a purchase."
         }
@@ -229,7 +229,7 @@ final class PurchaseAccess: ObservableObject {
                     }
                     applyVerifiedTransaction(transaction)
                     await transaction.finish()
-                    if streamAllowed { showMessage(product.id == TrialAccessRules.trialProductID ? "Your seven-day trial has started. No automatic charge." : "TailView is permanently unlocked.") }
+                    if streamAllowed { showMessage(product.id == TrialAccessRules.trialProductID ? "Your seven-day trial has started. No automatic charge." : "Mac Remote is permanently unlocked.") }
                     else { showMessage("Purchase received, but no active access was found. Try Restore Purchases.", error: true) }
                 case .unverified:
                     showMessage("Your purchase could not be verified. Try Restore Purchases. You do not need to buy it again.", error: true)

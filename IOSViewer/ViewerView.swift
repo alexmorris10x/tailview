@@ -1,9 +1,11 @@
 import Combine
 import AVKit
+import StoreKit
 import SwiftUI
 
 struct ViewerView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.requestReview) private var requestReview
     @AppStorage("macAddress") private var macAddress = ""
     @AppStorage("preferredMacID") private var preferredMacID = ""
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
@@ -35,6 +37,8 @@ struct ViewerView: View {
     @State private var screenOffset = CGSize.zero
     @State private var modifierSelection = ModifierSelection()
     @State private var notice: String?
+    /// When the current session began; kept across automatic reconnects.
+    @State private var sessionStartedAt: Date?
     @State private var noticeGeneration = 0
     @StateObject private var viewer = ViewerModel()
     @StateObject private var access = PurchaseAccess.shared
@@ -71,7 +75,7 @@ struct ViewerView: View {
                     controlBar
                 }
             }
-            .navigationTitle("TailView")
+            .navigationTitle("Mac Remote")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -105,7 +109,7 @@ struct ViewerView: View {
                 }
             } message: {
                 Text(remoteControlConsent
-                     ? "On your Mac, open TailView, enable remote control, and allow Accessibility in System Settings. The keyboard will open when control is available."
+                     ? "On your Mac, open Mac Remote, enable remote control, and allow Accessibility in System Settings. The keyboard will open when control is available."
                      : "Allow this device to send typing and pointer actions to your paired Mac. Your Mac must also enable remote control and allow Accessibility. You can turn this off in Settings.")
             }
         }
@@ -142,6 +146,7 @@ struct ViewerView: View {
         }
         .onChange(of: viewer.isConnected) { _, connected in
             if connected {
+                if sessionStartedAt == nil { sessionStartedAt = Date() }
                 microphoneSessionEnabled = viewer.microphoneWanted
                 macAudioSessionEnabled = viewer.macAudioWanted
                 showPairing = false
@@ -151,6 +156,10 @@ struct ViewerView: View {
                 // fresh pairing replaces an older, possibly revoked, profile.
                 if let id = viewer.connectedMacID { preferredMacID = id.uuidString }
             } else {
+                if !viewer.isReconnecting, let started = sessionStartedAt {
+                    sessionStartedAt = nil
+                    askForReviewIfDue(sessionLength: Date().timeIntervalSince(started))
+                }
                 releaseFunctionKey()
                 modifierSelection.reset()
                 closeKeyboard()
@@ -260,6 +269,16 @@ struct ViewerView: View {
         }
     }
 
+    /// A rating request after a session that genuinely worked, never over the
+    /// purchase screens or when access has run out.
+    private func askForReviewIfDue(sessionLength: TimeInterval) {
+        guard ReviewPrompt.sessionEnded(lasting: sessionLength),
+              scenePhase == .active, access.streamAllowed,
+              !showPurchase, !showSettings else { return }
+        ReviewPrompt.markAsked()
+        requestReview()
+    }
+
     private func updateAccess() {
         viewer.setStreamingAccess(allowed: access.streamAllowed, expiresAt: access.expirationDate)
     }
@@ -339,12 +358,12 @@ struct ViewerView: View {
         VStack(alignment: .leading, spacing: 16) {
             Label("1. Connect both devices to Tailscale", systemImage: "network")
                 .font(.headline)
-            Text("Sign in to the same Tailscale network on this device and your Mac. TailView only connects through that private network.")
+            Text("Sign in to the same Tailscale network on this device and your Mac. Mac Remote only connects through that private network.")
                 .font(.subheadline).foregroundStyle(.secondary)
             Link("Get Tailscale", destination: URL(string: "https://tailscale.com/download")!)
             Label("2. Set up the free Mac companion", systemImage: "desktopcomputer")
                 .font(.headline)
-            Text("On your Mac, open TailView, enable sharing, and allow Screen Recording. Enable remote control and microphone routing only if you want them.")
+            Text("On your Mac, open Mac Remote, enable sharing, and allow Screen Recording. Enable remote control and microphone routing only if you want them.")
                 .font(.subheadline).foregroundStyle(.secondary)
             Link("Mac download and setup", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
             Label("3. Pair before you start your trial", systemImage: "link")
@@ -507,7 +526,7 @@ struct ViewerView: View {
         guard viewer.isControlAllowed else { return true }
         guard viewer.macAcceptsPaste else {
             if fromKeyboard { return false }
-            showNotice("Update TailView on the Mac to paste")
+            showNotice("Update Mac Remote on the Mac to paste")
             return true
         }
         let pasteboard = UIPasteboard.general
@@ -654,7 +673,7 @@ struct ViewerView: View {
     private var settingsView: some View {
         NavigationStack {
             Form {
-                Section("TailView access") {
+                Section("Mac Remote access") {
                     Text(access.statusTitle)
                     Text(access.statusDetail).font(.caption).foregroundStyle(.secondary)
                     NavigationLink("Trial, purchase and restore") {
@@ -703,7 +722,7 @@ struct ViewerView: View {
                 }
                 Section("Lock screen") {
                     Toggle("Show lock screen controls", isOn: $lockScreenControls)
-                    Text("Controls remain available while intentional audio is running. Muting stops that audio direction. If both are off, iOS may suspend the connection; open TailView to reconnect or turn audio back on.")
+                    Text("Controls remain available while intentional audio is running. Muting stops that audio direction. If both are off, iOS may suspend the connection; open Mac Remote to reconnect or turn audio back on.")
                 }
                 Section("Remote control") {
                     Toggle("Enable keyboard and pointer control", isOn: $remoteControlConsent)
@@ -739,7 +758,7 @@ struct ViewerView: View {
                     Link("Setup and troubleshooting", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
                     Link("Privacy", destination: URL(string: "https://alexmorris10x.github.io/tailview/privacy.html")!)
                     Link("Support", destination: URL(string: "https://alexmorris10x.github.io/tailview/support.html")!)
-                    Text("TailView \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
+                    Text("Mac Remote \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 #if DEBUG

@@ -74,7 +74,7 @@ final class DisplayControlModel: ObservableObject {
         guard physicalDisplayController.canSafelyDisconnect else {
             showError(
                 title: "Another display required",
-                message: "Connect and use another display, such as an external monitor or a virtual display, first. TailView will not disconnect the Mac’s only active display."
+                message: "Connect and use another display, such as an external monitor or a virtual display, first. Mac Remote will not disconnect the Mac’s only active display."
             )
             return
         }
@@ -83,7 +83,7 @@ final class DisplayControlModel: ObservableObject {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Disconnect the built-in display?"
-        alert.informativeText = "This uses an undocumented macOS interface. TailView will share the remaining main display instead. The built-in display will reconnect automatically after 15 seconds unless you choose Keep Disconnected. A Mac restart is the emergency fallback."
+        alert.informativeText = "This uses an undocumented macOS interface. Mac Remote will share the remaining main display instead. The built-in display will reconnect automatically after 15 seconds unless you choose Keep Disconnected. A Mac restart is the emergency fallback."
         alert.addButton(withTitle: "Disconnect for 15 Seconds")
         alert.addButton(withTitle: "Cancel")
         guard alert.runModal() == .alertFirstButtonReturn else { return }

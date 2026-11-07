@@ -2,7 +2,59 @@
 
 **Status (2026-11-07):** Version 1.0 (build `20261030110510`) and both in-app purchases were first submitted to App Review on 7 November 2026 and are **Waiting for Review**, with **automatic release after approval**. This page is the listing as it stands in App Store Connect (read through the API on 7 November 2026); a later submission driven from the repo must start from these values. Actual reinstall/restore, declined Ask to Buy retry, and full setup with the distributed Mac app were still open at submission; see [the remaining work](../TODO.md).
 
-## Listing
+## Next version: 1.0.1 as Mac Remote (decided 7 November 2026)
+
+Not yet in App Store Connect. The app is renamed for search; bundle IDs, product IDs, keychain items and the repo name stay `tailview`, so pairings and purchases carry over. Enter these values when the 1.0.1 version is created; until then the 1.0 listing below is what App Store Connect holds.
+
+- **Name (en-US):** Mac Remote Desktop & Control
+- **Subtitle (en-US):** Control your Mac from iPhone
+- **Home-screen name:** Mac Remote (Release `CFBundleDisplayName`; the Debug build stays TailView Dev). The free Mac companion is also called Mac Remote; its 1.0 download still installs as TailView Mac until its next release.
+- **Keywords (en-US):** unchanged, `vnc,screen,sharing,mouse,keyboard,trackpad,access,ipad,audio,tailnet,viewer,away,host,wireguard`
+- **es-MX:** keep the 1.0 values below unless they are revisited.
+- Tailscale appears only as "works with Tailscale" in descriptive text, never in the name.
+- **Screenshots:** the 2026-11-07 set in [`docs/app-store/screenshots/2026-11-07/`](../app-store/screenshots/2026-11-07/README.md).
+- **What's New:** "TailView is now Mac Remote. Same app, same pairing and purchases, with a new name."
+
+### Promotional text (1.0.1)
+
+Your Mac, within reach. View its screen, type, click, and listen from your iPhone or iPad. Works with Tailscale. Try 7 days free, then unlock once. No subscription.
+
+### Description (1.0.1)
+
+Keep your Mac within reach from your iPhone or iPad.
+
+Mac Remote lets you see and control your Mac's whole desktop from your iPhone or iPad, privately over your own network. It works with Tailscale. Check a running app, type into a document, or pick up where you left off.
+
+YOUR MAC, ON YOUR DEVICE
+
+• View the Mac's main display, pinch to zoom, and pan around your desktop.
+• Click, drag, scroll, type, and send text from your device's clipboard.
+• Use modifier keys, keyboard shortcuts, and window controls.
+• Listen to Mac app and media audio.
+• Optionally send your iPhone or iPad microphone to a Mac app with the separately installed BlackHole 2ch driver.
+• Connect up to two paired devices, with one device handling audio at a time.
+
+PAIR ONCE, STAY IN CONTROL
+
+Use a temporary code to pair a trusted device. Saved devices can reconnect while the Mac Remote companion is running on your Mac. Pause Access disconnects all viewers immediately; Revoke removes a device's permission. Optional widgets and lock-screen controls make returning to a session easier.
+
+TRY FREE, UNLOCK ONCE
+
+Start the 7-day Trial with a free in-app purchase. After seven days, remote viewing, control, and audio require the one-time Lifetime Unlock. Saved Macs and settings remain. The trial does not renew, there is no automatic charge, and there is nothing to cancel. Apple shows your local unlock price before purchase. Restore Purchases restores access for the purchasing Apple Account.
+
+WHAT YOU NEED
+
+• A Mac with macOS 14 or later, awake and signed in, running the free Mac Remote companion app.
+• Works with Tailscale: install it and connect your Mac and mobile device, with network rules permitting the connection. Tailscale is a separate service with its own plans and terms.
+• Screen Recording permission on the Mac; Accessibility permission for remote input.
+• Microphone permission only if you choose microphone return.
+
+Mac Remote does not create an account or run a hosted remote desktop. Screen, audio, and control travel directly between your devices over your own network, which may use direct or encrypted relay connections. Both apps are open source under Apache 2.0.
+
+Setup, the free Mac download, privacy, and support:
+https://alexmorris10x.github.io/tailview/
+
+## Listing (1.0, as submitted)
 
 - **Name (en-US):** TailView: Remote Desktop Mac
 - **Subtitle (en-US):** Control your Mac from iPhone

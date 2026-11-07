@@ -46,7 +46,7 @@ struct PurchaseView: View {
                     } header: {
                         Text("Full access includes")
                     } footer: {
-                        Text("Requires your Mac, the free TailView Mac companion, and Tailscale on both devices. Finish setup and pair your Mac before starting the trial.")
+                        Text("Requires your Mac running the free Mac Remote companion app, and Tailscale on both devices. Finish setup and pair your Mac before starting the trial.")
                     }
 
                     if access.state == .trialAvailable {
@@ -78,7 +78,7 @@ struct PurchaseView: View {
                         .disabled(access.lifetimeProduct == nil || access.purchaseInProgress || access.state == .loading)
                         .accessibilityIdentifier("tailview.purchase.lifetime")
                     } header: {
-                        Text("Keep TailView")
+                        Text("Keep Mac Remote")
                     } footer: {
                         Text("One payment permanently unlocks screen viewing, control, and audio on your iPhone and iPad using the same Apple Account. No recurring fee. The Mac companion is free.")
                     }
@@ -110,7 +110,7 @@ struct PurchaseView: View {
                     Text("Restore with the Apple Account used for the original purchase. A restored trial keeps its original end date.")
                 }
             }
-            .navigationTitle("TailView Access")
+            .navigationTitle("Mac Remote Access")
             .navigationBarTitleDisplayMode(.inline)
     }
 

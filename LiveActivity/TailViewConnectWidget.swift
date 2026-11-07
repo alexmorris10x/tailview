@@ -30,7 +30,7 @@ struct TailViewConnectWidget: Widget {
                 .widgetURL(WidgetRoute.connect.url)
         }
         .configurationDisplayName("Connect to Mac")
-        .description("Open your saved Mac in TailView. Add keyboard and settings shortcuts with the medium widget.")
+        .description("Open your saved Mac in Mac Remote. Add keyboard and settings shortcuts with the medium widget.")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular])
         .disfavoredLocations([.iPhoneWidgetsOnMac], for: [.systemSmall, .systemMedium])
     }
@@ -45,10 +45,10 @@ private struct ConnectWidgetView: View {
             Image(systemName: "display")
                 .font(.title2)
                 .widgetAccentable()
-                .accessibilityLabel("Connect to Mac in TailView")
+                .accessibilityLabel("Connect to Mac in Mac Remote")
         case .accessoryRectangular:
             VStack(alignment: .leading, spacing: 2) {
-                Label("TailView", systemImage: "display").font(.headline)
+                Label("Mac Remote", systemImage: "display").font(.headline)
                 Text("Connect to Mac").font(.caption)
             }
         case .systemMedium:
@@ -79,7 +79,7 @@ private struct ConnectWidgetView: View {
                     .foregroundStyle(.white.opacity(0.65))
             }
             Spacer(minLength: 4)
-            Text("TailView")
+            Text("Mac Remote")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.white.opacity(0.65))
             Text("Connect to Mac")
@@ -93,7 +93,7 @@ private struct ConnectWidgetView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("TailView. Connect to your saved Mac.")
+        .accessibilityLabel("Mac Remote. Connect to your saved Mac.")
     }
 
     private func shortcut(_ title: String, symbol: String, route: WidgetRoute) -> some View {
@@ -106,7 +106,7 @@ private struct ConnectWidgetView: View {
                 .padding(.horizontal, 12)
                 .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 14))
         }
-        .accessibilityLabel("Open TailView \(title)")
+        .accessibilityLabel("Open Mac Remote \(title)")
     }
 }
 

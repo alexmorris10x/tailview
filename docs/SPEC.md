@@ -1,10 +1,10 @@
-# TailView blueprint
+# Mac Remote blueprint (formerly TailView)
 
 Version 1, 2026-10-30. Owner: Alex. Update this file when features, pricing, permissions, or distribution change.
 
 ## 1. The product in one minute
 
-TailView lets an iPhone or iPad view and control the owner's Mac over Tailscale, with Mac sound and optional microphone return. It is for people who need to return to a running Mac app away from the keyboard. The Mac host is free; iOS is a free download with a seven-day trial and a $9.99 US one-time permanent unlock. Both sides use Apache 2.0 source. Public release is in preparation, not approved or available merely because an App Store record exists.
+Mac Remote (formerly TailView; renamed for App Store search on 2026-11-07, shipping in iOS 1.0.1) lets an iPhone or iPad view and control the owner's Mac over Tailscale, with Mac sound and optional microphone return. It is for people who need to return to a running Mac app away from the keyboard. The Mac host is free; iOS is a free download with a seven-day trial and a $9.99 US one-time permanent unlock. Both sides use Apache 2.0 source. Public release is in preparation, not approved or available merely because an App Store record exists.
 
 ## 2. Premise and hook
 
@@ -42,7 +42,7 @@ macOS 14+ host, iOS/iPadOS 17+ viewer, Tailscale on both, TCP 47820 bound to Tai
 
 ## 8. Brand and look
 
-TailView uses the violet-screen/pointer icon, native SwiftUI controls, and plain labels such as **Start sharing**, **Pair Mac**, and **Start 7-day free trial**. The website's device illustration is labeled as an illustration, not an app screenshot.
+The app is named **Mac Remote**: App Store name "Mac Remote Desktop & Control", subtitle "Control your Mac from iPhone", home-screen and in-app name "Mac Remote", and the free Mac companion is also "Mac Remote". Bundle IDs, product IDs, keychain items, code identifiers and the repo keep `tailview` so pairings and purchases carry over; the Debug build stays TailView Dev. Store copy mentions Tailscale only as "works with Tailscale". It uses the violet-screen/pointer icon, native SwiftUI controls, and plain labels such as **Start sharing**, **Pair Mac**, and **Start 7-day free trial**. The website's device illustration is labeled as an illustration, not an app screenshot.
 
 ## 9. Rules for anyone changing it
 
@@ -58,10 +58,11 @@ Sharing starts only after Mac consent; remote control also requires explicit con
 | Pointer, keyboard, modifiers, text paste, window controls | Implemented behind consent | `ControlInjector.swift`, `RemoteKeyboardInput.swift`, `ViewerView.swift` |
 | One audio owner, Mac sound, optional microphone/route recovery | Implemented | `AudioRoutingController.swift`, `AudioSink.swift`, `ViewerModel.swift` |
 | Widgets, Live Activity, advanced display controls | Implemented with OS limits | `LiveActivity/`, `LiveControls/`, `MacHost/DisplayControl/` |
+| App Store rating request: when the third remote session lasting 2+ minutes ends with the app in front, at most once per app version; never over the purchase, trial or expired-access screens | Implemented (1.0.1) | `IOSViewer/ReviewPrompt.swift`, `ViewerView.swift` |
 
 ## 11. Screens
 
-Mac setup shows Tailscale, Screen Recording, **Start sharing**, control consent, optional audio routing, and paired-device revocation. iOS setup permits **Pair Mac** before access purchase. **TailView Access** contains trial, localized permanent price, and **Restore Purchases**. The connected viewer has the remote screen, toolbar, and audio controls; Settings owns consent, automatic audio, and lock-screen preferences. The keyboard button remains tappable when control is unavailable: it offers explicit device consent or explains the Mac control and Accessibility requirements. Keyboard focus resumes after settings and purchase sheets, and the button reflects the visible software keyboard.
+Mac setup shows Tailscale, Screen Recording, **Start sharing**, control consent, optional audio routing, and paired-device revocation. iOS setup permits **Pair Mac** before access purchase. **Mac Remote Access** contains trial, localized permanent price, and **Restore Purchases**. The connected viewer has the remote screen, toolbar, and audio controls; Settings owns consent, automatic audio, and lock-screen preferences. The keyboard button remains tappable when control is unavailable: it offers explicit device consent or explains the Mac control and Accessibility requirements. Keyboard focus resumes after settings and purchase sheets, and the button reflects the visible software keyboard.
 
 ## 12. Quality bar
 

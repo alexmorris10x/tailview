@@ -101,8 +101,8 @@ final class ViewerModel: ObservableObject {
     /// Retries and audio stopped after the background grace period; still
     /// reconnecting, so returning to the foreground resumes both.
     private var reconnectPaused = false
-    private static let pausedStatus = "Paused – open TailView to reconnect"
-    private static let pausedAudioStatus = "Paused until TailView reconnects"
+    private static let pausedStatus = "Paused – open Mac Remote to reconnect"
+    private static let pausedAudioStatus = "Paused until Mac Remote reconnects"
     private var engine: AVAudioEngine?
     private var macAudioPlayer: AVAudioPlayerNode?
     private var inputTapInstalled = false
@@ -237,8 +237,8 @@ final class ViewerModel: ObservableObject {
                 self.reconnectBackoff.restartBackgroundGrace()
                 DiagnosticLog.note("Audio interruption ended; shouldResume: \(AVAudioSession.InterruptionOptions(rawValue: rawOptions).contains(.shouldResume)), connected: \(self.isConnected), waiting for user: \(self.audioInterrupted)")
                 if self.audioInterrupted {
-                    self.microphoneStatus = "Return to TailView or tap Mic to resume audio"
-                    self.macAudioStatus = "Return to TailView or tap Speaker to resume audio"
+                    self.microphoneStatus = "Return to Mac Remote or tap Mic to resume audio"
+                    self.macAudioStatus = "Return to Mac Remote or tap Speaker to resume audio"
                 } else if self.isConnected {
                     self.scheduleAudioRouteRecovery()
                 } else { self.keepAudioRunning() }
@@ -321,7 +321,7 @@ final class ViewerModel: ObservableObject {
         streamAccess.update(allowed: allowed, expiresAt: expiresAt)
         if !streamAccess.permits(), isConnected || isReconnecting {
             disconnect()
-            status = "Start your trial or unlock TailView to view your Mac"
+            status = "Start your trial or unlock Mac Remote to view your Mac"
         }
     }
 
@@ -400,7 +400,7 @@ final class ViewerModel: ObservableObject {
         if case .pair = credential {
             // Save and verify a Mac before the customer starts a trial.
         } else if !streamAccess.permits() {
-            status = "Start your trial or unlock TailView to view your Mac"
+            status = "Start your trial or unlock Mac Remote to view your Mac"
             return
         }
         guard host.hasPrefix("100."),
@@ -749,7 +749,7 @@ final class ViewerModel: ObservableObject {
                 DispatchQueue.main.async {
                     guard self.connection === connection else { return }
                     self.disconnect()
-                    self.status = "Your trial has ended. Unlock TailView to reconnect."
+                    self.status = "Your trial has ended. Unlock Mac Remote to reconnect."
                 }
                 return
             }
@@ -1152,11 +1152,11 @@ final class ViewerModel: ObservableObject {
         case .microphone:
             if microphoneWanted { stopMicrophone() }
             else if !background { startMicrophone() }
-            else { microphoneStatus = "Open TailView to turn on the microphone" }
+            else { microphoneStatus = "Open Mac Remote to turn on the microphone" }
         case .macSound:
             if macAudioWanted { stopMacAudio() }
             else if !background { startMacAudio() }
-            else { macAudioStatus = "Open TailView to turn on Mac sound" }
+            else { macAudioStatus = "Open Mac Remote to turn on Mac sound" }
         case .function:
             setFunctionLatched(!functionHeld)
         case .returnKey:

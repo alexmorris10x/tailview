@@ -81,7 +81,7 @@ private enum StatusText {
     static let staleSymbol = "display"
 
     static func text(_ context: ActivityViewContext<TailViewControlsAttributes>) -> String {
-        context.isStale ? "Not running – open TailView" : context.state.status
+        context.isStale ? "Not running – open Mac Remote" : context.state.status
     }
 }
 

@@ -47,7 +47,7 @@ final class LocalInputController {
         guard isAccessibilityTrusted else {
             requestAccessibilityPermission()
             throw DisplayControlError.unavailable(
-                "Allow TailView Mac under System Settings → Privacy & Security → Accessibility, then try again."
+                "Allow Mac Remote under System Settings → Privacy & Security → Accessibility, then try again."
             )
         }
 
@@ -64,7 +64,7 @@ final class LocalInputController {
             userInfo: opaqueSelf
         ) else {
             throw DisplayControlError.unavailable(
-                "macOS did not allow the input shield. Confirm TailView Mac has Accessibility permission and relaunch it."
+                "macOS did not allow the input shield. Confirm Mac Remote has Accessibility permission and relaunch it."
             )
         }
 
