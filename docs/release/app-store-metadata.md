@@ -8,7 +8,7 @@ Not yet in App Store Connect. The app is renamed for search; bundle IDs, product
 
 - **Name (en-US):** Mac Remote Desktop & Control
 - **Subtitle (en-US):** Control your Mac from iPhone
-- **Home-screen name:** Mac Remote (Release `CFBundleDisplayName`; the Debug build stays TailView Dev). The free Mac companion is also called Mac Remote; its 1.0 download still installs as TailView Mac until its next release.
+- **Home-screen name:** Mac Remote (Release `CFBundleDisplayName`; the Debug build stays TailView Dev). The free Mac companion is also called Mac Remote; its 1.0.1 download ([v1.0.1-mac](https://github.com/alexmorris10x/tailview/releases/tag/v1.0.1-mac), 2026-11-08) installs as Mac Remote.
 - **Keywords (en-US):** unchanged, `vnc,screen,sharing,mouse,keyboard,trackpad,access,ipad,audio,tailnet,viewer,away,host,wireguard`
 - **es-MX:** keep the 1.0 values below unless they are revisited.
 - Tailscale appears only as "works with Tailscale" in descriptive text, never in the name.

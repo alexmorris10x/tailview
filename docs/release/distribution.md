@@ -21,6 +21,8 @@ export TAILVIEW_NOTARY_PROFILE='tailview-notary'
 ./scripts/package-mac-release.sh
 ```
 
+On Alex's Mac, the system proxy (PAC) sends `timestamp.apple.com` through the local Proton browser proxy, which rejects the signing timestamp request (HTTP 405), so `codesign` fails with "The timestamp service is not available". The 1.0.1 release (8 Nov 2026) ran this script unchanged with a scratch-only `codesign` shim on `PATH` that pointed `--timestamp` at a loopback HTTP relay to `http://timestamp.apple.com` (loopback stays direct under the PAC); leave the proxy itself alone. Notarization used the team's `deploy-link-notary` Keychain profile.
+
 `--check` only validates local prerequisites. It does not authenticate the notary profile, build, upload, or establish that notarization will succeed. A normal run checks Mac capacity and creates an isolated folder below `~/Developer/builds/agent-scratch/tailview-release/`. `TAILVIEW_RELEASE_ROOT` may choose another task folder under `~/Developer/builds`; synced folders and external disks are refused. No existing installed app is replaced. A failed signing/notary/Gatekeeper check is a failed public package, not a file to upload anyway.
 
 The packaging script deliberately gives TailView no executable entitlements: the non-sandboxed Mac host currently needs none beyond user-granted privacy permissions. Revisit that assumption if adding XPC services, a sandbox, or helper code. The script strips any development provisioning profile only from its staging copy. It includes `LICENSE` and `NOTICE` beside the app in the disk image; Tailscale and BlackHole are not included.
