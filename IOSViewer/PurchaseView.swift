@@ -109,6 +109,16 @@ struct PurchaseView: View {
                 } footer: {
                     Text("Restore with the Apple Account used for the original purchase. A restored trial keeps its original end date.")
                 }
+
+                Section {
+                    Link(destination: ContactAlex.telegramURL) {
+                        Label(ContactAlex.telegramTitle, systemImage: "paperplane")
+                    }
+                    .accessibilityIdentifier("tailview.purchase.telegram")
+                    Link(destination: ContactAlex.supportURL) {
+                        Label("Support", systemImage: "questionmark.circle")
+                    }
+                }
             }
             .navigationTitle("Mac Remote Access")
             .navigationBarTitleDisplayMode(.inline)

@@ -66,6 +66,7 @@
 		D0FFBA182CEF11EA7E2B83FF /* TailViewLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A71C9FC0005F131FD296CD8 /* TailViewLiveActivity.swift */; };
 		D20370E87626F559368764CA /* HostConsent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B309862429D525BDD5E80883 /* HostConsent.swift */; };
 		D532889CD858A358B807E9A4 /* WidgetRoute.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E45CCA9A1613ABA49A4D08 /* WidgetRoute.swift */; };
+		D7B6960B5F556D3A31BBFF1D /* ContactAlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08765F299AA19E5E64287864 /* ContactAlex.swift */; };
 		D9390B02DD5827C455F4AF49 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E5A80FDF0A7FD3053DAFD449 /* PrivacyInfo.xcprivacy */; };
 		DA64E87A02CB711247AFB317 /* ScreenViewport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DA8D3782FF731E1D29A215E /* ScreenViewport.swift */; };
 		E2DFF6483803B3259FC63E0D /* PurchaseAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 004D45BFCF918F6B9E149628 /* PurchaseAccess.swift */; };
@@ -122,6 +123,7 @@
 /* Begin PBXFileReference section */
 		0032B5D9347A208B3846F4D4 /* TailViewScreenshotUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = TailViewScreenshotUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		004D45BFCF918F6B9E149628 /* PurchaseAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchaseAccess.swift; sourceTree = "<group>"; };
+		08765F299AA19E5E64287864 /* ContactAlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactAlex.swift; sourceTree = "<group>"; };
 		0A23F41D19D9DFDAED35CE03 /* ModifierSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierSelection.swift; sourceTree = "<group>"; };
 		0B0C94E51C0739995CBF94FF /* PendingTaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingTaps.swift; sourceTree = "<group>"; };
 		10FF7F32DFFF47F40DA40EF3 /* TailViewMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TailViewMacApp.swift; sourceTree = "<group>"; };
@@ -321,6 +323,7 @@
 			isa = PBXGroup;
 			children = (
 				2ED200EAE69D0972F6653D93 /* Assets.xcassets */,
+				08765F299AA19E5E64287864 /* ContactAlex.swift */,
 				590D18DC9D63B20A1C6CD689 /* DevAssets.xcassets */,
 				46D423DC3388C7632ABFA92C /* DiagnosticLog.swift */,
 				FFAD381F1F4B2EF73F5FED87 /* Info.plist */,
@@ -622,6 +625,7 @@
 				8BBE9A9B25D7BE58A16B7F6F /* AudioConnectionGate.swift in Sources */,
 				A783C36DF12F342C9E17E7BC /* AudioJitterBuffer.swift in Sources */,
 				17E89A8D1680C25DA85BD166 /* AuthenticationReply.swift in Sources */,
+				D7B6960B5F556D3A31BBFF1D /* ContactAlex.swift in Sources */,
 				3D9E247C83C7A00EB103EDF0 /* ControlCommand.swift in Sources */,
 				3A5EA7D320A37B0FA8568E20 /* DiagnosticLog.swift in Sources */,
 				55FA5B9A380E2C6BD8A38909 /* LiveControls.swift in Sources */,
@@ -739,7 +743,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "AppIcon-Dev";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -759,7 +763,7 @@
 			buildSettings = {
 				APP_DISPLAY_NAME = "Mac Remote Controls";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -800,7 +804,7 @@
 			buildSettings = {
 				APP_DISPLAY_NAME = "TailView Controls Dev";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				INFOPLIST_FILE = LiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1016,7 +1020,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 64;
+				CURRENT_PROJECT_VERSION = 65;
 				EXCLUDED_SOURCE_FILE_NAMES = DevAssets.xcassets;
 				INFOPLIST_FILE = IOSViewer/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

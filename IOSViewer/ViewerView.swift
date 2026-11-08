@@ -680,6 +680,7 @@ struct ViewerView: View {
                         PurchaseView(access: access, embedded: true)
                     }
                 }
+                ContactAlexSection(access: access)
                 Section("Connection") {
                     Text(viewer.status)
                     if viewer.isConnected || viewer.isReconnecting {
@@ -756,8 +757,6 @@ struct ViewerView: View {
                 }
                 Section("Help") {
                     Link("Setup and troubleshooting", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
-                    Link("Privacy", destination: URL(string: "https://alexmorris10x.github.io/tailview/privacy.html")!)
-                    Link("Support", destination: URL(string: "https://alexmorris10x.github.io/tailview/support.html")!)
                     Text("Mac Remote \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
