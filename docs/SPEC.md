@@ -60,6 +60,7 @@ Sharing starts only after Mac consent; remote control also requires explicit con
 | Widgets, Live Activity, advanced display controls | Implemented with OS limits | `LiveActivity/`, `LiveControls/`, `MacHost/DisplayControl/` |
 | App Store rating request: when the third remote session lasting 2+ minutes ends with the app in front, at most once per app version; never over the purchase, trial or expired-access screens | Implemented (1.0.1) | `IOSViewer/ReviewPrompt.swift`, `ViewerView.swift` |
 | Contact Alex (app standard part 9): Settings › Support is the second section, with "Tell me anything: a bug, a wish, a complaint. I read every message and ship fixes fast.", **Message Alex on Telegram** (https://t.me/alexmorris10x), a copyable Support ID (StoreKit `appTransactionID` on iOS 18.4+, else the original ID of the first purchase; hidden when neither exists), **Copy Support Details** (app, version and build, iOS, device model, purchase state, Support ID), Support and Privacy Policy. Mac Remote Access carries the same Telegram link beside Support | Implemented (1.0.1, build 65) | `IOSViewer/ContactAlex.swift`, `ViewerView.swift`, `PurchaseView.swift` |
+| Getting the Mac app: with no saved Mac, setup step 2 "Get the free Mac app" offers **Send Mac Download Link** (share sheet: AirDrop, Messages, Mail to your Mac), **Copy Link** and the setup guide. The link is `mac.html`, one page with the Download for Mac button (the current notarized DMG), three steps and the Tailscale note; `setup.html` step 2 has the same button | Implemented (1.0.1, build 66) | `IOSViewer/ViewerView.swift`, `docs/site/mac.html`, `docs/site/setup.html` |
 
 ## 11. Screens
 
@@ -76,7 +77,7 @@ A fresh setup must pair without spending trial time, disclose each permission, a
 | Dev/production; XcodeGen | Separate identities and schemes; implemented |
 | Payments | Direct StoreKit non-consumables; deliberate exception to subscription defaults |
 | Internal accounts; transactional email | No account or email backend; Dev access is not customer revenue |
-| Public page | Live on GitHub Pages; notarized Mac download published; App Store link pending |
+| Public page | Live on GitHub Pages; notarized Mac download published (`mac.html` is the page to send to a Mac; update its DMG link with each Mac release); App Store link pending |
 | Analytics; feedback pass; waitlist | No tracking SDK or waitlist; explicit free trial supplies evaluation access |
 | Referrals; affiliates | Not now |
 | Blueprint and backlog | This file and TODO are canonical |

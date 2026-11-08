@@ -19,6 +19,7 @@ struct ViewerView: View {
     @State private var showPairing = false
     @State private var showSettings = false
     @State private var showPurchase = false
+    @State private var macLinkCopied = false
     @State private var showControlHelp = false
     @State private var automaticConnection = true
     @State private var didRunDebugLaunch = false
@@ -354,6 +355,9 @@ struct ViewerView: View {
         .background(Color(uiColor: .systemBackground))
     }
 
+    /// One page with the Mac download button, meant to be opened on the Mac.
+    static let macDownloadURL = URL(string: "https://alexmorris10x.github.io/tailview/mac.html")!
+
     private var setupSteps: some View {
         VStack(alignment: .leading, spacing: 16) {
             Label("1. Connect both devices to Tailscale", systemImage: "network")
@@ -361,11 +365,30 @@ struct ViewerView: View {
             Text("Sign in to the same Tailscale network on this device and your Mac. Mac Remote only connects through that private network.")
                 .font(.subheadline).foregroundStyle(.secondary)
             Link("Get Tailscale", destination: URL(string: "https://tailscale.com/download")!)
-            Label("2. Set up the free Mac companion", systemImage: "desktopcomputer")
+            Label("2. Get the free Mac app", systemImage: "desktopcomputer")
                 .font(.headline)
-            Text("On your Mac, open Mac Remote, enable sharing, and allow Screen Recording. Enable remote control and microphone routing only if you want them.")
+            Text("Send the download link to your Mac, open it there and install Mac Remote. Then turn on sharing and allow Screen Recording.")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Link("Mac download and setup", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
+            ShareLink(
+                item: Self.macDownloadURL,
+                subject: Text("Mac Remote for Mac"),
+                message: Text("Open this on your Mac to download the free Mac Remote app.")
+            ) {
+                Label("Send Mac Download Link", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier("tailview.send-mac-link")
+            HStack(spacing: 16) {
+                Button {
+                    UIPasteboard.general.url = Self.macDownloadURL
+                    macLinkCopied = true
+                } label: {
+                    Label(macLinkCopied ? "Link Copied" : "Copy Link", systemImage: macLinkCopied ? "checkmark" : "doc.on.doc")
+                }
+                Link("Setup guide", destination: URL(string: "https://alexmorris10x.github.io/tailview/setup.html")!)
+            }
+            .font(.subheadline)
             Label("3. Pair before you start your trial", systemImage: "link")
                 .font(.headline)
             Text("Choose Pair a New Device on the Mac, then enter its Tailscale address and temporary code below. Your seven days start only when you choose Start Trial.")

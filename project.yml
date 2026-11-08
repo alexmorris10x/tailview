@@ -39,7 +39,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios
         MARKETING_VERSION: "1.0.1"
-        CURRENT_PROJECT_VERSION: 65
+        CURRENT_PROJECT_VERSION: 66
         APP_DISPLAY_NAME: Mac Remote
         TAILVIEW_URL_SCHEME: tailview
         INFOPLIST_FILE: IOSViewer/Info.plist
@@ -69,7 +69,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.10x.tailview.ios.LiveActivity
         MARKETING_VERSION: "1.0.1"
-        CURRENT_PROJECT_VERSION: 65
+        CURRENT_PROJECT_VERSION: 66
         APP_DISPLAY_NAME: Mac Remote Controls
         INFOPLIST_FILE: LiveActivity/Info.plist
         CODE_SIGN_STYLE: Automatic
