@@ -11,6 +11,7 @@ struct ViewerView: View {
     @AppStorage("alignScreenToTop") private var alignScreenToTop = false
     @AppStorage("reverseScrollDirection") private var reverseScrollDirection = false
     @AppStorage("microphoneOnConnect") private var microphoneOnConnect = false
+    @AppStorage(MicInput.iPhoneOnlyKey) private var iPhoneMicOnly = false
     @AppStorage("remoteControlConsent") private var remoteControlConsent = false
     @AppStorage("macAudioOnConnect") private var macAudioOnConnect = true
     @AppStorage("lockScreenControls") private var lockScreenControls = true
@@ -754,6 +755,10 @@ struct ViewerView: View {
                 }
                 Section("Microphone") {
                     Toggle("Connect microphone automatically", isOn: $microphoneOnConnect)
+                    Toggle("Always use iPhone microphone", isOn: $iPhoneMicOnly)
+                        .onChange(of: iPhoneMicOnly) { _, _ in viewer.applyMicrophoneInputChoice() }
+                    Text("Off: the microphone iOS picks sends to the Mac, such as your AirPods when they're connected. On: the iPhone's own microphone always sends.")
+                        .font(.caption).foregroundStyle(.secondary)
                     Text("Sends this device’s microphone to the Mac. This requires microphone permission here and optional BlackHole setup and consent on the Mac.")
                         .font(.caption).foregroundStyle(.secondary)
                     Text(viewer.microphoneStatus)

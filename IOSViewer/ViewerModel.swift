@@ -1058,8 +1058,11 @@ final class ViewerModel: ObservableObject {
             // A2DP permits Bluetooth output while the built-in mic is active.
             // Without defaultToSpeaker, starting the mic switches an iPhone's
             // playback to its quiet receiver. Headphones still take precedence.
+            // Unless iPhone-only is on, HFP lets AirPods or another headset
+            // be the microphone.
             try session.setCategory(.playAndRecord, mode: .default,
-                                    options: [.allowBluetoothA2DP, .defaultToSpeaker, .mixWithOthers])
+                                    options: [.allowBluetoothA2DP, .defaultToSpeaker, .mixWithOthers]
+                                        .union(MicInput.bluetoothOptions))
             // iOS silences haptics while recording unless the session allows
             // them; the fn hold confirms itself with one.
             try session.setAllowHapticsAndSystemSoundsDuringRecording(true)
@@ -1365,6 +1368,13 @@ final class ViewerModel: ObservableObject {
         scheduleAudioRouteRecovery()
     }
 
+    /// Settings › Always use iPhone microphone changed: restart a running
+    /// capture so the new input applies now.
+    func applyMicrophoneInputChoice() {
+        guard isMicrophoneOn else { return }
+        restartMicrophone(reason: "Switching microphone input")
+    }
+
     /// The microphone is unmuted but no voice is being sent: another device
     /// owns audio, or capture is waiting, failed, or restarting.
     var microphoneNeedsAttention: Bool {
@@ -1502,9 +1512,7 @@ final class ViewerModel: ObservableObject {
             macAudioGeneration &+= 1
             macAudioPlayer?.stop()
             queuedMacAudioFrames = 0
-            if let builtInMicrophone = session.availableInputs?.first(where: { $0.portType == .builtInMic }) {
-                try session.setPreferredInput(builtInMicrophone)
-            }
+            MicInput.applyPreferredInput(session)
             let outputRouteName = session.currentRoute.outputs.first?.portName ?? "Unknown output"
             inputRouteName = (session.currentRoute.inputs.first?.portName ?? "Unknown input") + " → " + outputRouteName
             #if DEBUG
@@ -1864,5 +1872,23 @@ final class ViewerModel: ObservableObject {
             case .testRecordingFailed: "Could not start a temporary diagnostic recording"
             }
         }
+    }
+}
+
+/// Settings › Microphone. Off (default): the microphone iOS picks sends to the
+/// Mac (AirPods or another headset when connected). On: the iPhone's built-in
+/// microphone always sends, even with a headset connected.
+enum MicInput {
+    static let iPhoneOnlyKey = "iPhoneMicrophoneOnly"
+    static var iPhoneOnly: Bool { UserDefaults.standard.bool(forKey: iPhoneOnlyKey) }
+    static var bluetoothOptions: AVAudioSession.CategoryOptions {
+        if iPhoneOnly { return [] }
+        if #available(iOS 26.0, *) { return [.allowBluetoothHFP, .bluetoothHighQualityRecording] }
+        return [.allowBluetooth]
+    }
+    /// Call after setting the category: pins the built-in mic, or leaves the choice to iOS.
+    static func applyPreferredInput(_ session: AVAudioSession) {
+        let builtIn = iPhoneOnly ? session.availableInputs?.first { $0.portType == .builtInMic } : nil
+        try? session.setPreferredInput(builtIn)
     }
 }
