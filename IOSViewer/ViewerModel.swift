@@ -1061,7 +1061,7 @@ final class ViewerModel: ObservableObject {
             // Unless iPhone-only is on, HFP lets AirPods or another headset
             // be the microphone.
             try session.setCategory(.playAndRecord, mode: .default,
-                                    options: [.allowBluetoothA2DP, .defaultToSpeaker, .mixWithOthers]
+                                    options: AVAudioSession.CategoryOptions([.allowBluetoothA2DP, .defaultToSpeaker, .mixWithOthers])
                                         .union(MicInput.bluetoothOptions))
             // iOS silences haptics while recording unless the session allows
             // them; the fn hold confirms itself with one.
